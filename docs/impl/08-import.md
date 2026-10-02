@@ -1,7 +1,7 @@
 # 08 — Importing Songs (Implementation)
 
 > **Document type: Implementation.** Step 2 of [SPEC.md §10](../SPEC.md#10-suggested-build-order), slice 2C.
-> Status: **Proposed** (draft 2026-10-02). Items marked **[P-xx]** are decisions listed in the [index](README.md#4-proposed-decisions).
+> Status: **Approved** 2026-10-03 (drafted 2026-10-02; Spec Gate and adversarial review round 3 done). Items marked **[P-xx]** are decisions listed in the [index](README.md#4-proposed-decisions).
 
 ## 1. Scope
 
