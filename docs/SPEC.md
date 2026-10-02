@@ -53,6 +53,9 @@ One user may hold several roles. Multimedia team is a team-member role for now; 
 - Create a liturgy for a date and service from a template; items are copied in and can then be added, removed, reordered, or edited freely without affecting the template.
 - Each liturgy has a **language**: the service's main language (e.g. `id` for the Indonesian service, `zh-Hans` for the Mandarin service), taken from the template. Content is entered in that language; parallel text comes later (see 6).
 - Support more than one service on the same date.
+- **Services.** A church defines its regular services once: name, language, default template, and one or more weekly times (any weekday, e.g. "Ibadah Umum 1: Sunday 07:00", "Persekutuan Doa: Wednesday 19:00", "Ibadah Pemuda: Saturday 17:00 and Sunday 15:00").
+- **Prepare next week.** The user picks a week; the app lists every scheduled service occurrence in it with date and time, all ticked by default. Unticking skips one; one click creates a liturgy for each, from the service's template and in its language.
+- **One-off services** (e.g. Christmas Eve, Good Friday) are created individually with any name, date and template. A liturgy keeps a copy of its service name, so renaming a service doesn't change past liturgies.
 - For each item, attach content depending on type:
   - **Song:** link one or more songs from the library; several songs in one item form a medley, sung in order. For each song, build its **sequence**: which sections are sung and in what order, with repeats allowed (e.g. V1, Chorus, V2, Chorus, Chorus). Choosing a song fills the sequence from the song's default arrangement, or all verses in order if it has none; the liturgist then edits it freely.
     - Each entry in the sequence can name **who sings it** (e.g. Semua, Pemandu, Jemaat, Pria, Wanita, Paduan Suara), chosen from a list each church configures.
@@ -112,6 +115,18 @@ Draft ──submit──▶ In Review ──approve──▶ Approved ──publ
 - **Mobile-friendly web view** of a published liturgy, shareable by link, plus a "my assignments" view for each team member.
 - **Open decision:** layout of the PDF. Get GKY Citragarden's current liturgy document as the reference design.
 
+### 5.7 First-time experience
+- **Setup wizard** (the setup page from the decisions log): church name and first admin (name, email or phone, password); default language; default Bible translation; time zone (WIB, WITA or WIT); key display ("Do = G" or "G"); regular services. Everything can be changed later in settings.
+- **Seeded defaults**, created as normal editable data in the church's default language:
+  - role types (e.g. Liturgis, Pemandu Pujian, Pemusik, Pembaca Alkitab, Pengkhotbah, Multimedia, Kolektan);
+  - singing parts (Semua, Pemandu, Jemaat, Pria, Wanita, Paduan Suara);
+  - translation names only, no text (e.g. TB, TB2, BIS, CUV, KJV, WEB);
+  - a starter template "Ibadah Minggu" with item titles only and no default texts (votum words are often Bible text, which can't be shipped); a Mandarin version if Mandarin is chosen. The order is to be aligned with GKY Citragarden's real order of service.
+- **Onboarding checklist** on the church admin's dashboard until done or dismissed: invite your team; import your songs; check your template; create next week's liturgies.
+- **Helpful empty screens:** every empty list explains what to do next with direct actions (e.g. an empty song library offers EasyWorship import, paste lyrics, add a song).
+- **Team member welcome:** after accepting an invite, team members land on "Tugas saya" (my assignments) with a short welcome and simple steps to add the app to the home screen on Android and iPhone.
+- **No sample data** in installs (almost all Indonesian hymn lyrics are copyrighted).
+
 ## 6. Out of scope for MVP (but design for it)
 
 - Presentation slides / export to PowerPoint, Google Slides, OpenLP, or a built-in presenter. *(Keep lyrics sectioned and content separate from formatting so this is just another renderer.)*
@@ -122,19 +137,23 @@ Draft ──submit──▶ In Review ──approve──▶ Approved ──publ
 - Lectionary integration.
 - AI-assisted import (a language model turning messy documents into structured songs). *(Later, opt-in only: bring-your-own API key, or a SaaS service used only with the church's explicit consent, because it sends church content to an outside service. It would be another `Importer`.)*
 - Importing past liturgies as history. *(Not planned; songs matter far more than old services.)*
+- Monthly service patterns (e.g. Holy Communion on the first Sunday). *(MVP: weekly times only; create these as one-off services or pick a different template when preparing that week.)*
+- A public demo site run by Brightfellow, so people can try the app before installing.
 
 ## 7. Data model sketch
 
 Starting point, not final. Refine as needed.
 
-- **Church**: id, name, default_language, default_translation_id, settings (incl. key display format: "Do = G" or "G") *(slug is SaaS-only; see 8.1.1)*
+- **Church**: id, name, default_language, default_translation_id, time_zone (e.g. `Asia/Jakarta`), settings (incl. key display format: "Do = G" or "G") *(slug is SaaS-only; see 8.1.1)*
 - **ChurchSlugRedirect**: old_slug, church_id *(SaaS-only, and only if slug renaming is allowed; see 8.1.1)*
 - **User**: id, name, email?, phone?, password_hash *(platform-wide, no church_id; at least one of email or phone; each is unique across the platform)*
 - **Membership**: id, user_id, church_id, roles *(roles apply per church; a user may belong to several churches)*
 - **RoleType**: id, church_id, name (e.g. "Pemandu Pujian", "Pemusik")
 - **Template**: id, church_id, name, language
+- **Service**: id, church_id, name, language, default_template_id
+- **ServiceTime**: id, service_id, weekday, time *(one or more per service)*
 - **TemplateItem**: id, template_id, position, title, item_type, default_text, default_role_type_id
-- **Liturgy**: id, church_id, date, service_name, language, template_id (origin), state, version, archived_at (null = active), archived_by, created_by, timestamps
+- **Liturgy**: id, church_id, date, service_id? (null for one-off services), service_name (copy), time?, language, template_id (origin), state, version, archived_at (null = active), archived_by, created_by, timestamps
 - **LiturgyItem**: id, liturgy_id, position, title, item_type, reading_id?, text?, version *(songs are attached through `LiturgyItemSong`)*
 - **LiturgyItemSong**: id, liturgy_item_id, position, song_id, key?, note? *(several per item = medley)*
 - **SequenceEntry**: id, liturgy_item_song_id, position, kind (MVP: `section` only; later `instrumental`, `spoken`, …), song_section_id?, singing_part_id?, key_change?, note?
@@ -255,7 +274,8 @@ Limit names are constants defined in one place, next to feature names. Self-host
 1. **What counts.** Every liturgy that is not archived counts, in any state (Draft, In Review, Needs Revision, Approved, Published), past or upcoming, and whether it was created from a template or from scratch. Each service counts separately when a date has several.
 2. **Archiving frees a slot.** Users with the liturgist or church admin role can archive a **Published** liturgy. Archiving is a manual action; the app never archives anything automatically. Archived liturgies are kept in full, are never deleted by the limit, and **remain viewable read-only on every plan**, including PDF export. Archiving manages slots and clutter; it does not take a church's history away.
 3. **Deleting unpublished liturgies frees a slot.** Users with the liturgist or church admin role can delete any liturgy that is not yet Published (Draft, In Review, Needs Revision, Approved), with a confirmation step. Deletion removes the liturgy with its items, assignments and comments. Published liturgies cannot be deleted, only archived.
-4. **Creation is blocked at the limit.** Creating a new liturgy (from a template, from scratch, or by duplicating) when the church is at the limit is blocked with a message offering the ways forward: upgrade, archive a published liturgy, or delete an unpublished one. The message should list the oldest published liturgies with a one-click archive action, so a church can continue in seconds.
+4. **Creation is blocked at the limit.** Creating a new liturgy (from a template, from scratch, by duplicating, or through "Prepare next week") when the church is at the limit is blocked with a message offering the ways forward: upgrade, archive a published liturgy, or delete an unpublished one. The message should list the oldest published liturgies with a one-click archive action, so a church can continue in seconds.
+   - **"Prepare next week" at the limit:** the list shows how many of the week's liturgies fit within both limits. When the week needs more slots than are free, it offers one button: "Archive last week's N published liturgies and create these N" (only Published liturgies, only for liturgist or church admin). The user can instead untick extras, or archive or delete other liturgies first. Archiving still happens only when the user presses the button; nothing is archived automatically.
 5. **Restoring needs a slot.** Unarchiving a liturgy makes it count again, so it is only allowed when the church is under the limit.
 6. **Existing work is never blocked.** Editing, reviewing, approving, publishing, viewing, and exporting liturgies that already exist are never affected by the limit; only creating new ones is.
 7. **Downgrades are gentle.** If a church on a paid plan drops to free while over the limit, nothing is archived or locked automatically. The church simply cannot create new liturgies until it archives enough to get under the limit.
@@ -266,7 +286,7 @@ Limit names are constants defined in one place, next to feature names. Self-host
 1. **What counts.** Every non-archived liturgy in an unpublished state: Draft, In Review, Needs Revision, or Approved. Counting all unpublished states (not only Draft) prevents working around the limit by moving liturgies into review.
 2. **Both limits apply.** An unpublished liturgy counts toward both `max_unpublished_liturgies` and `max_active_liturgies`. Creating a liturgy requires a free slot in both.
 3. **Freeing a slot.** Publishing a liturgy frees an unpublished slot (it still counts as active). Deleting an unpublished liturgy frees a slot in both limits.
-4. **Blocked creation message** explains which limit was reached. When it is the unpublished limit, list the unpublished liturgies with their state so the user can finish or delete one.
+4. **Blocked creation message** explains which limit was reached (also in "Prepare next week", per liturgy that doesn't fit). When it is the unpublished limit, list the unpublished liturgies with their state so the user can finish or delete one.
 5. **Why 4:** a church with one weekly service can plan about a month ahead; a church with several services per Sunday can prepare the next Sunday fully plus some upcoming ones. It sits below the active limit of 7, leaving room for at least 3 published liturgies to stay active for reference.
 6. Downgrades follow the same gentle rule as above: nothing is deleted or locked; creation is blocked until the church is under the limit.
 
@@ -279,7 +299,7 @@ Limit names are constants defined in one place, next to feature names. Self-host
 5. Existing members are never removed or locked out automatically, including after a downgrade; new invites are simply blocked until the count is under the limit.
 6. Church settings show usage (e.g. "9 of 12 team members").
 
-**Tests:** counting across all states and multiple services per date; blocked creation via every creation path (template, scratch, duplicate) for each limit separately; archive only allowed for Published and only by permitted roles; delete only allowed for unpublished liturgies and only by permitted roles; archived liturgies viewable and exportable on the free plan; unarchive blocked at the limit; existing liturgies fully usable at and over the limit; downgrade behavior; blocked member invites; team-member count includes every role and pending invites but not free-text assignees; accepting a reserved invite never fails; expired, cancelled or removed entries free a slot.
+**Tests:** counting across all states and multiple services per date; blocked creation via every creation path (template, scratch, duplicate, "Prepare next week") for each limit separately; "Prepare next week" shows correctly how many liturgies fit and creates none beyond the limits; the combined archive-and-create button archives only Published liturgies, only for permitted roles, and only when pressed; archive only allowed for Published and only by permitted roles; delete only allowed for unpublished liturgies and only by permitted roles; archived liturgies viewable and exportable on the free plan; unarchive blocked at the limit; existing liturgies fully usable at and over the limit; downgrade behavior; blocked member invites; team-member count includes every role and pending invites but not free-text assignees; accepting a reserved invite never fails; expired, cancelled or removed entries free a slot.
 
 ### 8.3 Self-host operations
 
@@ -409,3 +429,6 @@ Record resolved decisions here (date, decision, reason). Move items from section
 | 2026-10-02 | Operations basics: `/healthz` and `/readyz`; `slog` logs with request IDs and no personal data; disk-space warnings, with backups checking for space first; a system page for church admins; releases with semantic versions, release notes and signed checksums | Gives volunteers visibility without command-line skills; keeps logs safe under UU PDP |
 | 2026-10-02 | Importing content: an `Importer` port; paste and split (with Indonesian, English and Chinese section labels), OpenLyrics and ChordPro in the MVP; EasyWorship 6/7 (version to be confirmed with the pilot church; OpenLP's importer plus OpenLyrics as the fallback route) and `.pptx` for the pilot; `.docx`, spreadsheets and other formats later. File imports go through a review step (`ImportBatch`, `ImportCandidate`) with duplicate detection by hymnal number or normalised title; accepted candidates are saved through the normal use cases | An empty library is the biggest hurdle to adoption; the pilot church is assumed to use EasyWorship and PowerPoint, and EasyWorship already holds lyrics split into sections |
 | 2026-10-02 | AI-assisted import is a later, opt-in option only (bring-your-own key, or a SaaS service with the church's explicit consent). Past liturgies are not imported as history | AI extraction sends church content to an outside service and must not be required for self-hosting; old services add little value compared with songs |
+| 2026-10-02 | First-time experience: a setup wizard (church and first admin, default language, default translation, time zone, key display, regular services); seeded editable defaults in the church's language (role types, singing parts, translation names without text, a starter template with titles only, to be aligned with GKY's order of service); an onboarding checklist and helpful empty screens; a team-member welcome on "Tugas saya" with home-screen instructions. No sample data in installs; a public demo site later | A church should reach its first real liturgy quickly without help; Bible text and hymn lyrics can't be shipped as defaults or samples |
+| 2026-10-02 | Services: a church defines regular services (`Service`: name, language, default template) with one or more weekly times on any weekday (`ServiceTime`). "Prepare next week" lists all scheduled occurrences and creates the ticked ones in one click. One-off services are created individually. Liturgies keep a copy of the service name. Monthly patterns are later | Most services repeat weekly, but not only on Sundays and sometimes on several days; preparing a whole week at once saves the most time |
+| 2026-10-02 | "Prepare next week" respects the free-plan limits: it shows how many liturgies fit, and when more slots are needed it offers one explicit button, "Archive last week's N published liturgies and create these N". Automatic archiving was considered and rejected | Nearly as convenient as auto-archiving while keeping the earlier decision that nothing is archived automatically and the church stays in control; only relevant to the SaaS free plan (community installs are unlimited) |
