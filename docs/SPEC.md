@@ -125,6 +125,7 @@ Draft ──submit──▶ In Review ──approve──▶ Approved ──publ
   - **Credits:** each song's copyright line under the song in the team version and the published view (on by default; a church setting can turn it off; not on the musician sheet), and an optional licence footer with the church's licence numbers (e.g. "CCLI License #1234567").
   - **Production:** a print view of the published liturgy, styled for print, printed or saved as PDF through the browser. Song headings are kept with their first section, and sections are not split across pages where possible. Server-side PDF (Typst) comes later, for booklets and an exact match with the reference layout.
 - **Mobile-friendly web view** of a published liturgy, shareable by link, plus a "my assignments" view for each team member.
+- **Reading mode** (MVP) on the published view, for reading or leading from a phone during the service: large text in one column, high contrast, menus hidden; the viewer's own items highlighted, with a "Go to my part" button; a keep-screen-on toggle (browser Wake Lock API); works offline through the PWA cache.
 - **Open decision:** layout of the PDF. Get GKY Citragarden's current liturgy document as the reference design.
 
 - **WhatsApp messages** (MVP; no WhatsApp API, no cost, no setup). After publishing, the app offers ready-made texts:
@@ -182,6 +183,13 @@ Draft ──submit──▶ In Review ──approve──▶ Approved ──publ
 - **Team member welcome:** after accepting an invite, team members land on "Tugas saya" (my assignments) with a short welcome and simple steps to add the app to the home screen on Android and iPhone.
 - **No sample data** in installs (almost all Indonesian hymn lyrics are copyrighted).
 
+### 5.8 Accessibility and older volunteers
+Many readers, elders and liturgists are older, use mid-range Android phones with large system text, and sometimes read from a phone at the lectern.
+- **Text size:** the UI uses relative sizes (no fixed pixel sizes) and works with the phone's text size at 200%. An in-app control (A · A+ · A++) on the published view and "Tugas saya" is saved to the person's account, so it follows them to a new phone.
+- **Simpler navigation** for people who are only team members (no editing roles): just "Tugas saya" (my assignments) and "Liturgi" (published liturgies); no admin menus or empty editor screens.
+- **General rules:** tap targets of at least 48 px; buttons labelled with words, not icons alone; plain Indonesian (e.g. "Tambahkan ke layar utama", never "PWA" or "sync"); dark mode follows the phone's setting.
+- Reading mode is described in 5.6.
+
 ## 6. Out of scope for MVP (but design for it)
 
 - Presentation slides / export to PowerPoint, Google Slides, OpenLP, or a built-in presenter. *(Keep lyrics sectioned and content separate from formatting so this is just another renderer.)*
@@ -203,7 +211,7 @@ Starting point, not final. Refine as needed.
 
 - **Church**: id, name, default_language, default_translation_id, time_zone (e.g. `Asia/Jakarta`), logo_file? (stored through `Storage`), settings (incl. key display format: "Do = G" or "G", print defaults, church licences such as a CCLI licence number, and whether credit lines are shown) *(slug is SaaS-only; see 8.1.1)*
 - **ChurchSlugRedirect**: old_slug, church_id *(SaaS-only, and only if slug renaming is allowed; see 8.1.1)*
-- **User**: id, name, email?, phone?, password_hash *(platform-wide, no church_id; at least one of email or phone; each is unique across the platform)*
+- **User**: id, name, email?, phone?, password_hash, preferences (text size, UI language) *(platform-wide, no church_id; at least one of email or phone; each is unique across the platform)*
 - **Membership**: id, user_id, church_id, roles *(roles apply per church; a user may belong to several churches)*
 - **RoleType**: id, church_id, name (e.g. "Pemandu Pujian", "Pemusik")
 - **Template**: id, church_id, name, language
@@ -271,6 +279,7 @@ e.g. https://liturgist.brightfellow.net/gky-citragarden/liturgies/2026-10-11
 
 - **UI language:** Indonesian first, with i18n from the start (English as second locale).
 - **Mobile-friendly:** team members will mostly open links on phones.
+- **Accessibility:** WCAG 2.2 AA as the target, checked automatically with axe in the Playwright tests (see 5.8).
 - **No bundled copyrighted content** (lyrics, Bible text).
 - Apache-2.0 license headers/notice per repository convention.
 - Tests for workflow state transitions and permissions at minimum.
@@ -492,3 +501,4 @@ Record resolved decisions here (date, decision, reason). Move items from section
 | 2026-10-02 | WhatsApp messages in the MVP (community `Notifier`): a team summary (Copy, Share to WhatsApp via `wa.me/?text=`), personal messages per assigned person (Send via WhatsApp via `wa.me/<phone>?text=`), and a change summary after republishing (diff against the previous `PublishedVersion`). Content: titles, hymnal numbers, keys, reading references, assignments and the link; never lyrics or Bible text; checkboxes for songs, keys and readings. WhatsApp `*bold*` and plain URLs only. Friendly tone with the person's name, avoiding "kamu" or "Bapak/Ibu". Editable message templates, automatic sending, reminders and email notifications come later | WhatsApp is how Indonesian church teams communicate; wa.me links give most of the value with no API, cost or setup; copyrighted text stays behind login |
 | 2026-10-02 | Print formats in the MVP: team version and musician sheet; A4 and F4 / Folio paper; options for lyrics (full or first lines), reading text, assignments, keys and notes, and text size, with church defaults; header with church name, optional logo (stored through `Storage`), service, date and time. Produced with print styling in the browser. Congregation version, "my part" and A5 booklets come later (booklets need server-side Typst plus a booklet step). The exact layout still waits for open decision 3 | F4 is common in Indonesian churches and easy to forget; the musician sheet costs almost nothing from the same data; booklets can't be produced reliably by browsers |
 | 2026-10-02 | Song copyright: `Song.author` is split into lyricist, composer and translator, and songs gain copyright holder, copyright line, CCLI song number and licence status (unknown, public domain, covered by church licence, permission obtained), keeping free-text notes; the library can filter by status. Church licences (e.g. CCLI number) live in settings, with an optional licence footer on prints. Credit lines appear under songs in the team version and published view, on by default. `PublishedVersion` stores the credits as published. A usage report CSV is in the MVP. Licence status never blocks publishing or printing | Licences usually require credit lines and usage reporting; translations of old hymns are separate copyrighted works; the app records and reports but doesn't police, because it can't know a church's agreements |
+| 2026-10-02 | Older volunteers and accessibility: the UI follows the phone's text size (works at 200%), plus an A · A+ · A++ control saved to the account (`User.preferences`). Reading mode in the MVP: large text in one column, high contrast, the viewer's own items highlighted with "Go to my part", a keep-screen-on toggle (Wake Lock), offline through the PWA. People who are only team members see just "Tugas saya" and "Liturgi". WCAG 2.2 AA as the target with automated axe checks; tap targets of at least 48 px, labelled buttons, plain Indonesian, dark mode following the phone | Many team members are older and read from phones at the lectern; these are cheap to build in from the start and expensive to retrofit |
