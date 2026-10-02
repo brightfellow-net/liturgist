@@ -112,6 +112,12 @@ Draft ──submit──▶ In Review ──approve──▶ Approved ──publ
 
 ### 5.6 Outputs
 - **Printable PDF** of the official liturgy document, rendered from the data.
+- **Print formats** (MVP):
+  - **Variants:** the **team version** (the official liturgy document: every item, who leads it, lyrics with sequences and singing parts, reading text, keys and notes, the assignments list) and the **musician sheet** (one compact page: each song with hymnal number, key and key changes, sequence, singing parts and notes; no full lyrics, or first lines only).
+  - **Paper sizes:** A4 and F4 / Folio (215 × 330 mm).
+  - **Options:** lyrics in full or first lines only; reading text on or off; assignments, keys and notes shown or hidden; normal or large text. The church sets defaults; the person printing can change them.
+  - **Header:** church name, optional church logo (uploaded in settings, stored through `Storage`), service, date and time.
+  - **Production:** a print view of the published liturgy, styled for print, printed or saved as PDF through the browser. Song headings are kept with their first section, and sections are not split across pages where possible. Server-side PDF (Typst) comes later, for booklets and an exact match with the reference layout.
 - **Mobile-friendly web view** of a published liturgy, shareable by link, plus a "my assignments" view for each team member.
 - **Open decision:** layout of the PDF. Get GKY Citragarden's current liturgy document as the reference design.
 
@@ -182,12 +188,14 @@ Draft ──submit──▶ In Review ──approve──▶ Approved ──publ
 - Importing past liturgies as history. *(Not planned; songs matter far more than old services.)*
 - Monthly service patterns (e.g. Holy Communion on the first Sunday). *(MVP: weekly times only; create these as one-off services or pick a different template when preparing that week.)*
 - A public demo site run by Brightfellow, so people can try the app before installing.
+- More print variants: a **congregation version** (lyrics and responses, no team names, keys or notes; printing lyrics for the congregation also depends on the church's licences) and **"my part"** (only what one person reads or says).
+- **A5 booklets** (A4 folded, pages reordered for folding). *(Needs server-side PDF: Typst plus a booklet step, e.g. `pdfcpu`, to be checked. Until then, churches can use their printer driver's booklet option.)*
 
 ## 7. Data model sketch
 
 Starting point, not final. Refine as needed.
 
-- **Church**: id, name, default_language, default_translation_id, time_zone (e.g. `Asia/Jakarta`), settings (incl. key display format: "Do = G" or "G") *(slug is SaaS-only; see 8.1.1)*
+- **Church**: id, name, default_language, default_translation_id, time_zone (e.g. `Asia/Jakarta`), logo_file? (stored through `Storage`), settings (incl. key display format: "Do = G" or "G", and print defaults) *(slug is SaaS-only; see 8.1.1)*
 - **ChurchSlugRedirect**: old_slug, church_id *(SaaS-only, and only if slug renaming is allowed; see 8.1.1)*
 - **User**: id, name, email?, phone?, password_hash *(platform-wide, no church_id; at least one of email or phone; each is unique across the platform)*
 - **Membership**: id, user_id, church_id, roles *(roles apply per church; a user may belong to several churches)*
@@ -476,3 +484,4 @@ Record resolved decisions here (date, decision, reason). Move items from section
 | 2026-10-02 | Services: a church defines regular services (`Service`: name, language, default template) with one or more weekly times on any weekday (`ServiceTime`). "Prepare next week" lists all scheduled occurrences and creates the ticked ones in one click. One-off services are created individually. Liturgies keep a copy of the service name. Monthly patterns are later | Most services repeat weekly, but not only on Sundays and sometimes on several days; preparing a whole week at once saves the most time |
 | 2026-10-02 | "Prepare next week" respects the free-plan limits: it shows how many liturgies fit, and when more slots are needed it offers one explicit button, "Archive last week's N published liturgies and create these N". Automatic archiving was considered and rejected | Nearly as convenient as auto-archiving while keeping the earlier decision that nothing is archived automatically and the church stays in control; only relevant to the SaaS free plan (community installs are unlimited) |
 | 2026-10-02 | WhatsApp messages in the MVP (community `Notifier`): a team summary (Copy, Share to WhatsApp via `wa.me/?text=`), personal messages per assigned person (Send via WhatsApp via `wa.me/<phone>?text=`), and a change summary after republishing (diff against the previous `PublishedVersion`). Content: titles, hymnal numbers, keys, reading references, assignments and the link; never lyrics or Bible text; checkboxes for songs, keys and readings. WhatsApp `*bold*` and plain URLs only. Friendly tone with the person's name, avoiding "kamu" or "Bapak/Ibu". Editable message templates, automatic sending, reminders and email notifications come later | WhatsApp is how Indonesian church teams communicate; wa.me links give most of the value with no API, cost or setup; copyrighted text stays behind login |
+| 2026-10-02 | Print formats in the MVP: team version and musician sheet; A4 and F4 / Folio paper; options for lyrics (full or first lines), reading text, assignments, keys and notes, and text size, with church defaults; header with church name, optional logo (stored through `Storage`), service, date and time. Produced with print styling in the browser. Congregation version, "my part" and A5 booklets come later (booklets need server-side Typst plus a booklet step). The exact layout still waits for open decision 3 | F4 is common in Indonesian churches and easy to forget; the musician sheet costs almost nothing from the same data; booklets can't be produced reliably by browsers |
