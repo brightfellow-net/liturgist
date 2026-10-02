@@ -53,7 +53,7 @@ type IDGenerator interface{ New() domain.ID }         // ULID, monotonic within 
 - Platform-level questions that cross churches go through `Users()`, never through `ForChurch`: `Users().MembershipChurchIDs(ctx, userID)` (used by `GET /me`, the admin-reset rule in [03 §9](03-identity-auth.md#9-password-reset), and accepting invites as an existing user).
 - Use cases never see `*sql.DB`, `*sql.Tx` or SQL.
 - Repository methods take and return `domain` types. Repository interfaces are defined in `app`, next to the use cases that need them.
-- **Retries (the only authoritative list):** `Tx.Write` re-runs the whole `fn` when the driver reports PostgreSQL `40001` (serialisation failure) or `40P01` (deadlock), or SQLite `SQLITE_BUSY` after the busy timeout. At most **3 attempts**, waiting 10 ms, 50 ms, then 250 ms (each ±50 % jitter) between them; waiting stops immediately if `ctx` is cancelled. After the last failed attempt the error becomes `app.ErrUnavailable` → 503 `unavailable`. `Tx.Read` retries the same errors the same way.
+- **Retries (the only authoritative list):** `Tx.Write` re-runs the whole `fn` when the driver reports PostgreSQL `40001` (serialisation failure) or `40P01` (deadlock), or SQLite `SQLITE_BUSY` after the busy timeout. At most **3 attempts**, waiting 10 ms after the first and 50 ms after the second (each ±50 % jitter); waiting stops immediately if `ctx` is cancelled. After the last failed attempt the error becomes `app.ErrUnavailable` → 503 `unavailable`. `Tx.Read` retries the same errors the same way.
 - **Retry-safe use cases:** `fn` must have no side effects outside the transaction (no network calls, no sent messages, no cookies). IDs and timestamps may be generated inside `fn`; only values from the **committed** attempt are ever returned, logged or put in cookies, so values from failed attempts are never visible.
 - **Deadlines:** `Tx.Write` and `Tx.Read` derive a context with a **10-second** deadline from the caller's; when it expires or the request is cancelled, the transaction rolls back. PostgreSQL connections set `statement_timeout = 5s` and `idle_in_transaction_session_timeout = 15s`. Expensive work (password hashing) is never done inside a transaction ([03 §5](03-identity-auth.md#5-login-and-throttling)).
 
@@ -138,6 +138,7 @@ Both SQLite (3.35+) and PostgreSQL support `ON CONFLICT … DO UPDATE` and `RETU
 | Use-case tests | SQLite **file in `t.TempDir()`** **[P-12]** | `sqlstoretest.NewSQLite(t)` returns a store on a copy of a migrated template; one per test; runs in parallel |
 | Template for SQLite tests | One migrated file per test package | Created once (guarded by `sync.Once`) in a package-level temp folder by `sqlstoretest`; each test copies it (`io.Copy`, ~1 ms) and opens the copy with the production pools; the template folder is removed in `TestMain` |
 | Repository contract tests | SQLite always; PostgreSQL when `LITURGIST_TEST_POSTGRES=1` **[P-29]** | `storetest.Run(t, factory)` runs the same suite against each dialect |
+| Harness clean-up | Packages using `sqlstoretest` call it from `TestMain`: `func TestMain(m *testing.M) { os.Exit(sqlstoretest.Main(m)) }`, which removes the SQLite template and stops the container | — |
 | PostgreSQL provisioning | testcontainers-go, image `postgres:17-alpine` | One container per `go test` package run; each test gets a fresh database created from a migrated template (`CREATE DATABASE t_x TEMPLATE liturgist_template`) |
 
 - A temp file (not `:memory:`) is used so tests exercise the same two pools, WAL mode and locking as production. In-memory databases are per connection (writer and readers would see different data), sharing them needs SQLite's shared-cache mode with table-level locks, and they can't use WAL. **[P-12]** amends the decisions-log wording "in-memory".
@@ -162,7 +163,7 @@ The dialect translates driver errors into `app` errors:
 | Busy / serialisation | `SQLITE_BUSY` after timeout | `40001`, `40P01` | retried by `Tx.Write` (3×), then `app.ErrUnavailable` |
 | Connection failure | open/IO error | connection error | `app.ErrUnavailable` |
 
-Constraint names are identical in both migrations (e.g. `users_email_key`) so mapping by name works for both.
+Constraint names are identical in both migrations (e.g. `users_email_key`) so mapping by name works for both. PostgreSQL reports the constraint name directly. SQLite reports the **columns** for ordinary unique constraints (`UNIQUE constraint failed: users.email`), so the SQLite dialect keeps a small table from columns to constraint names, filled in with each migration that adds a unique constraint; partial unique indexes are reported by index name and need no entry.
 
 ## 9. Anti-patterns (DO NOT)
 

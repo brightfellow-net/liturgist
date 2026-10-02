@@ -29,9 +29,12 @@ func testConfig(t *testing.T, base string, logBuf *bytes.Buffer) Config {
 		logBuf = &bytes.Buffer{}
 	}
 	return Config{
-		Listen:  "127.0.0.1:0",
-		BaseURL: u,
-		Logger:  slog.New(slog.NewJSONHandler(logBuf, nil)),
+		Listen:      "127.0.0.1:0",
+		BaseURL:     u,
+		DataDir:     t.TempDir(),
+		DBDriver:    "sqlite",
+		AutoMigrate: true,
+		Logger:      slog.New(slog.NewJSONHandler(logBuf, nil)),
 	}
 }
 
@@ -41,6 +44,7 @@ func testHandler(t *testing.T, cfg Config, opts ...Option) http.Handler {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { _ = srv.Close() })
 	return srv.Handler()
 }
 

@@ -32,6 +32,7 @@ type Config struct {
 	DBMaxConns            int // PostgreSQL pool size; 0 = 10
 	DBMaxReaders          int // SQLite reader pool size; 0 = 4
 	AutoMigrate           bool
+	AllowNewerSchema      bool // --allow-newer-schema: only skips the refusal to start (02 §5.1)
 	RequirePreUpgradeCopy bool
 	SessionTTL            time.Duration
 	SessionMaxAge         time.Duration

@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/brightfellow-net/liturgist/adapters/sqlstore"
 	"github.com/danielgtaylor/huma/v2"
 )
 
@@ -32,20 +33,30 @@ func WithRoutes(fn func(api huma.API)) Option {
 // Server is a configured Liturgist HTTP server.
 type Server struct {
 	cfg     Config
+	db      *sqlstore.DB
 	handler http.Handler
 }
 
-// New builds the server. The context is reserved for start-up work (database, migrations) in later slices.
-func New(_ context.Context, cfg Config, opts ...Option) (*Server, error) {
+// New opens the database, checks or migrates the schema, and builds the HTTP handler.
+func New(ctx context.Context, cfg Config, opts ...Option) (*Server, error) {
 	var o options
 	for _, opt := range opts {
 		opt(&o)
 	}
-	h, err := newHandler(cfg, o, nil)
+	db, mo, err := openDB(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
-	return &Server{cfg: cfg, handler: h}, nil
+	if err := prepareSchema(ctx, cfg, db, mo); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	h, err := newHandler(cfg, o, readyCheck(db, mo))
+	if err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	return &Server{cfg: cfg, db: db, handler: h}, nil
 }
 
 // Handler returns the server's root HTTP handler.
@@ -82,8 +93,8 @@ func (s *Server) Run(ctx context.Context) error {
 	return nil
 }
 
-// Close releases resources. Database handles arrive in slice 2.
-func (s *Server) Close() error { return nil }
+// Close closes the database.
+func (s *Server) Close() error { return s.db.Close() }
 
 // OpenAPI returns the OpenAPI document without opening a database (liturgist openapi).
 func OpenAPI(opts ...Option) ([]byte, error) {

@@ -2,6 +2,11 @@ version: "2"
 linters:
   enable: [depguard, errorlint, gosec, misspell, revive, unconvert]
   settings:
+    errcheck:
+      exclude-functions: # CLI output to stdout/stderr; nothing useful to do on failure
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
     depguard:
       rules:
         domain:
