@@ -206,7 +206,9 @@ func (s *Server) Run(ctx context.Context) error {
 		Addr:              s.cfg.Listen,
 		Handler:           s.handler,
 		ReadHeaderTimeout: 10 * time.Second,
-		BaseContext:       func(net.Listener) context.Context { return ctx },
+		// Requests keep ctx's values but not its cancellation: on SIGTERM,
+		// requests in flight must finish (IT-F-004), within Shutdown's limit.
+		BaseContext: func(net.Listener) context.Context { return context.WithoutCancel(ctx) },
 	}
 	errc := make(chan error, 1)
 	go func() { errc <- srv.ListenAndServe() }()

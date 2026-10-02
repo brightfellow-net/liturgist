@@ -6,6 +6,7 @@ package app_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"sync"
 	"testing"
@@ -105,6 +106,48 @@ func TestLogin(t *testing.T) {
 	if _, err := e2.login("budi@example.org", password, "203.0.113.5"); err != nil {
 		t.Errorf("lock must end after 15 min: %v", err)
 	}
+}
+
+// TC-A-005 edge cases: the identifier and IP counters, and the window.
+func TestLoginThrottleEdges(t *testing.T) {
+	var many *app.TooManyAttemptsError
+	t.Run("identifier across IPs", func(t *testing.T) {
+		e := newEnv(t, nil)
+		for i := range 50 { // one failure per address: no identifier+IP counter reaches 5
+			_, _ = e.login("budi@example.org", "wrong password!", fmt.Sprintf("198.51.100.%d", i+1))
+		}
+		if _, err := e.login("budi@example.org", password, "203.0.113.5"); !errors.As(err, &many) || many.RetryAfter != time.Hour {
+			t.Errorf("51st attempt from a new IP must be locked for 1 h: %v", err)
+		}
+		e.clock.add(time.Hour + time.Second)
+		if _, err := e.login("budi@example.org", password, "203.0.113.5"); err != nil {
+			t.Errorf("lock must end after 1 h: %v", err)
+		}
+	})
+	t.Run("IP across identifiers", func(t *testing.T) {
+		e := newEnv(t, nil)
+		for i := range 100 {
+			_, _ = e.login(fmt.Sprintf("guess%d@example.org", i), "wrong password!", "203.0.113.5")
+		}
+		if _, err := e.login("budi@example.org", password, "203.0.113.5"); !errors.As(err, &many) || many.RetryAfter != 15*time.Minute {
+			t.Errorf("the IP must be locked for everyone: %v", err)
+		}
+		if _, err := e.login("budi@example.org", password, "198.51.100.7"); err != nil {
+			t.Errorf("other IP must still work: %v", err)
+		}
+	})
+	t.Run("failures 16 minutes apart", func(t *testing.T) {
+		e := newEnv(t, nil)
+		for i := range 8 { // 4 failures, 16 min later 4 more: never 5 in one window
+			if i == 4 {
+				e.clock.add(16 * time.Minute)
+			}
+			_, _ = e.login("budi@example.org", "wrong password!", "203.0.113.5")
+		}
+		if _, err := e.login("budi@example.org", password, "203.0.113.5"); err != nil {
+			t.Errorf("failures outside the 15-min window must not lock: %v", err)
+		}
+	})
 }
 
 func TestLoginMalformedIdentifierIsCounted(t *testing.T) {
