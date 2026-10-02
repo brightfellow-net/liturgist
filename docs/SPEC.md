@@ -10,7 +10,7 @@
 - **License:** Apache-2.0
 - **Distribution model:** free, self-hostable software first; later a paid hosted SaaS on brightfellow.net subdomains for churches that don't want to self-host.
 - **Pilot church:** GKY Citragarden (Indonesia).
-- **Owner:** Hutomo, professional software engineer (C/C++ background, comfortable with low-level systems work).
+- **Owner:** Hutomo, professional software engineer.
 
 ## 2. The problem
 
@@ -47,27 +47,38 @@ One user may hold several roles. Multimedia team is a team-member role for now; 
 - A church defines reusable templates: an ordered list of liturgy items (e.g. Votum & Salam, Pujian, Pembacaan Alkitab, Doa Syafaat, Khotbah, Persembahan, Berkat).
 - Each template item has: title, item type (song, reading, prayer, sermon, free text, other), optional default text, optional default role.
 - Multiple templates per church (regular Sunday, Holy Communion, special services).
+- Each template has a **language** (e.g. a Mandarin template has Mandarin item titles), defaulting to the church's default language.
 
 ### 5.2 Weekly liturgy
 - Create a liturgy for a date and service from a template; items are copied in and can then be added, removed, reordered, or edited freely without affecting the template.
+- Each liturgy has a **language**: the service's main language (e.g. `id` for the Indonesian service, `zh-Hans` for the Mandarin service), taken from the template. Content is entered in that language; parallel text comes later (see 6).
 - Support more than one service on the same date.
 - For each item, attach content depending on type:
-  - **Song:** link to a song in the library, choose which sections/verses are sung and in what order.
+  - **Song:** link one or more songs from the library; several songs in one item form a medley, sung in order. For each song, build its **sequence**: which sections are sung and in what order, with repeats allowed (e.g. V1, Chorus, V2, Chorus, Chorus). Choosing a song fills the sequence from the song's default arrangement, or all verses in order if it has none; the liturgist then edits it freely.
+    - Each entry in the sequence can name **who sings it** (e.g. Semua, Pemandu, Jemaat, Pria, Wanita, Paduan Suara), chosen from a list each church configures.
+    - Each song in the item has a **key** (defaulting to the song's default key), and any entry can carry a **key change** (e.g. up a half step before the last chorus). Keys are shown as "Do = G" by default; a church setting can switch to "G".
+    - Optional free-text notes on each song in the item (e.g. "tempo lambat") and on each entry (e.g. "2x").
+    - Non-lyric entries (intro, instrumental interlude, spoken lines) are not in the MVP; the model leaves room for them.
   - **Reading:** Bible reference (book, chapter, verse range) linked to a stored reading text.
   - **Other:** free text.
 - Assign team members to roles for this liturgy (liturgist, worship leader, musicians, readers, multimedia, etc.). Role names are configurable per church.
+- **Several people editing at once.** The liturgy and each item carry a version; every change states the version it was based on. The server rejects a change only when that same item (or, for reordering and state changes, the liturgy) changed in the meantime; the editor then shows "changed meanwhile", reloads that item and keeps the user's own text so it can be re-applied. Other people's changes appear live, and the editor shows who else is editing (e.g. "Budi is also editing").
+- **Undo/redo** is per person: Ctrl+Z undoes your own latest change, and is refused with a clear message if someone has since changed that item. The history is stored per liturgy and visible to everyone editing it.
 
 ### 5.3 Song library
 - Per-church library. **The app ships with no lyrics.** Each church enters its own.
-- Song fields: title, alternative titles, hymnal source and number (e.g. KJ 1, PKJ 12, NKB 5), author/composer, default key, copyright/license notes.
-- Lyrics are stored **as ordered sections** (verse 1, verse 2, chorus, bridge…), not one text block. This is required so slides can be generated later.
-- Search by title, hymnal number, and lyric text.
+- Song fields: title, alternative titles, hymnal source and number (e.g. KJ 1, PKJ 12, NKB 5), author/composer, default key, copyright/license notes, and an optional **default arrangement** (the usual order of sections, e.g. V1, PC, C, V2, PC, C, B, C, C).
+- Lyrics are stored **as ordered sections** (verse 1, verse 2, chorus, bridge…), not one text block. This is required so slides can be generated later. Each section has a kind (verse, pre-chorus, chorus, bridge, tag, intro, ending, other) and, for verses, a number.
+- A section cannot be deleted while an unpublished liturgy uses it. Published liturgies are unaffected because they keep their own copy (`PublishedVersion`).
+- Each song has a **language**. The same hymn in another language is a separate song (its own hymnal number, sections, verse count and licence notes), linked to its other-language versions through a song group, so they can be found together and paired up for parallel text later.
+- Search by title, hymnal number, and lyric text. Chinese text is searched by substring matching (Chinese has no spaces between words, so full-text search can't find words inside a line); Indonesian and English use full-text search. Both sit behind the search interface.
 - Usage history: which liturgies used this song (useful for planning and future license reporting).
 
 ### 5.4 Readings
 - **The app ships with no Bible text.** Modern Indonesian translations (e.g. LAI Terjemahan Baru) are copyrighted.
 - MVP approach: user enters a reference and pastes the text once; the app stores it keyed by reference + translation and reuses it next time the same reference is chosen.
 - **Reference parser.** Users type references the way Indonesian churches write them, e.g. "Yoh 3:16-21", "Kej. 1:1–2:3", "Mzm 23", with Indonesian book names and common abbreviations (Kej, Kel, Im, Bil, Ul, … Mat, Mrk, Luk, Yoh, Kis, Rm, …). The parser stores them in a standard form using standard book codes (e.g. `JHN 3:16-21`), so the same passage is recognised however it was typed and any provider can look it up. English and Mandarin book names come later. Different verse numbering between translations is allowed for in the design but not handled in the MVP.
+- **Translations** are records with a code, name and language (e.g. `TB` → `id`, `CUV` → `zh-Hans`), so a reading's language follows from its translation.
 - **Default translation.** Each church sets a default translation (TB for the pilot), used when a reading is added; it can be changed per reading.
 - **Attribution.** Each stored reading carries an attribution line (e.g. the copyright notice required by the publisher), shown on the published view and in the PDF.
 - Keep the text source pluggable (`BibleTextProvider`, see 8.2) so a licensed API, imported Bible files or public-domain translations can be added later. Each provider result states its source, its attribution line, and whether the text may be stored.
@@ -82,6 +93,7 @@ Draft ──submit──▶ In Review ──approve──▶ Approved ──publ
 ```
 
 - Liturgist and administrator can comment on a **specific liturgy item**, not just the liturgy as a whole. Comments can be resolved.
+- Only **Draft** and **Needs Revision** liturgies can be edited. **In Review** is read-only apart from comments; to change anything, the reviewer requests changes (→ Needs Revision).
 - Approved and Published liturgies are locked. Editing after approval requires explicitly reopening it (back to Draft), and this should be recorded.
 - Keep a simple history of state changes (who, when).
 
@@ -94,8 +106,8 @@ Draft ──submit──▶ In Review ──approve──▶ Approved ──publ
 
 - Presentation slides / export to PowerPoint, Google Slides, OpenLP, or a built-in presenter. *(Keep lyrics sectioned and content separate from formatting so this is just another renderer.)*
 - WhatsApp or email notifications. *(A copyable text summary of the published liturgy is a cheap MVP stand-in if time allows.)*
-- Multilingual parallel text (e.g. Indonesian + Mandarin/English side by side). *(Avoid assumptions that each item has exactly one language.)*
-- Hosted SaaS operations: billing, plans, signup, church onboarding. *(Only the entitlement stub in 8.2 is in MVP scope.)* *(The tenancy and URL structure in section 8.1 is in scope from the start, so the SaaS needs no rework later.)*
+- Multilingual parallel text (e.g. Indonesian + Mandarin/English side by side) and pinyin under Chinese lyrics. *(Avoid assumptions that each item has exactly one language. The MVP model leaves room: liturgies, templates and songs carry a language; songs in different languages are linked through a song group; readings refer to a translation with a language. Parallel text later adds secondary-language text alongside the existing single-language content. Until then, bilingual singing uses a medley of the linked language versions.)*
+- Hosted SaaS operations: billing, plans, signup, church onboarding. *(Only the entitlement stub in 8.2 is in MVP scope.)* *(The community tenancy foundation in 8.1 is in scope from the start, so the SaaS needs no rework later; multi-church hosting itself (8.1.1) is SaaS-only.)*
 - Volunteer rostering, availability, rotation.
 - Lectionary integration.
 
@@ -103,21 +115,27 @@ Draft ──submit──▶ In Review ──approve──▶ Approved ──publ
 
 Starting point, not final. Refine as needed.
 
-- **Church**: id, slug (unique, URL-safe), name, default_translation, settings
-- **ChurchSlugRedirect**: old_slug, church_id *(only needed if slug renaming is allowed; see 8.1)*
+- **Church**: id, name, default_language, default_translation_id, settings (incl. key display format: "Do = G" or "G") *(slug is SaaS-only; see 8.1.1)*
+- **ChurchSlugRedirect**: old_slug, church_id *(SaaS-only, and only if slug renaming is allowed; see 8.1.1)*
 - **User**: id, name, email?, phone?, password_hash *(platform-wide, no church_id; at least one of email or phone; each is unique across the platform)*
 - **Membership**: id, user_id, church_id, roles *(roles apply per church; a user may belong to several churches)*
 - **RoleType**: id, church_id, name (e.g. "Pemandu Pujian", "Pemusik")
-- **Template**: id, church_id, name
+- **Template**: id, church_id, name, language
 - **TemplateItem**: id, template_id, position, title, item_type, default_text, default_role_type_id
-- **Liturgy**: id, church_id, date, service_name, template_id (origin), state, archived_at (null = active), archived_by, created_by, timestamps
-- **LiturgyItem**: id, liturgy_id, position, title, item_type, song_id?, song_section_order?, reading_id?, text?
+- **Liturgy**: id, church_id, date, service_name, language, template_id (origin), state, version, archived_at (null = active), archived_by, created_by, timestamps
+- **LiturgyItem**: id, liturgy_id, position, title, item_type, reading_id?, text?, version *(songs are attached through `LiturgyItemSong`)*
+- **LiturgyItemSong**: id, liturgy_item_id, position, song_id, key?, note? *(several per item = medley)*
+- **SequenceEntry**: id, liturgy_item_song_id, position, kind (MVP: `section` only; later `instrumental`, `spoken`, …), song_section_id?, singing_part_id?, key_change?, note?
 - **Assignment**: id, liturgy_id, user_id (or free-text name for non-users), role_type_id
-- **Song**: id, church_id, title, alt_titles, hymnal_source, hymnal_number, author, default_key, license_notes
-- **SongSection**: id, song_id, position, label (Verse 1, Chorus…), text
-- **Reading**: id, church_id, reference (standard form, e.g. `JHN 3:16-21`), reference_display (as typed, e.g. "Yoh 3:16-21"), translation, text, attribution, source_provider *(unique per church + standard reference + translation)*
+- **Song**: id, church_id, song_group_id?, language, title, alt_titles, hymnal_source, hymnal_number, author, default_key, license_notes, default_arrangement? (ordered list of section ids)
+- **SongSection**: id, song_id, position, kind (verse, pre_chorus, chorus, bridge, tag, intro, ending, other), number?, label (Verse 1, Chorus…), text
+- **SingingPart**: id, church_id, name (e.g. Semua, Pemandu, Jemaat, Pria, Wanita, Paduan Suara; seeded with defaults, editable per church)
+- **Reading**: id, church_id, reference (standard form, e.g. `JHN 3:16-21`), reference_display (as typed, e.g. "Yoh 3:16-21"), translation_id, text, attribution, source_provider *(unique per church + standard reference + translation)*
+- **Translation**: id, code (e.g. `TB`, `CUV`), name, language *(language codes are BCP 47: `id`, `zh-Hans`, `zh-Hant`, `en`)*
+- **SongGroup**: id, church_id, name? *(links the language versions of the same song)*
 - **Comment**: id, liturgy_id, liturgy_item_id?, author_id, body, resolved, timestamps
 - **StateChange**: id, liturgy_id, from_state, to_state, user_id, timestamp
+- **LiturgyEdit**: id, liturgy_id, user_id, command (e.g. MoveItem, EditItemText, SetSequence), reverse_data (what is needed to undo it), created_at, undone_at? *(the per-liturgy undo/redo history)*
 - **PublishedVersion**: id, liturgy_id, version, content (complete copy of the liturgy as published: items, chosen song sections with text, reading text, assignments), published_at, published_by
 
 ## 8. Non-functional requirements
@@ -128,9 +146,23 @@ Starting point, not final. Refine as needed.
   - *PostgreSQL is the expected choice for the hosted SaaS:* better concurrent writes across many churches, and mature backup/replication tooling.
   - Migrations must run on both. Tests should run against both, or at minimum against SQLite with PostgreSQL in CI.
   - The SaaS uses one shared PostgreSQL database (decided 2026-10-02; see decisions log).
-- **Tenant-ready:** all data scoped by `church_id`. See 8.1.
+- **Tenant-ready:** all church-owned data scoped by `church_id`, behind a tenant context and church-scoped repositories (8.1). One church per community install; multi-church hosting is SaaS-only (8.1.1).
 
-### 8.1 Tenancy and URL structure
+### 8.1 Tenancy
+
+Each community install serves **exactly one church**. To serve several churches, run several instances. Hosting many churches in one install (the SaaS) is built in `liturgist-saas` on top of the foundation below (see 8.1.1), so it needs no changes to the schema or the use cases.
+
+**Community foundation (this repository):**
+
+1. **Church-owned data.** Every church-owned row has `church_id`; indexes and foreign keys between church-owned tables include it.
+2. **Tenant context.** Every request carries the church it is for, provided by the `TenantResolver` port. The community implementation returns the single church from config. Handlers never decide the church themselves.
+3. **Scoped data access.** All queries for church-owned data go through the tenant context, so a handler cannot fetch another church's records by accident (e.g. a repository/query layer that requires the tenant, rather than ad-hoc `WHERE church_id = ?` in handlers).
+4. **Authorization checks membership.** Users are platform-wide (see 7), so on every request the use cases verify that the logged-in user is a member of the request's church with the needed role; otherwise 403 (or 404 to avoid revealing what exists). **This is the most important security requirement of the tenancy design.** Community tests cover users without a membership and users with the wrong role, for liturgies, comments, PDF, share links and API endpoints.
+5. **URL generation through `URLBuilder`.** All internal links, redirects, PDF links and share links are built by the `URLBuilder` port. The community implementation adds no prefix (`/liturgies/…`, `/api/v1/…`). No hardcoded paths in handlers or the frontend's link-building code.
+6. **Share links.** Published-liturgy links (web view, PDF, "my assignments") are normal church URLs and require login; after login the user returns to the link they opened. Guest links without login are deferred (see decisions log).
+7. **First-time setup** creates the install's one church and its first admin (see decisions log).
+
+#### 8.1.1 SaaS multi-church hosting *(moves to `liturgist-saas`)*
 
 The hosted SaaS serves every church from one product subdomain, with the church identified by the first path segment:
 
@@ -139,24 +171,14 @@ https://liturgist.brightfellow.net/<church_slug>/...
 e.g. https://liturgist.brightfellow.net/gky-citragarden/liturgies/2026-10-11
 ```
 
-**Deployment modes** (set by configuration, same code path):
+- **Church slug.** Each church has a unique, lowercase, URL-safe slug (`a-z`, `0-9`, `-`; e.g. `gky-citragarden`). Validate on creation.
+- **Reserved slugs.** Reject slugs that collide with system routes or could confuse users, at minimum: `login`, `logout`, `signup`, `api`, `admin`, `static`, `assets`, `health`, `docs`, `about`, `help`, `www`. Keep the list in one place and check it against the router's top-level routes in a test.
+- **Slug resolver.** The SaaS `TenantResolver` reads the first path segment and loads the church; unknown slug → 404. The SaaS mounts the community API under `/{slug}` with this resolver in front, and its `URLBuilder` adds the `/<slug>` prefix.
+- **Slug changes.** Prefer slugs to be immutable. If renaming is supported, store the old slug in `ChurchSlugRedirect` and 301-redirect old URLs, because links get printed and shared in WhatsApp groups.
+- **Platform-level routes** (login, signup, platform admin) live outside any church prefix. After login, send the user to their church, or a church picker if they belong to several.
+- **Cross-church tests.** All churches share one domain, so the session cookie is valid on every church's path. Dedicated tests: a user of church A requesting church B's liturgy, comments, PDF, share links and API endpoints through B's URLs.
+- **Church onboarding** and **PostgreSQL row-level security policies** (see decisions log).
 
-| Mode | URL shape | Use |
-|---|---|---|
-| `single` | `/...` (no slug) | Self-hosted install for one church. The tenant is fixed by config; slug routing is disabled. |
-| `multi` | `/<church_slug>/...` | Hosted SaaS, or a self-hoster serving several churches. |
-
-**Requirements:**
-
-1. **Church slug.** Each church has a unique, lowercase, URL-safe slug (`a-z`, `0-9`, `-`; e.g. `gky-citragarden`). Validate on creation.
-2. **Reserved slugs.** Reject slugs that collide with system routes or could confuse users, at minimum: `login`, `logout`, `signup`, `api`, `admin`, `static`, `assets`, `health`, `docs`, `about`, `help`, `www`. Keep the list in one place and check it against the router's top-level routes in a test.
-3. **Tenant resolution middleware.** In `multi` mode, a middleware reads the first path segment, loads the church, and stores it as the request's tenant context. Unknown slug → 404. Handlers never read the slug themselves.
-4. **Scoped data access.** All queries for church-owned data go through the tenant context, so a handler cannot fetch another church's records by accident (e.g. a repository/query layer that requires the tenant, rather than ad-hoc `WHERE church_id = ?` in handlers).
-5. **Authorization checks membership.** All churches share one domain, so the session cookie is valid on every church's path. On every request to a church path, verify the logged-in user is a member of *that* church with the needed role; otherwise 403 (or 404 to avoid revealing which churches exist). **This is the most important security requirement of the tenancy design** and must have dedicated tests (user of church A requesting church B's liturgy, comments, PDF, share links, and API endpoints).
-6. **URL generation through a helper.** All internal links, redirects, PDF links, and share links are built by a helper that applies the current mode and slug. No hardcoded paths in templates or handlers.
-7. **Share links.** Published-liturgy links (web view, PDF, "my assignments") are normal church URLs and require login; after login the user returns to the link they opened. Guest links without login are deferred (see decisions log).
-8. **Slug changes.** Prefer slugs to be immutable for MVP. If renaming is supported, store the old slug in `ChurchSlugRedirect` and 301-redirect old URLs, because links get printed and shared in WhatsApp groups.
-9. **Platform-level routes** (login, signup, platform admin) live outside any church prefix. After login, send the user to their church, or a church picker if they belong to several.
 - **UI language:** Indonesian first, with i18n from the start (English as second locale).
 - **Mobile-friendly:** team members will mostly open links on phones.
 - **No bundled copyrighted content** (lyrics, Bible text).
@@ -176,6 +198,7 @@ e.g. https://liturgist.brightfellow.net/gky-citragarden/liturgies/2026-10-11
 | `Exporter` | Render a liturgy to an output format | PDF, web view | Slides (PPTX/OpenLP/presenter), other print layouts |
 | `Storage` | Store generated files and future media | Local filesystem | Object storage (S3-compatible) |
 | `AuthProvider` | Authenticate users | Per open decision 2 | SSO / Google login |
+| `EventBus` | Deliver live "liturgy changed" and presence events to open editors | In-memory (one process) | PostgreSQL `LISTEN/NOTIFY` across several server instances (SaaS) |
 
 Rules:
 - Core code depends only on the interfaces, never on a concrete implementation.
@@ -256,7 +279,7 @@ Limit names are constants defined in one place, next to feature names. Self-host
 
 ## 10. Suggested build order
 
-1. Project skeleton, data model, migrations (SQLite + PostgreSQL), auth, church + users + roles, tenancy middleware and URL helper with membership tests (8.1), extension-point interfaces and entitlement stub with feature and limit checks (8.2, 8.2.1).
+1. Project skeleton, data model, migrations (SQLite + PostgreSQL), auth, church + users + roles, tenant context, `TenantResolver` and `URLBuilder` ports, membership tests (8.1), extension-point interfaces and entitlement stub with feature and limit checks (8.2, 8.2.1).
 2. Song library (CRUD, sections, search) and readings store.
 3. Templates and weekly liturgy editor (items, reorder, songs, readings, assignments).
 4. Review workflow with item-level comments and state history.
@@ -271,7 +294,7 @@ Record resolved decisions here (date, decision, reason). Move items from section
 
 | Date | Decision | Reason |
 |---|---|---|
-| 2026-10-02 | SaaS uses path-based tenancy: `liturgist.brightfellow.net/<church_slug>/` | One DNS record and one TLS certificate; simpler than per-church subdomains |
+| 2026-10-02 | SaaS uses path-based tenancy: `liturgist.brightfellow.net/<church_slug>/` *(Amended 2026-10-02: multi-church hosting is SaaS-only; see the tenancy-split row below)* | One DNS record and one TLS certificate; simpler than per-church subdomains |
 | 2026-10-02 | Support SQLite (self-host default) and PostgreSQL (expected for SaaS) | Zero-maintenance self-hosting; PostgreSQL suits a shared hosted service |
 | 2026-10-02 | Core workflow stays free and open; SaaS charges for hosting, convenience, and features with real running/license costs | Fits the community identity and Apache-2.0 license; a feature paywall would be easy to bypass and erode contributor trust |
 | 2026-10-02 | Extension points with compiled-in implementations; no dynamic plugin system in MVP; premium code in a private module | Most of a plugin system's benefit without designing a stable public plugin API too early |
@@ -282,34 +305,45 @@ Record resolved decisions here (date, decision, reason). Move items from section
 | 2026-10-02 | Archived liturgies stay viewable read-only (including PDF) on every plan | Archiving manages slots, not access; churches keep their history |
 | 2026-10-02 | Unpublished liturgies can be deleted by liturgist/church admin; published ones can only be archived | Lets churches free slots from abandoned drafts while keeping published history |
 | 2026-10-02 | Free plan also limits unpublished liturgies (planned: 4), counting Draft, In Review, Needs Revision and Approved | Caps work-in-progress; counting all unpublished states prevents bypassing via review |
-| 2026-10-02 | Clean architecture: domain → application (use cases + ports) → adapters, wired in one composition root by configuration. Persistence, search, transactions and the 8.2 extension points are ports; repositories are tenant-scoped | Core logic stays independent of the database and framework, so SQLite and PostgreSQL can be swapped without touching it; tenant-scoped ports enforce 8.1 rule 4 |
+| 2026-10-02 | Clean architecture: domain → application (use cases + ports) → adapters, wired in one composition root by configuration. Persistence, search, transactions and the 8.2 extension points are ports; repositories are tenant-scoped | Core logic stays independent of the database and framework, so SQLite and PostgreSQL can be swapped without touching it; tenant-scoped ports enforce 8.1 rule 3 |
 | 2026-10-02 | One shared SQL persistence adapter with a small dialect layer (placeholders, upserts, locking, full-text search), not separate SQLite and PostgreSQL adapters. Separate migration folders per database with matching versions | Each query is written once and the two databases can't silently drift apart; database-specific differences stay in one small place |
 | 2026-10-02 | Use-case tests run against the real SQLite adapter (in-memory), not hand-written fakes. Repository contract tests run against both SQLite and PostgreSQL (PostgreSQL in CI) | Fast enough for every test run; avoids keeping a third, fake persistence implementation; meets the "tests against both" requirement in 8 |
 | 2026-10-02 | Tech stack: Go backend exposing a JSON API (the HTTP adapter over the use cases) + React SPA (Vite + TypeScript) for all web pages, built into the Go binary with `go:embed`. A React Native (Expo) mobile app may follow later, for team members and the multimedia team | Owner has 5 years of Go and knows React. One frontend approach on every page. The multimedia presenter needs client-side, offline-capable code, and React skills and TypeScript packages carry over to React Native. Self-hosters still get a single binary |
 | 2026-10-02 | Backend libraries: chi router; Huma (code-first OpenAPI 3.1); `database/sql` + `sqlx` with hand-written SQL; `modernc.org/sqlite` (pure Go, no CGO) and `pgx`; goose migrations (embedded); ULID IDs; `log/slog`; `go-i18n`; testcontainers-go for PostgreSQL in CI; `depguard` to enforce layer boundaries | Small, stable dependencies; static single binary; OpenAPI generated from Go types keeps the TypeScript client in sync |
 | 2026-10-02 | Frontend libraries: `openapi-typescript` + `openapi-fetch` (types and client generated from the OpenAPI spec); TanStack Query; React Router; React Hook Form + Zod; Tailwind + shadcn/ui; dnd-kit; i18next (same message files as Go, `id` default, `en` second); `vite-plugin-pwa`; Vitest + Testing Library; Playwright for end-to-end | Common, maintained choices. API client, types and i18n can be shared with a future React Native app. shadcn/ui code lives in the repo, which limits dependency churn |
 | 2026-10-02 | Sessions are server-side and stored in the database, in an HttpOnly SameSite=Lax cookie with CSRF protection; a mobile app later uses bearer tokens through `AuthProvider`. The login method itself is still open decision 2 | Sessions can be revoked and work the same on SQLite and PostgreSQL |
-| 2026-10-02 | URL layout: in `multi` mode the API is at `/<church_slug>/api/v1/...` and SPA routes at `/<church_slug>/...` (the server returns `index.html`); in `single` mode `/api/v1/...` and `/...`. Platform routes (login, platform API) sit outside any church prefix | Keeps 8.1 unchanged: the first path segment is the church, so the tenant middleware and URL helper work for both API and pages |
+| 2026-10-02 | *(Superseded 2026-10-02 by the tenancy-split row below.)* URL layout: in `multi` mode the API is at `/<church_slug>/api/v1/...` and SPA routes at `/<church_slug>/...` (the server returns `index.html`); in `single` mode `/api/v1/...` and `/...`. Platform routes (login, platform API) sit outside any church prefix | Keeps 8.1 unchanged: the first path segment is the church, so the tenant middleware and URL helper work for both API and pages |
 | 2026-10-02 | The API returns the actions the current user may take on each resource (e.g. `"actions": {"submit": true, "edit": false}`). The UI shows or hides controls from these and never re-implements permission or workflow rules | All rules stay in Go, in one place; web and mobile clients stay consistent |
-| 2026-10-02 | Undo/redo in the liturgy editor is server-side: each editor change is a use-case command recorded per liturgy with the data to reverse it. History is shared by everyone editing that liturgy and lasts after reload, while the liturgy is editable (Draft, Needs Revision). The UI may apply undo immediately and confirm with the server in the background | History is the same on every device and for both editors; it can also show what changed since the last review |
+| 2026-10-02 | *(Amended 2026-10-02: undo is per person, not shared; see the concurrent-editing row below.)* Undo/redo in the liturgy editor is server-side: each editor change is a use-case command recorded per liturgy with the data to reverse it. History is shared by everyone editing that liturgy and lasts after reload, while the liturgy is editable (Draft, Needs Revision). The UI may apply undo immediately and confirm with the server in the background | History is the same on every device and for both editors; it can also show what changed since the last review |
 | 2026-10-02 | PDF: print stylesheet on the published view for the MVP; server-side Typst later, shipped alongside the binary (in the Docker image or release archive). PDF does not need to be inside the single binary | Server cost is negligible, and server output is the same on every device and shareable by URL; the final layout waits for open decision 3 |
-| 2026-10-02 | Repository layout: one monorepo with the Go module at the root (`cmd/`, `internal/{domain,app,adapters}`, `migrations/{sqlite,postgres}`) and pnpm workspaces for TypeScript (`web/`, `packages/api-client`, `packages/i18n`). `make build` builds the frontend, generates API types, then runs `go build`; CI fails if generated types are out of date | One place for the whole web product. How a future mobile app shares the API client and translations is decided later, with the mobile app |
+| 2026-10-02 | Repository layout: one monorepo with the Go module at the root (`domain/`, `app/`, `adapters/…`, `server/`, `cmd/liturgist/`, `internal/` for private helpers only, `migrations/{sqlite,postgres}`; see the package-layout row below, which replaced the earlier `internal/{domain,app,adapters}`) and pnpm workspaces for TypeScript (`web/`, `packages/api-client`, `packages/i18n`). `make build` builds the frontend, generates API types, then runs `go build`; CI fails if generated types are out of date | One place for the whole web product. How a future mobile app shares the API client and translations is decided later, with the mobile app |
 | 2026-10-02 | Auth for MVP: invite-only accounts with a password. A church admin creates an invite (link expires in 7 days) and shares it through any channel; the recipient sets a password. No open sign-up into a church. Passwords: argon2id, minimum 10 characters, checked against a list of commonly leaked passwords, no composition rules, rate-limited login attempts. Google login, passkeys, email magic links and two-step login for admins come later through `AuthProvider` | Works without email setup, which matters for self-hosters; invite links can be shared on WhatsApp; churches control who joins |
 | 2026-10-02 | Login identifier is email or phone number; each user has at least one and may have both, and each is unique across the platform. Emails are stored trimmed and lowercased; phone numbers in international format, with Indonesia as the default region (`0812…` → `+62812…`). One "Email or phone number" field on the login form | Many volunteers use WhatsApp more than email; the identifier needs no verification because an admin invited the person |
 | 2026-10-02 | Password reset: by email link when the user has an email and the install has email configured; otherwise a church admin generates a reset link to share; a `liturgist user reset-password` command for locked-out admins | Every install can recover accounts, with or without email |
 | 2026-10-02 | Every team member has a full account, including read-only team members | Owner's choice: one consistent way to access the app |
-| 2026-10-02 | Users are platform-wide (`User` has no `church_id`); church access and roles live in `Membership`. Inviting an email or phone that already belongs to a user adds a membership after they log in, and never creates a duplicate account | Supports users in several churches (8.1 rule 9); in `single` mode everyone simply has one membership |
-| 2026-10-02 | First-time setup: a one-time setup link printed to the log on first start opens a "create church and first admin" page; a `liturgist setup` command does the same for scripts and Docker. Both call the same use case | Friendly for non-technical installers, and scriptable for automated installs |
-| 2026-10-02 | Share links require login (8.1 rule 7): the published view, its PDF and "my assignments" are only shown to logged-in members of that church, and after login the user returns to the link they opened. Guest links are deferred; if the pilot asks for them, they will be per-liturgy tokens (stored hashed, read-only, expiring a week after the service by default, revocable) | Lyrics and Bible text are copyrighted, and church licences usually cover the congregation, not anyone holding a link; one access rule keeps the 8.1 rule 5 tests sufficient |
+| 2026-10-02 | Users are platform-wide (`User` has no `church_id`); church access and roles live in `Membership`. Inviting an email or phone that already belongs to a user adds a membership after they log in, and never creates a duplicate account | Supports users in several churches on the SaaS (8.1.1); in a community install everyone simply has one membership |
+| 2026-10-02 | *(Amended 2026-10-02: in the community edition setup creates the install's only church. See the tenancy-split row below.)* First-time setup: a one-time setup link printed to the log on first start opens a "create church and first admin" page; a `liturgist setup` command does the same for scripts and Docker. Both call the same use case | Friendly for non-technical installers, and scriptable for automated installs |
+| 2026-10-02 | Share links require login (8.1 rule 6): the published view, its PDF and "my assignments" are only shown to logged-in members of that church, and after login the user returns to the link they opened. Guest links are deferred; if the pilot asks for them, they will be per-liturgy tokens (stored hashed, read-only, expiring a week after the service by default, revocable) | Lyrics and Bible text are copyrighted, and church licences usually cover the congregation, not anyone holding a link; one access rule keeps the 8.1 rule 4 tests sufficient |
 | 2026-10-02 | Every member of a church can view all of that church's published liturgies, not only those they are assigned to | Simpler, and lets musicians and readers look ahead |
 | 2026-10-02 | Publishing stores a `PublishedVersion`: a complete copy of the liturgy as published. The published view and PDF always read from the latest version, never from the editable liturgy. When a published liturgy is reopened, members keep seeing the last published version with a "being revised" notice; edits stay invisible until the next publish. Archiving keeps all versions | The team always has something to rehearse from; later library edits don't change what was distributed; exact record for future licence reporting (5.3) |
 | 2026-10-02 | Sessions last 90 days, extended whenever the app is used; configurable per install | Team members rarely need to log in again on their phones |
 | 2026-10-02 | SaaS database layout (open decision 6): one shared PostgreSQL database with `church_id` on every church-owned row. Indexes on church-owned tables start with `church_id`; foreign keys between church-owned tables include `church_id`; deleting a church cascades from `Church`. Not one SQLite file per church, and not one schema per church | Users and memberships are platform-wide, so per-church files would still need a separate platform database; one migration run, managed backups and simple cross-church reporting; expected scale is easily handled by one PostgreSQL instance |
-| 2026-10-02 | PostgreSQL row-level security as a second line of defence: the hook is built now (the PostgreSQL dialect sets the current church at the start of each transaction through the transaction port); policies on church-owned tables are switched on before the SaaS launch. Platform-level queries (login, membership lookup) use a separate path allowed to bypass them. SQLite has no equivalent and relies on tenant-scoped repositories | Catches a buggy query in our own code before it can return another church's data; building the hook now is cheap and avoids retrofitting |
-| 2026-10-02 | Export one church to a SQLite file and import it again (`liturgist church export <slug>` / import), built after the MVP and before the SaaS launch, reusing the shared SQL adapter | Gives back the main advantage of per-church files: a church can take its data to self-hosting, or be restored on its own; also useful for self-hosters in `multi` mode |
+| 2026-10-02 | *(Amended 2026-10-02: the policies are SaaS migrations; the hook stays in the shared adapter. See the tenancy-split row below.)* PostgreSQL row-level security as a second line of defence: the hook is built now (the PostgreSQL dialect sets the current church at the start of each transaction through the transaction port); policies on church-owned tables are switched on before the SaaS launch. Platform-level queries (login, membership lookup) use a separate path allowed to bypass them. SQLite has no equivalent and relies on tenant-scoped repositories | Catches a buggy query in our own code before it can return another church's data; building the hook now is cheap and avoids retrofitting |
+| 2026-10-02 | *(Amended 2026-10-02: in the community edition the command exports the install's only church, `liturgist church export`; exporting by slug is a SaaS command. See the tenancy-split row below.)* Export one church to a SQLite file and import it again (`liturgist church export <slug>` / import), built after the MVP and before the SaaS launch, reusing the shared SQL adapter | Gives back the main advantage of per-church files: a church can take its data to self-hosting, or be restored on its own |
 | 2026-10-02 | `max_team_members` (open decision 8) counts every active membership in the church, whatever its roles, plus pending unexpired invites, which reserve a slot so accepting never fails. Free-text assignees are not counted. A person in several churches counts once in each. A church admin frees a slot by removing a member or cancelling an invite; "remove member" is in the MVP | Clear and easy to explain ("12 people can use the app"). Free-text names are for guests and would otherwise block edits to existing liturgies; people without accounts can't log in, so using them as a workaround gains little |
 | 2026-10-02 | Main translation for the pilot is LAI Terjemahan Baru (TB), copyrighted by LAI. The owner will contact LAI about licensing (church-use rules, a licence for the hosted service, storing text, required attribution, TB2, cost) | TB is what GKY Citragarden uses; a licence from LAI (directly or through an API that carries TB) is the only clean way to provide TB text in the app |
 | 2026-10-02 | Bible text in the MVP: manual entry with reuse (5.4), plus a reference parser that understands Indonesian book names and abbreviations (e.g. "Yoh 3:16-21", "Kej. 1:1–2:3", "Mzm 23") and stores references in a standard form (standard book codes, e.g. `JHN 3:16-21`). Each church has a default translation. Stored readings carry an attribution line, shown on the published view and PDF. Different verse numbering between translations is allowed for in the design but not handled in the MVP | Manual entry needs no licence from the app; standard references let any later provider look text up; most licences require attribution |
 | 2026-10-02 | Bible text after the MVP: an import provider for Bible files the church has rights to (USFM, OSIS or Zefania XML), and an optional download of public-domain and open-licence texts (e.g. Chinese Union Version 1919, KJV, WEB, BSB; AYT if its licence is confirmed). Nothing is bundled in the binary, so "ships no Bible text" stays true. Licensed TB/TB2 for the SaaS depends on LAI's answer. Copying text from websites is not allowed | Fills whole Bibles in one step for self-hosters and gives Mandarin and English quickly, without distributing copyrighted text |
 | 2026-10-02 | Each `BibleTextProvider` result states its source, its attribution line, and whether the text may be stored; stored copies (in `Reading` and `PublishedVersion`) record which provider they came from | API and publisher licences often limit storing text and require attribution; recording the source keeps each stored copy traceable to its licence |
 | 2026-10-02 | Repository (open decision 5): `brightfellow-net/liturgist` (Go module `github.com/brightfellow-net/liturgist`, binary `liturgist`, Docker image `ghcr.io/brightfellow-net/liturgist`). The private SaaS build lives in `brightfellow-net/liturgist-saas` (premium implementations, the SaaS `main`, deployment config). A future mobile app lives in a separate repository; its name and how it shares code are decided later | Matches the product name, the SaaS URL and the CLI commands in this spec; the org name already says Brightfellow, so no prefix is needed |
+| 2026-10-02 | This repository is the community edition only. `liturgist-saas` imports its Go module. SaaS-specific content in this spec (free-plan limit values, plan reasoning, SaaS onboarding) moves to `liturgist-saas` later; the hooks stay here (entitlement stub and limit-check calls, the tenancy foundation and its ports, the row-level security hook) *(Amended 2026-10-02: `multi` mode moved to the SaaS; see the tenancy-split row below)* | Keeps the open repository complete and independent |
+| 2026-10-02 | Go package layout: packages the SaaS imports live outside `internal/`, at the top level: `domain/` (entities, state machine, rules), `app/` (use cases and ports), `adapters/…` (e.g. `sqlstore`, `httpapi`), and `server/`, a builder that wires everything and accepts options (e.g. `WithNotifier`, `WithEntitlements`, `WithRoutes`). `cmd/liturgist/` is the community `main`. `internal/` is only for private helpers | Go does not allow other modules to import `internal/` packages; one builder with options keeps the SaaS `main` small |
+| 2026-10-02 | The SaaS customises the API only by adding endpoints, registered as extra Huma operations through a `server` option; it never overrides or changes community endpoints. Differences in behaviour go through ports (`Entitlements`, `Notifier`, `BibleTextProvider`, …). The SaaS pins `v0.x` tags of this module, a `go.work` file links both repos during development, and SaaS CI runs nightly against community `main` | Avoids forked endpoints drifting from the community version; breaking changes are caught early |
+| 2026-10-02 | The SaaS frontend lives in a separate repository as an independent React app, built against the SaaS OpenAPI spec (community operations plus SaaS operations). The community frontend is not built as a reusable package. The API must stay independent of any one frontend (no endpoints shaped around a particular screen), and all rules stay on the server ("allowed actions"), so both frontends behave the same | Owner's choice: full freedom for the SaaS presentation layer. The cost is building core screens twice, and the API becomes the shared contract |
+| 2026-10-02 | Tenancy split: each community install serves exactly one church; to serve several churches, run several instances. The community edition keeps the foundation: `church_id` on church-owned rows, a tenant context on every request, church-scoped repositories, memberships, permission checks in the use cases, and two ports, `TenantResolver` (community: the single church from config) and `URLBuilder` (community: no prefix; API at `/api/v1/...`). `single`/`multi` stop being configuration options. The SaaS owns the multi-church mechanics: slug routing and rules, reserved slugs, slug redirects, the church picker, platform routes and admin, church onboarding, cross-church URL tests, and the row-level security policies. It mounts the community API under `/{slug}` with its own resolver | Keeps the community code simpler and the paid product's value clear, without forking: the SaaS builds on the same schema and use cases. Accepted cost: a synod or volunteer hosting many branches needs several instances or the SaaS |
+| 2026-10-02 | Song sequences: a liturgy item can hold several songs (medley, `LiturgyItemSong`). Each song has an ordered sequence (`SequenceEntry`) of sections with repeats allowed, each entry optionally naming who sings it (`SingingPart`, configurable per church, seeded with Semua, Pemandu, Jemaat, Pria, Wanita, Paduan Suara) and carrying a key change and a note. Songs have an optional default arrangement that fills a new sequence (otherwise all verses in order). Key per song in the liturgy, defaulting to the song's key, displayed as "Do = G" by default (church setting). `SongSection` gains kind and number. Non-lyric entries (instrumental, spoken) are not in the MVP; `SequenceEntry.kind` leaves room for them. A section cannot be deleted while an unpublished liturgy uses it. Replaces `LiturgyItem.song_id` and `song_section_order` | Matches how Indonesian liturgies are sung and printed (alternating parts, repeats, modulation, medleys, "Do = G"); default arrangements save rebuilding the same order every week; sequence entries map directly to slide groups later |
+| 2026-10-02 | Concurrent editing: version check on each change plus live updates, not locks or real-time co-editing. `Liturgy` and `LiturgyItem` carry a version; each change states the version it was based on, and the server rejects only real conflicts (the same item changed meanwhile; the liturgy version for reordering and state changes). Conflicts show "changed meanwhile" and keep the user's text. Changes and presence ("Budi is also editing", in the MVP) are pushed over server-sent events through a new `EventBus` port: in-memory in the community edition, PostgreSQL `LISTEN/NOTIFY` in the SaaS | Overlap is uncommon but must never lose edits silently; the editor already sends small named changes, so only real conflicts need rejecting; no stale locks |
+| 2026-10-02 | Undo is per person: Ctrl+Z undoes your own latest change and is refused if someone has since changed that item. The history (`LiturgyEdit`) stays per liturgy and visible to everyone | With two editors, a shared Ctrl+Z would undo the other person's change; per-person undo is what Google Docs and Figma users expect |
+| 2026-10-02 | In Review is read-only apart from comments; only Draft and Needs Revision are editable. To change a liturgy under review, the reviewer requests changes | Clear handoff between author and reviewer, and far fewer simultaneous edits |
+| 2026-10-02 | Content language: BCP 47 language codes on `Liturgy` (the service's main language), `Template`, `Song` and `Church` (`default_language`). Readings refer to a `Translation` record (code, name, language, e.g. `TB` → `id`, `CUV` → `zh-Hans`). The same song in another language is a separate `Song`, linked through a `SongGroup`. Content stays in one language per record for now; parallel text later adds secondary-language text alongside it. Bilingual singing meanwhile uses a medley of the linked versions. Mandarin uses simplified characters (`zh-Hans`). Pinyin comes later | The pilot church needs more than one language. Language versions of a hymn differ in hymnal number, copyright and verse count, so separate linked songs fit better than per-section translations; the model leaves room for parallel text without a rewrite |
+| 2026-10-02 | Lyric search uses substring matching for Chinese text and full-text search for Indonesian and English, both behind the search interface | Chinese has no spaces between words, so full-text search (and 3-character trigram search) misses typical 1–2-character queries; libraries are small enough for substring matching |
