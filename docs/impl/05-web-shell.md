@@ -40,13 +40,15 @@ web/
   src/lib/errors.ts         problem-details → translated message by `code`
   src/lib/fragmentToken.ts  read `#t=` once, then remove it from the address bar
   vite.config.ts            dev proxy /api → http://localhost:8080; PWA plugin added in step 5
-packages/api-client/        openapi.json, src/schema.d.ts (generated), src/index.ts
-packages/i18n/              en.json (source), id.json
+packages/api-client/        @liturgist/api-client: openapi.json, src/schema.d.ts (generated),
+                            src/index.ts (re-exports; hand-corrects only `Me`, whose `church`
+                            and `membership` are nullable but generated as always present)
+packages/i18n/              @liturgist/i18n: en.json (source), id.json
 ```
 
 ## 4. API client and data
 
-- `createClient<paths>({ baseUrl: "" })` from `openapi-fetch`, typed by the generated `schema.d.ts`.
+- `createClient<paths>({ baseUrl: "/api/v1" })` from `openapi-fetch`, typed by the generated `schema.d.ts`. The generated paths have no `/api/v1` prefix (it is in the spec's `servers`), so the client adds it.
 - All server data goes through TanStack Query. Query keys: `["me"]`, `["church"]`, `["members"]`, `["invites"]`, `["translations"]`.
 - On a 401 `unauthenticated` from any query: clear the cache and go to `/login?next=<current path>`.
 - On 409 `not_set_up`: go to `/setup`.
