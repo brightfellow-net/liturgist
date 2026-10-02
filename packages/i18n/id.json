@@ -1,0 +1,262 @@
+{
+  "app": {
+    "name": "Liturgist",
+    "skip_to_content": "Langsung ke isi",
+    "loading": "Memuat…"
+  },
+  "nav": {
+    "label": "Menu utama",
+    "home": "Beranda",
+    "privacy": "Privasi",
+    "log_out": "Keluar",
+    "profile": "Profil",
+    "settings": "Pengaturan"
+  },
+  "common": {
+    "language": "Bahasa",
+    "show_password": "Tampilkan kata sandi",
+    "hide_password": "Sembunyikan kata sandi",
+    "retry": "Coba lagi",
+    "go_to_login": "Ke halaman masuk",
+    "field_invalid": "Periksa isian ini.",
+    "required": "Isian ini wajib diisi.",
+    "too_long": "Paling banyak {{max}} karakter.",
+    "link_incomplete": "Tautan ini tidak lengkap. Minta tautan baru kepada admin gereja Anda.",
+    "back": "Kembali",
+    "password_hint": "Minimal 10 karakter. Beberapa kata yang digabung mudah diingat.",
+    "cancel": "Batal",
+    "done": "Selesai",
+    "no": "Tidak, biarkan"
+  },
+  "share": {
+    "copy": "Salin tautan",
+    "whatsapp": "Bagikan ke WhatsApp",
+    "copied": "Tautan disalin.",
+    "copy_failed": "Tidak bisa menyalin. Pilih tautannya dan salin sendiri.",
+    "expires": "Berlaku sampai {{when}}."
+  },
+  "language": {
+    "en": "English",
+    "id": "Bahasa Indonesia"
+  },
+  "login": {
+    "title": "Masuk",
+    "identifier": "Email atau nomor HP",
+    "password": "Kata sandi",
+    "submit": "Masuk",
+    "forgot": "Lupa kata sandi?",
+    "forgot_text": "Minta admin gereja Anda mengirimkan tautan untuk mengatur ulang kata sandi."
+  },
+  "setup": {
+    "title": "Siapkan Liturgist",
+    "intro": "Buat gereja Anda dan admin gereja yang pertama. Pengaturan gereja bisa diubah nanti.",
+    "church_section": "Gereja",
+    "church_name": "Nama gereja",
+    "ui_language": "Bahasa aplikasi",
+    "content_language": "Bahasa utama liturgi",
+    "translation": "Terjemahan Alkitab",
+    "time_zone": "Zona waktu",
+    "key_display": "Cara menampilkan nada dasar lagu",
+    "key_do": "Do = G",
+    "key_letter": "G",
+    "admin_section": "Admin gereja pertama",
+    "admin_name": "Nama Anda",
+    "admin_identifier": "Email atau nomor HP Anda",
+    "admin_password": "Kata sandi",
+    "submit": "Buat gereja",
+    "already": "Liturgist sudah disiapkan.",
+    "incomplete": "Tautan ini tidak lengkap. Buka tautan penyiapan yang tercetak di log server.",
+    "content_languages": {
+      "id": "Bahasa Indonesia",
+      "en": "Bahasa Inggris",
+      "zh-Hans": "Bahasa Mandarin (sederhana)",
+      "zh-Hant": "Bahasa Mandarin (tradisional)"
+    },
+    "time_zones": {
+      "Asia/Jakarta": "WIB (Jakarta)",
+      "Asia/Makassar": "WITA (Makassar)",
+      "Asia/Jayapura": "WIT (Jayapura)"
+    }
+  },
+  "invite": {
+    "title": "Bergabung dengan tim gereja",
+    "invited": "{{church}} mengundang {{name}} untuk bergabung dengan tim gereja.",
+    "logged_in_as": "Anda masuk sebagai {{name}}.",
+    "join_with_account": "Bergabung dengan akun ini",
+    "use_other_account": "Keluar dan gunakan akun lain",
+    "has_account": "Anda sudah punya akun. Masuk untuk menerima undangan.",
+    "already_have_account": "Saya sudah punya akun",
+    "new_account": "Buat akun Anda",
+    "name": "Nama Anda",
+    "email": "Email",
+    "phone": "Nomor HP",
+    "contact_hint": "Isi minimal satu. Anda akan masuk dengan ini.",
+    "need_identifier": "Isi alamat email atau nomor HP.",
+    "password": "Buat kata sandi",
+    "continue": "Lanjut",
+    "log_in": "Masuk",
+    "confirm": "Anda bergabung dengan {{church}} sebagai {{name}}.",
+    "join": "Bergabung",
+    "identifier_taken": "Email atau nomor HP ini sudah punya akun. Masuk untuk menerima undangan."
+  },
+  "reset": {
+    "title": "Atur kata sandi baru",
+    "for": "Kata sandi baru untuk {{name}}.",
+    "created_by": "Tautan ini dibuat oleh {{name}}.",
+    "created_by_server": "Tautan ini dibuat oleh administrator server.",
+    "new_password": "Kata sandi baru",
+    "submit": "Simpan kata sandi dan masuk"
+  },
+  "home": {
+    "title": "Selamat datang, {{name}}",
+    "church": "Anda anggota {{church}}.",
+    "assignments": "Tugas Anda akan tampil di sini."
+  },
+  "profile": {
+    "title": "Profil",
+    "details": "Data Anda",
+    "name": "Nama",
+    "text_size": "Ukuran huruf",
+    "text_sizes": {
+      "normal": "Biasa",
+      "large": "Besar",
+      "larger": "Lebih besar"
+    },
+    "ui_language": "Bahasa aplikasi",
+    "church_default": "Bawaan gereja ({{language}})",
+    "save": "Simpan",
+    "saved": "Tersimpan.",
+    "password_title": "Ganti kata sandi",
+    "current_password": "Kata sandi sekarang",
+    "new_password": "Kata sandi baru",
+    "change_password": "Ganti kata sandi",
+    "password_changed": "Kata sandi Anda sudah diganti. Anda sudah dikeluarkan dari perangkat lain.",
+    "devices_title": "Perangkat lain",
+    "devices_text": "HP Anda hilang? Keluar dari semua perangkat kecuali perangkat ini.",
+    "end_others": "Keluar dari semua perangkat lain",
+    "others_ended": "Anda sudah dikeluarkan dari semua perangkat lain."
+  },
+  "settings": {
+    "title": "Pengaturan",
+    "church": "Gereja",
+    "members": "Anggota",
+    "roles": "Peran"
+  },
+  "church": {
+    "read_only": "Hanya anggota yang boleh mengubah pengaturan gereja yang bisa mengubah ini.",
+    "feedback_url": "Tautan masukan",
+    "feedback_url_hint": "Opsional. Tautan yang diawali https:// untuk jemaat mengirim masukan.",
+    "feedback_url_invalid": "Tautan harus diawali https://.",
+    "privacy_contact": "Kontak privasi",
+    "privacy_contact_hint": "Opsional. Tampil di halaman privasi, misalnya nama dan nomor HP."
+  },
+  "members": {
+    "title": "Anggota",
+    "usage": "{{used}} dari {{max}} anggota tim (termasuk undangan yang masih terbuka).",
+    "team_member": "Anggota tim (tanpa peran)",
+    "server_admin": "administrator server",
+    "reset_used": "Tautan atur ulang dipakai pada {{when}}.",
+    "reset_open": "Tautan atur ulang dibuat oleh {{name}}, berlaku sampai {{when}}.",
+    "reset_link": "Tautan atur ulang untuk {{name}}",
+    "reset_message": "{{name}}, pakai tautan ini untuk mengatur kata sandi Liturgist yang baru: {{link}}",
+    "edit_roles": "Ubah peran",
+    "create_reset_link": "Buat tautan atur ulang",
+    "remove": "Keluarkan dari gereja",
+    "remove_question": "Keluarkan {{name}} dari gereja? Akunnya tetap ada, tetapi tidak bisa lagi melihat gereja ini.",
+    "remove_confirm": "Keluarkan {{name}}",
+    "roles": "Peran",
+    "roles_hint": "Tanpa peran = anggota tim."
+  },
+  "invites": {
+    "title": "Undangan",
+    "new": "Undang seseorang",
+    "none": "Tidak ada undangan terbuka.",
+    "message": "{{name}}, Anda diundang bergabung dengan {{church}} di Liturgist. Buka tautan ini: {{link}}",
+    "pending": "Diundang oleh {{name}}, berlaku sampai {{when}}.",
+    "expired": "Kedaluwarsa pada {{when}}.",
+    "link": "Tautan undangan untuk {{name}}",
+    "regenerate": "Tautan baru",
+    "cancel": "Batalkan undangan",
+    "cancel_question": "Batalkan undangan untuk {{name}}? Tautannya tidak bisa dipakai lagi.",
+    "cancel_confirm": "Batalkan undangan",
+    "created": "Undangan untuk {{name}} sudah dibuat. Kirim tautan ini; tautan hanya ditampilkan sekarang.",
+    "name": "Nama",
+    "contact_hint": "Isi minimal satu.",
+    "create": "Buat undangan"
+  },
+  "roles": {
+    "title": "Peran",
+    "intro": "Peran adalah sekumpulan izin. Seorang anggota bisa memegang beberapa peran.",
+    "new": "Peran baru",
+    "member_count_other": "{{count}} anggota memegang peran ini.",
+    "no_scopes": "Tanpa izin",
+    "edit": "Ubah",
+    "delete": "Hapus peran",
+    "delete_question_other": "Hapus peran {{name}}? {{count}} anggota akan kehilangan peran ini.",
+    "delete_confirm": "Hapus {{name}}",
+    "edit_title": "Ubah {{name}}",
+    "name": "Nama peran",
+    "description": "Keterangan (opsional)",
+    "scopes": "Izin"
+  },
+  "membership": {
+    "not_member": "Anda sudah bukan anggota gereja ini."
+  },
+  "privacy": {
+    "title": "Privasi",
+    "what_title": "Apa yang kami simpan",
+    "what": "Nama, alamat email dan nomor HP orang-orang yang diundang gereja Anda, serta liturgi yang Anda siapkan bersama.",
+    "ip_title": "Alamat IP",
+    "ip": "Alamat IP hanya disimpan sebentar, untuk mencegah orang menebak kata sandi, dan dihapus dalam satu jam.",
+    "why_title": "Untuk apa",
+    "why": "Agar tim gereja Anda bisa menyiapkan dan menerbitkan liturgi bersama.",
+    "who_title": "Siapa yang bisa melihat",
+    "who": "Anggota yang diizinkan melihat daftar anggota bisa melihat kontak. Administrator server bisa melihat semua yang tersimpan di server.",
+    "contact_title": "Pertanyaan",
+    "contact_default": "Tanyakan kepada admin gereja Anda.",
+    "contact_church": "Kontak: {{contact}}"
+  },
+  "not_found": {
+    "title": "Halaman tidak ditemukan",
+    "text": "Halaman ini tidak ada.",
+    "home": "Ke beranda"
+  },
+  "errors": {
+    "generic": "Terjadi kesalahan. Silakan coba lagi.",
+    "network": "Tidak bisa terhubung ke server. Periksa koneksi Anda.",
+    "validation_failed": "Beberapa isian perlu diperiksa.",
+    "weak_password": {
+      "too_short": "Kata sandi minimal 10 karakter.",
+      "too_long": "Kata sandi paling banyak 128 karakter.",
+      "common": "Kata sandi ini terlalu umum. Pilih yang lain.",
+      "matches_identity": "Kata sandi tidak boleh sama dengan nama, email, nomor HP atau nama gereja Anda.",
+      "unknown": "Pilih kata sandi yang lebih kuat."
+    },
+    "invalid_identifier": "Masukkan alamat email atau nomor HP yang benar.",
+    "unauthenticated": "Silakan masuk lagi.",
+    "invalid_credentials": "Email/nomor HP atau kata sandi salah.",
+    "forbidden": "Anda tidak punya izin untuk melakukan ini.",
+    "scope_not_held": "Anda hanya bisa memberikan izin yang Anda miliki sendiri: {{scopes}}.",
+    "csrf_rejected": "Permintaan Anda diblokir. Muat ulang halaman lalu coba lagi.",
+    "invite_identifier_mismatch": "Undangan ini untuk akun lain. Keluar, lalu masuk sebagai orang tersebut.",
+    "limit_reached": "Gereja Anda sudah mencapai batas {{max}} anggota tim.",
+    "not_found": "Tidak ditemukan.",
+    "invalid_token": {
+      "unknown": "Tautan ini tidak bisa dipakai. Minta tautan baru kepada admin gereja Anda.",
+      "expired": "Tautan ini sudah kedaluwarsa. Minta tautan baru kepada admin gereja Anda.",
+      "used": "Tautan ini sudah pernah dipakai.",
+      "cancelled": "Tautan ini sudah dibatalkan. Minta tautan baru kepada admin gereja Anda."
+    },
+    "already_set_up": "Liturgist sudah disiapkan.",
+    "not_set_up": "Liturgist belum disiapkan.",
+    "already_member": "Orang ini sudah menjadi anggota gereja.",
+    "invite_exists": "Orang ini sudah punya undangan yang masih berlaku.",
+    "identifier_taken": "Email atau nomor HP ini milik akun lain.",
+    "lockout_prevented": "Harus ada orang yang tetap punya izin mengatur peran dan anggota.",
+    "role_name_taken": "Sudah ada peran lain dengan nama ini.",
+    "reset_not_allowed": "Orang ini juga anggota gereja lain, jadi kata sandinya tidak bisa Anda atur ulang.",
+    "too_many_attempts_other": "Terlalu banyak percobaan. Coba lagi dalam {{count}} menit.",
+    "internal": "Terjadi kesalahan di server.",
+    "unavailable": "Server sedang sibuk. Silakan coba lagi."
+  }
+}

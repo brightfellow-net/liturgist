@@ -1,0 +1,12 @@
+{
+  "name": "@liturgist/i18n",
+  "private": true,
+  "scripts": {
+    "lint": "echo ok",
+    "test": "echo \"completeness is tested in web (TC-W-003)\""
+  },
+  "exports": {
+    "./en.json": "./en.json",
+    "./id.json": "./id.json"
+  }
+}

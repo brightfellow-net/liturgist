@@ -1,0 +1,50 @@
+version: "2"
+linters:
+  enable: [depguard, errorlint, gosec, misspell, revive, unconvert]
+  settings:
+    errcheck:
+      exclude-functions: # CLI output to stdout/stderr; nothing useful to do on failure
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+    depguard:
+      rules:
+        domain:
+          files: ["**/domain/**", "!$test"]
+          # Standard library plus two pure-computation libraries (01 §3).
+          allow:
+            - "$gostd"
+            - "github.com/brightfellow-net/liturgist/domain"
+            - "github.com/nyaruka/phonenumbers"
+            - "golang.org/x/text/unicode/norm"
+          deny:
+            - pkg: "net/http"
+              desc: "domain is pure; HTTP lives in adapters (01 §3)"
+            - pkg: "database/sql"
+              desc: "domain is pure; SQL lives in adapters (01 §3)"
+        app:
+          files: ["**/app/**", "!$test"] # use-case tests run on real SQLite (P-12)
+          allow: ["$gostd", "github.com/brightfellow-net/liturgist/domain"]
+          deny:
+            - pkg: "net/http"
+              desc: "use cases don't know HTTP (01 §3)"
+            - pkg: "database/sql"
+              desc: "use cases use the Store port (02 §2)"
+        adapters:
+          files: ["**/adapters/**"]
+          deny:
+            - pkg: "github.com/brightfellow-net/liturgist/server"
+              desc: "adapters must not import the composition root"
+            - pkg: "github.com/brightfellow-net/liturgist/cmd"
+              desc: "adapters must not import commands"
+        cmd:
+          files: ["**/cmd/**"]
+          deny:
+            - pkg: "github.com/brightfellow-net/liturgist/app"
+              desc: "cmd wires through server/ only (01 §3)"
+            - pkg: "github.com/brightfellow-net/liturgist/domain"
+              desc: "cmd wires through server/ only"
+            - pkg: "github.com/brightfellow-net/liturgist/adapters"
+              desc: "cmd wires through server/ only"
+formatters:
+  enable: [gofmt, goimports]

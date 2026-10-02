@@ -1,0 +1,265 @@
+{
+  "app": {
+    "name": "Liturgist",
+    "skip_to_content": "Skip to content",
+    "loading": "Loading…"
+  },
+  "nav": {
+    "label": "Main menu",
+    "home": "Home",
+    "privacy": "Privacy",
+    "log_out": "Log out",
+    "profile": "Profile",
+    "settings": "Settings"
+  },
+  "common": {
+    "language": "Language",
+    "show_password": "Show password",
+    "hide_password": "Hide password",
+    "retry": "Try again",
+    "go_to_login": "Go to login",
+    "field_invalid": "Check this field.",
+    "required": "This field is required.",
+    "too_long": "At most {{max}} characters.",
+    "link_incomplete": "This link is incomplete. Ask your church admin for a new link.",
+    "back": "Back",
+    "password_hint": "At least 10 characters. A few words together are easy to remember.",
+    "cancel": "Cancel",
+    "done": "Done",
+    "no": "No, keep it"
+  },
+  "share": {
+    "copy": "Copy link",
+    "whatsapp": "Share to WhatsApp",
+    "copied": "Link copied.",
+    "copy_failed": "Couldn't copy. Select the link and copy it yourself.",
+    "expires": "Valid until {{when}}."
+  },
+  "language": {
+    "en": "English",
+    "id": "Bahasa Indonesia"
+  },
+  "login": {
+    "title": "Log in",
+    "identifier": "Email or phone number",
+    "password": "Password",
+    "submit": "Log in",
+    "forgot": "Forgot password?",
+    "forgot_text": "Ask your church admin to send you a reset link."
+  },
+  "setup": {
+    "title": "Set up Liturgist",
+    "intro": "Create your church and the first church admin. You can change the church settings later.",
+    "church_section": "Church",
+    "church_name": "Church name",
+    "ui_language": "Language of the app",
+    "content_language": "Main language of the liturgy",
+    "translation": "Bible translation",
+    "time_zone": "Time zone",
+    "key_display": "How song keys are shown",
+    "key_do": "Do = G",
+    "key_letter": "G",
+    "admin_section": "First church admin",
+    "admin_name": "Your name",
+    "admin_identifier": "Your email or phone number",
+    "admin_password": "Password",
+    "submit": "Create church",
+    "already": "Liturgist is already set up.",
+    "incomplete": "This link is incomplete. Open the setup link printed in the server log.",
+    "content_languages": {
+      "id": "Indonesian",
+      "en": "English",
+      "zh-Hans": "Chinese (simplified)",
+      "zh-Hant": "Chinese (traditional)"
+    },
+    "time_zones": {
+      "Asia/Jakarta": "WIB (Jakarta)",
+      "Asia/Makassar": "WITA (Makassar)",
+      "Asia/Jayapura": "WIT (Jayapura)"
+    }
+  },
+  "invite": {
+    "title": "Join your church team",
+    "invited": "{{church}} has invited {{name}} to join the church team.",
+    "logged_in_as": "You are logged in as {{name}}.",
+    "join_with_account": "Join with this account",
+    "use_other_account": "Log out and use another account",
+    "has_account": "You already have an account. Log in to accept the invite.",
+    "already_have_account": "I already have an account",
+    "new_account": "Create your account",
+    "name": "Your name",
+    "email": "Email",
+    "phone": "Phone number",
+    "contact_hint": "Fill in at least one. You will log in with it.",
+    "need_identifier": "Enter an email address or a phone number.",
+    "password": "Choose a password",
+    "continue": "Continue",
+    "log_in": "Log in",
+    "confirm": "You are joining {{church}} as {{name}}.",
+    "join": "Join",
+    "identifier_taken": "This email or phone number already has an account. Log in to accept the invite."
+  },
+  "reset": {
+    "title": "Set a new password",
+    "for": "New password for {{name}}.",
+    "created_by": "This link was created by {{name}}.",
+    "created_by_server": "This link was created by the server administrator.",
+    "new_password": "New password",
+    "submit": "Save password and log in"
+  },
+  "home": {
+    "title": "Welcome, {{name}}",
+    "church": "You are a member of {{church}}.",
+    "assignments": "Your assignments will appear here."
+  },
+  "profile": {
+    "title": "Profile",
+    "details": "Your details",
+    "name": "Name",
+    "text_size": "Text size",
+    "text_sizes": {
+      "normal": "Normal",
+      "large": "Large",
+      "larger": "Larger"
+    },
+    "ui_language": "Language of the app",
+    "church_default": "Church default ({{language}})",
+    "save": "Save",
+    "saved": "Saved.",
+    "password_title": "Change password",
+    "current_password": "Current password",
+    "new_password": "New password",
+    "change_password": "Change password",
+    "password_changed": "Your password has been changed. You have been logged out on your other devices.",
+    "devices_title": "Other devices",
+    "devices_text": "Lost your phone? Log out everywhere except on this device.",
+    "end_others": "Log out on all other devices",
+    "others_ended": "You have been logged out on all other devices."
+  },
+  "settings": {
+    "title": "Settings",
+    "church": "Church",
+    "members": "Members",
+    "roles": "Roles"
+  },
+  "church": {
+    "read_only": "Only members allowed to change church settings can edit these.",
+    "feedback_url": "Feedback link",
+    "feedback_url_hint": "Optional. A link starting with https:// where the congregation can send feedback.",
+    "feedback_url_invalid": "The link must start with https://.",
+    "privacy_contact": "Privacy contact",
+    "privacy_contact_hint": "Optional. Shown on the privacy page, e.g. a name and phone number."
+  },
+  "members": {
+    "title": "Members",
+    "usage": "{{used}} of {{max}} team members (including open invites).",
+    "team_member": "Team member (no roles)",
+    "server_admin": "the server administrator",
+    "reset_used": "Reset link used on {{when}}.",
+    "reset_open": "Reset link created by {{name}}, valid until {{when}}.",
+    "reset_link": "Reset link for {{name}}",
+    "reset_message": "{{name}}, use this link to set a new Liturgist password: {{link}}",
+    "edit_roles": "Change roles",
+    "create_reset_link": "Create reset link",
+    "remove": "Remove from church",
+    "remove_question": "Remove {{name}} from the church? Their account stays, but they can no longer see this church.",
+    "remove_confirm": "Remove {{name}}",
+    "roles": "Roles",
+    "roles_hint": "No roles = team member."
+  },
+  "invites": {
+    "title": "Invites",
+    "new": "Invite a person",
+    "none": "No open invites.",
+    "message": "{{name}}, you are invited to join {{church}} on Liturgist. Open this link: {{link}}",
+    "pending": "Invited by {{name}}, valid until {{when}}.",
+    "expired": "Expired on {{when}}.",
+    "link": "Invite link for {{name}}",
+    "regenerate": "New link",
+    "cancel": "Cancel invite",
+    "cancel_question": "Cancel the invite for {{name}}? The link stops working.",
+    "cancel_confirm": "Cancel the invite",
+    "created": "Invite for {{name}} created. Send them this link; it is shown only now.",
+    "name": "Name",
+    "contact_hint": "Fill in at least one.",
+    "create": "Create invite"
+  },
+  "roles": {
+    "title": "Roles",
+    "intro": "A role is a set of permissions. Members can hold several roles.",
+    "new": "New role",
+    "member_count_one": "{{count}} member has this role.",
+    "member_count_other": "{{count}} members have this role.",
+    "no_scopes": "No permissions",
+    "edit": "Edit",
+    "delete": "Delete role",
+    "delete_question_one": "Delete the role {{name}}? {{count}} member will lose it.",
+    "delete_question_other": "Delete the role {{name}}? {{count}} members will lose it.",
+    "delete_confirm": "Delete {{name}}",
+    "edit_title": "Edit {{name}}",
+    "name": "Role name",
+    "description": "Description (optional)",
+    "scopes": "Permissions"
+  },
+  "membership": {
+    "not_member": "You are no longer a member of this church."
+  },
+  "privacy": {
+    "title": "Privacy",
+    "what_title": "What we store",
+    "what": "Names, email addresses and phone numbers of the people your church invites, and the liturgies you prepare together.",
+    "ip_title": "IP addresses",
+    "ip": "IP addresses are kept only briefly, to block people guessing passwords, and are deleted within an hour.",
+    "why_title": "Why",
+    "why": "To let your church team prepare and publish liturgies together.",
+    "who_title": "Who can see it",
+    "who": "Members who are allowed to see the member list can see contact details. The server's administrator can see everything stored on the server.",
+    "contact_title": "Questions",
+    "contact_default": "Ask your church admin.",
+    "contact_church": "Contact: {{contact}}"
+  },
+  "not_found": {
+    "title": "Page not found",
+    "text": "This page doesn't exist.",
+    "home": "Go to the home page"
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "network": "Can't reach the server. Check your connection.",
+    "validation_failed": "Some fields need attention.",
+    "weak_password": {
+      "too_short": "The password must be at least 10 characters.",
+      "too_long": "The password must be at most 128 characters.",
+      "common": "This password is too common. Choose another.",
+      "matches_identity": "The password must not be your name, email, phone number or church name.",
+      "unknown": "Choose a stronger password."
+    },
+    "invalid_identifier": "Enter a valid email address or phone number.",
+    "unauthenticated": "Please log in again.",
+    "invalid_credentials": "The email/phone or password is incorrect.",
+    "forbidden": "You don't have permission to do this.",
+    "scope_not_held": "You can only give permissions you have yourself: {{scopes}}.",
+    "csrf_rejected": "Your request was blocked. Reload the page and try again.",
+    "invite_identifier_mismatch": "This invite is for another account. Log out and log in as that person.",
+    "limit_reached": "Your church has reached its limit of {{max}} team members.",
+    "not_found": "Not found.",
+    "invalid_token": {
+      "unknown": "This link can't be used. Ask your church admin for a new one.",
+      "expired": "This link has expired. Ask your church admin for a new one.",
+      "used": "This link has already been used.",
+      "cancelled": "This link was cancelled. Ask your church admin for a new one."
+    },
+    "already_set_up": "Liturgist is already set up.",
+    "not_set_up": "Liturgist is not set up yet.",
+    "already_member": "This person is already a member of the church.",
+    "invite_exists": "This person already has an open invite.",
+    "identifier_taken": "This email or phone number belongs to another account.",
+    "lockout_prevented": "Someone must keep the permissions to manage roles and members.",
+    "role_name_taken": "Another role already has this name.",
+    "reset_not_allowed": "This person also belongs to another church, so you can't reset their password.",
+    "too_many_attempts_one": "Too many attempts. Try again in {{count}} minute.",
+    "too_many_attempts_other": "Too many attempts. Try again in {{count}} minutes.",
+    "internal": "Something went wrong on the server.",
+    "unavailable": "The server is busy. Please try again."
+  }
+}
