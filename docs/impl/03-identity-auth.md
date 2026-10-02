@@ -146,7 +146,7 @@ A **pending** invite is one with `accepted_at`, `cancelled_at` both null and `ex
 2. If the invite has an owner → 409 `identifier_taken` (the page switches to "log in to accept").
 3. `name`, `email`, `phone` are pre-filled from the invite in the web app and may be corrected by the invitee; at least one identifier; each parsed as in [§2](#2-identifiers). If a submitted identifier belongs to an existing user → 409 `identifier_taken`.
 4. The password check of step 0 includes the submitted name and identifiers.
-5. In the same transaction, create the user with the submitted details, a membership with the invite's roles (role IDs that no longer exist are skipped), mark the invite accepted (recording `accepted_user_id`), create a session; `201`.
+5. In the same transaction, create the user with the submitted details, a membership with the invite's roles (role IDs that no longer exist are skipped), record the new user as `accepted_user_id` on the invite claimed in step 1, create a session; `201`.
 
 **Accept with the logged-in account** `POST /api/v1/invites/accept-existing` `{ token }` — requires a session:
 1. In one `Tx.Write`: check rule 2 below, then **atomically claim** the invite; nothing claimed → `invalid_token` with `reason`.
@@ -197,7 +197,7 @@ Names are created in the church's default UI language; churches can rename them.
 **Safeguards** (checked inside the same `Tx.Write` as the change: the use case calls `LockChurch` first, then applies the change, then checks, then commits — so two concurrent changes in the same church are evaluated one after the other on both databases):
 
 1. **No lock-out [P-16]:** after the change, at least one membership must hold `roles.manage` **and** `members.manage` (through any combination of roles). Otherwise → 409 `lockout_prevented`. Applies to: editing a role's scopes, deleting a role, changing a member's roles, removing a member.
-2. **No escalation:** the actor must hold every scope they put into a role (create/edit), every scope of every role they assign or remove from a member, and every scope of every role in an invite they create or regenerate. Otherwise → 403 `scope_not_held` with the missing `scopes`.
+2. **No escalation:** the actor must hold every scope they add to a role (on create, all its scopes; on edit, only scopes the role doesn't already have, so renaming or removing scopes needs none), every scope of every role they assign to or remove from a member, every scope of a role they delete while members hold it (deleting it takes it away from them), and every scope of every role in an invite they create or regenerate. Otherwise → 403 `scope_not_held` with the missing `scopes`.
 3. **Removing members:** removing a member deletes the membership and its role assignments; the user account and sessions remain. The actor needs `members.manage`, plus rule 2 for the removed member's roles (you cannot remove someone more powerful than you).
 
 **Effective scopes** of an actor = union of the scopes of their roles, computed per request in `authz.Actor` ([04 §5](04-tenancy-extensions.md#5-authorization)).
@@ -282,7 +282,7 @@ Email-based reset is not part of step 1 (no email support yet).
 | `time_zone` | Loadable by `time.LoadLocation`; the wizard offers `Asia/Jakarta` (WIB, pre-selected), `Asia/Makassar` (WITA), `Asia/Jayapura` (WIT) |
 | `key_display` | `do` ("Do = G") or `letter` ("G") |
 
-Validate fields and hash the admin password outside any transaction. Then in one `Tx.Write`: take `LockInstall`; **atomically claim** the token (`DELETE FROM setup_tokens WHERE id = 1 AND token_hash = $h AND expires_at > $now`, 1 row required, otherwise 400 `invalid_token`); if any church exists → 409 `already_set_up`; create the church, the three ready-made roles ([§8](#8-member-roles-and-permissions)), the user, and a membership holding the Church admin role; create a session; respond `201` after commit. The resolver cache is refreshed ([04 §3](04-tenancy-extensions.md#3-tenantresolver)).
+Validate fields and hash the admin password outside any transaction. Then in one `Tx.Write`: take `LockInstall`; if any church exists → 409 `already_set_up`; **atomically claim** the token (`DELETE FROM setup_tokens WHERE id = 1 AND token_hash = $h AND expires_at > $now`, 1 row required, otherwise 400 `invalid_token` with reason `unknown`, since the single row can't tell an expired token from a replaced one); create the church, the three ready-made roles ([§8](#8-member-roles-and-permissions)), the user, and a membership holding the Church admin role; create a session; respond `201` after commit. The resolver cache is refreshed ([04 §3](04-tenancy-extensions.md#3-tenantresolver)).
 
 **CLI** `liturgist setup --church-name … --admin-name … --admin-identifier … [--ui-language en] [--language id] [--translation TB] [--time-zone Asia/Jakarta] [--key-display do]`. The password is read from the terminal without echo, or from stdin with `--password-stdin`. Calls the same use case without a token, but under the same `LockInstall` and church-count check, so the CLI and the web wizard can never both create a church. Already set up → exit 4.
 

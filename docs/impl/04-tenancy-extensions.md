@@ -22,7 +22,7 @@ The tenant context, the `TenantResolver` and `URLBuilder` ports, authorization (
 - **Invite operations** (`/api/v1/invites/inspect`, `/accept`, `/accept-existing`) are `optional` and take the church from the invite:
   - Community: the resolver always returns the install's only church, which is always the invite's church.
   - SaaS: invite links carry the church slug (built by the SaaS `URLBuilder`). If a tenant is resolved and differs from the invite's church → 404 `not_found`. If the slug is unknown → 404 `not_found`.
-- `GET /api/v1/me` with no tenant (not set up) returns `church` and `membership` as `null`.
+- `GET /api/v1/me` with no tenant (not set up), or for a user who is not a member of the tenant church, returns `church` and `membership` as `null`.
 - Use cases read the tenant with `app.TenantFrom(ctx)`; it returns an error if absent. Use cases pass `Tenant.ChurchID` to `Store.ForChurch` ([02 §2](02-persistence.md#2-ports-in-app)).
 - **Enforcing scoped access:** every `ChurchStore` repository method is covered by the two-church contract test IT-P-007 ([02 §10](02-persistence.md#10-test-case-specifications)), and composite foreign keys reject cross-church references. When `liturgist-saas` adds row-level-security policies, they must deny all rows when `liturgist.church_id` is unset (fail closed).
 
@@ -202,7 +202,7 @@ type Entitlements interface {
 
 | Test ID | Flow | Setup | Verification | Teardown |
 |---|---|---|---|---|
-| IT-T-001 | Not a member | User U with no membership, logged in | Every church endpoint in §6 → 404 `not_found`, body identical to a request for a non-existent member ID; log line has `not_found_reason=not_member`; `GET /me` → `membership: null` | — |
+| IT-T-001 | Not a member | User U with no membership, logged in | Every church endpoint in §6 → 404 `not_found`, body identical to a request for a non-existent member ID; log line has `not_found_reason=not_member`; `GET /me` → `membership: null`, `church: null` | — |
 | IT-T-002 | Missing scope | Logged-in team member (no roles) | `PATCH /church`, `GET /members`, `POST /invites`, `POST /roles` → 403 `forbidden` | Custom role with only `members.view` → `GET /members` 200, `POST /invites` 403 |
 | IT-T-007 | Role editor safeguards | Church admin A and liturgist L | A removes `roles.manage` from Church admin role while A is the only holder → 409 `lockout_prevented`; L (no `roles.manage`) can't edit roles; A creates role with a scope A lacks → 403 `scope_not_held` | — |
 | IT-T-003 | Not set up | Fresh install, logged out | `GET /api/v1/church` → 409 `not_set_up`; `GET /api/v1/setup/status` → 200 | — |

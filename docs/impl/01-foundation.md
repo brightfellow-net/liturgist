@@ -159,6 +159,7 @@ type Config struct {
     RequirePreUpgradeCopy bool
     ClientIPHeader string
     Logger      *slog.Logger
+    Notices     io.Writer // where serve prints the framed setup link (stderr); nil = log only
 }
 
 type Option func(*options)
@@ -169,16 +170,19 @@ func WithStorage(s app.Storage) Option
 func WithEventBus(b app.EventBus) Option
 func WithTenantResolver(r httpapi.TenantResolver) Option
 func WithURLBuilder(u app.URLBuilder) Option
-func WithRoutes(fn func(api huma.API, deps Deps)) Option // SaaS adds operations; never replaces community ones
+func WithRoutes(fn func(api huma.API)) Option // SaaS adds operations; never replaces community ones
 
 func New(ctx context.Context, cfg Config, opts ...Option) (*Server, error)
 func (s *Server) Handler() http.Handler
 func (s *Server) Run(ctx context.Context) error
 func (s *Server) Close() error
+
+func OpenOperator(ctx context.Context, cfg Config) (*Operator, error) // the CLI commands of §6
 ```
 
 - Every option has a community default; `New` with no options gives the community edition.
 - `New` fills zero-valued `SessionTTL`, `SessionMaxAge` and `Logger` with the same defaults as the environment variables, so a `Config` built in code (the SaaS) can't produce sessions that expire immediately.
+- `OpenOperator` never migrates: a database with pending migrations is refused with a hint to run `liturgist migrate`.
 - `WithRoutes` panics at startup if it registers an operation ID or method+path that already exists.
 
 ## 8. HTTP basics
