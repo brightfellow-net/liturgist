@@ -70,12 +70,17 @@ One user may hold several roles. Multimedia team is a team-member role for now; 
 
 ### 5.3 Song library
 - Per-church library. **The app ships with no lyrics.** Each church enters its own.
-- Song fields: title, alternative titles, hymnal source and number (e.g. KJ 1, PKJ 12, NKB 5), author/composer, default key, copyright/license notes, and an optional **default arrangement** (the usual order of sections, e.g. V1, PC, C, V2, PC, C, B, C, C).
+- Song fields: title, alternative titles, hymnal source and number (e.g. KJ 1, PKJ 12, NKB 5), lyricist, composer, translator, default key, copyright fields (below), and an optional **default arrangement** (the usual order of sections, e.g. V1, PC, C, V2, PC, C, B, C, C).
 - Lyrics are stored **as ordered sections** (verse 1, verse 2, chorus, bridge…), not one text block. This is required so slides can be generated later. Each section has a kind (verse, pre-chorus, chorus, bridge, tag, intro, ending, other) and, for verses, a number.
 - A section cannot be deleted while an unpublished liturgy uses it. Published liturgies are unaffected because they keep their own copy (`PublishedVersion`).
 - Each song has a **language**. The same hymn in another language is a separate song (its own hymnal number, sections, verse count and licence notes), linked to its other-language versions through a song group, so they can be found together and paired up for parallel text later.
 - Search by title, hymnal number, and lyric text. Chinese text is searched by substring matching (Chinese has no spaces between words, so full-text search can't find words inside a line); Indonesian and English use full-text search. Both sit behind the search interface.
-- Usage history: which liturgies used this song (useful for planning and future license reporting).
+- Usage history: which liturgies used this song (useful for planning and license reporting).
+- **Copyright information.** The app can't grant permission; it helps a church record what it knows, show required credit lines, and report usage. Translations of public-domain hymns are usually copyrighted works of their own, so original authors and translator are recorded separately.
+  - Song fields: copyright holder (e.g. Yamuger), copyright line (the exact text to print, e.g. "© Yayasan Musik Gereja Indonesia"), CCLI song number, licence status (unknown, public domain, covered by church licence, permission obtained), and free-text licence notes.
+  - The song library can be filtered by licence status, so a church can review its gaps.
+  - **No enforcement:** publishing and printing are never blocked because of licence status.
+  - **Usage report** (MVP): a CSV export of songs used in a chosen period, with title, hymnal number, CCLI number, how often, and in which services (e.g. for CCLI reporting).
 
 **Importing existing content.** An empty library is the biggest hurdle to adoption, so getting a church's existing lyrics in must be quick:
 - **Paste and split** (MVP, an everyday tool): the user pastes lyrics; the app splits them at blank lines and recognises section labels in Indonesian, English and Chinese ("1.", "Bait 1", "Ayat 1" → verse 1; "Reff", "Refrein", "Chorus", "副歌" → chorus; "Bridge", "Pre-Chorus", "Interlude"), suggesting an unlabelled block repeated after each verse as the chorus. The user checks and adjusts the preview before saving.
@@ -117,6 +122,7 @@ Draft ──submit──▶ In Review ──approve──▶ Approved ──publ
   - **Paper sizes:** A4 and F4 / Folio (215 × 330 mm).
   - **Options:** lyrics in full or first lines only; reading text on or off; assignments, keys and notes shown or hidden; normal or large text. The church sets defaults; the person printing can change them.
   - **Header:** church name, optional church logo (uploaded in settings, stored through `Storage`), service, date and time.
+  - **Credits:** each song's copyright line under the song in the team version and the published view (on by default; a church setting can turn it off; not on the musician sheet), and an optional licence footer with the church's licence numbers (e.g. "CCLI License #1234567").
   - **Production:** a print view of the published liturgy, styled for print, printed or saved as PDF through the browser. Song headings are kept with their first section, and sections are not split across pages where possible. Server-side PDF (Typst) comes later, for booklets and an exact match with the reference layout.
 - **Mobile-friendly web view** of a published liturgy, shareable by link, plus a "my assignments" view for each team member.
 - **Open decision:** layout of the PDF. Get GKY Citragarden's current liturgy document as the reference design.
@@ -195,7 +201,7 @@ Draft ──submit──▶ In Review ──approve──▶ Approved ──publ
 
 Starting point, not final. Refine as needed.
 
-- **Church**: id, name, default_language, default_translation_id, time_zone (e.g. `Asia/Jakarta`), logo_file? (stored through `Storage`), settings (incl. key display format: "Do = G" or "G", and print defaults) *(slug is SaaS-only; see 8.1.1)*
+- **Church**: id, name, default_language, default_translation_id, time_zone (e.g. `Asia/Jakarta`), logo_file? (stored through `Storage`), settings (incl. key display format: "Do = G" or "G", print defaults, church licences such as a CCLI licence number, and whether credit lines are shown) *(slug is SaaS-only; see 8.1.1)*
 - **ChurchSlugRedirect**: old_slug, church_id *(SaaS-only, and only if slug renaming is allowed; see 8.1.1)*
 - **User**: id, name, email?, phone?, password_hash *(platform-wide, no church_id; at least one of email or phone; each is unique across the platform)*
 - **Membership**: id, user_id, church_id, roles *(roles apply per church; a user may belong to several churches)*
@@ -209,7 +215,7 @@ Starting point, not final. Refine as needed.
 - **LiturgyItemSong**: id, liturgy_item_id, position, song_id, key?, note? *(several per item = medley)*
 - **SequenceEntry**: id, liturgy_item_song_id, position, kind (MVP: `section` only; later `instrumental`, `spoken`, …), song_section_id?, singing_part_id?, key_change?, note?
 - **Assignment**: id, liturgy_id, user_id (or free-text name for non-users), role_type_id
-- **Song**: id, church_id, song_group_id?, language, title, alt_titles, hymnal_source, hymnal_number, author, default_key, license_notes, default_arrangement? (ordered list of section ids)
+- **Song**: id, church_id, song_group_id?, language, title, alt_titles, hymnal_source, hymnal_number, lyricist, composer, translator, default_key, copyright_holder, copyright_line, ccli_song_number?, licence_status (unknown, public_domain, church_licence, permission_obtained), license_notes, default_arrangement? (ordered list of section ids)
 - **SongSection**: id, song_id, position, kind (verse, pre_chorus, chorus, bridge, tag, intro, ending, other), number?, label (Verse 1, Chorus…), text
 - **SingingPart**: id, church_id, name (e.g. Semua, Pemandu, Jemaat, Pria, Wanita, Paduan Suara; seeded with defaults, editable per church)
 - **ImportBatch**: id, church_id, source_format (e.g. paste, openlyrics, chordpro, easyworship, pptx), created_by, created_at, status
@@ -220,7 +226,7 @@ Starting point, not final. Refine as needed.
 - **Comment**: id, liturgy_id, liturgy_item_id?, author_id, body, resolved, timestamps
 - **StateChange**: id, liturgy_id, from_state, to_state, user_id, timestamp
 - **LiturgyEdit**: id, liturgy_id, user_id, command (e.g. MoveItem, EditItemText, SetSequence), reverse_data (what is needed to undo it), created_at, undone_at? *(the per-liturgy undo/redo history)*
-- **PublishedVersion**: id, liturgy_id, version, content (complete copy of the liturgy as published: items, chosen song sections with text, reading text, assignments), published_at, published_by
+- **PublishedVersion**: id, liturgy_id, version, content (complete copy of the liturgy as published: items, chosen song sections with text, reading text, assignments, song credit lines and the licence footer as they were at publishing), published_at, published_by
 
 ## 8. Non-functional requirements
 
@@ -485,3 +491,4 @@ Record resolved decisions here (date, decision, reason). Move items from section
 | 2026-10-02 | "Prepare next week" respects the free-plan limits: it shows how many liturgies fit, and when more slots are needed it offers one explicit button, "Archive last week's N published liturgies and create these N". Automatic archiving was considered and rejected | Nearly as convenient as auto-archiving while keeping the earlier decision that nothing is archived automatically and the church stays in control; only relevant to the SaaS free plan (community installs are unlimited) |
 | 2026-10-02 | WhatsApp messages in the MVP (community `Notifier`): a team summary (Copy, Share to WhatsApp via `wa.me/?text=`), personal messages per assigned person (Send via WhatsApp via `wa.me/<phone>?text=`), and a change summary after republishing (diff against the previous `PublishedVersion`). Content: titles, hymnal numbers, keys, reading references, assignments and the link; never lyrics or Bible text; checkboxes for songs, keys and readings. WhatsApp `*bold*` and plain URLs only. Friendly tone with the person's name, avoiding "kamu" or "Bapak/Ibu". Editable message templates, automatic sending, reminders and email notifications come later | WhatsApp is how Indonesian church teams communicate; wa.me links give most of the value with no API, cost or setup; copyrighted text stays behind login |
 | 2026-10-02 | Print formats in the MVP: team version and musician sheet; A4 and F4 / Folio paper; options for lyrics (full or first lines), reading text, assignments, keys and notes, and text size, with church defaults; header with church name, optional logo (stored through `Storage`), service, date and time. Produced with print styling in the browser. Congregation version, "my part" and A5 booklets come later (booklets need server-side Typst plus a booklet step). The exact layout still waits for open decision 3 | F4 is common in Indonesian churches and easy to forget; the musician sheet costs almost nothing from the same data; booklets can't be produced reliably by browsers |
+| 2026-10-02 | Song copyright: `Song.author` is split into lyricist, composer and translator, and songs gain copyright holder, copyright line, CCLI song number and licence status (unknown, public domain, covered by church licence, permission obtained), keeping free-text notes; the library can filter by status. Church licences (e.g. CCLI number) live in settings, with an optional licence footer on prints. Credit lines appear under songs in the team version and published view, on by default. `PublishedVersion` stores the credits as published. A usage report CSV is in the MVP. Licence status never blocks publishing or printing | Licences usually require credit lines and usage reporting; translations of old hymns are separate copyrighted works; the app records and reports but doesn't police, because it can't know a church's agreements |
