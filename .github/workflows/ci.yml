@@ -26,3 +26,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: make gen && git diff --exit-code
       - run: pnpm -r lint && pnpm -r test && pnpm --filter web build
+      - run: pnpm --filter web exec playwright install --with-deps chromium
+      - run: pnpm --filter web e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            web/playwright-report
+            web/test-results

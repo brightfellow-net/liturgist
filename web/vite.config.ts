@@ -11,5 +11,5 @@ export default defineConfig({
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   build: { outDir: "dist", assetsDir: "assets" },
   server: { port: 5173, proxy: { "/api": "http://localhost:8080" } },
-  test: { environment: "jsdom", setupFiles: ["./src/test/setup.ts"] },
+  test: { environment: "jsdom", setupFiles: ["./src/test/setup.ts"], include: ["src/**/*.test.{ts,tsx}"] },
 });

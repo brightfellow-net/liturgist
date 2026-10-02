@@ -2,7 +2,7 @@ GO_LDFLAGS := -X github.com/brightfellow-net/liturgist/server.Version=$(shell gi
               -X github.com/brightfellow-net/liturgist/server.Commit=$(shell git rev-parse --short HEAD 2>/dev/null || echo unknown) \
               -X github.com/brightfellow-net/liturgist/server.BuildDate=$(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 
-.PHONY: build web gen test test-pg lint dev
+.PHONY: build web gen test test-pg e2e lint dev
 
 build: gen web
 	go build -ldflags "$(GO_LDFLAGS)" -o bin/liturgist ./cmd/liturgist
@@ -20,6 +20,12 @@ test:
 
 test-pg:
 	LITURGIST_TEST_POSTGRES=1 go test ./...
+
+# Browser tests against the real binary (05 §9). Uses Playwright's Chromium
+# ("pnpm --filter web exec playwright install chromium"), or an installed
+# Google Chrome with PLAYWRIGHT_CHANNEL=chrome.
+e2e: web
+	pnpm --filter web e2e
 
 lint: node_modules
 	golangci-lint run ./...

@@ -2,3 +2,5 @@ web/dist/*
 !web/dist/.keep
 bin/
 node_modules/
+web/test-results/
+web/playwright-report/
