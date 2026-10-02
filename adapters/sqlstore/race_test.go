@@ -4,6 +4,7 @@
 package sqlstore_test
 
 import (
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -134,7 +135,9 @@ func TestRacePatterns(t *testing.T) {
 		t.Run("conditional update", func(t *testing.T) {
 			// Extension racing with logout: the session stays deleted.
 			race(t, db, func(i int, s app.Store, wait func()) (bool, error) {
-				if _, err := s.Sessions().ByTokenHash(ctx, hash("3")); err != nil {
+				// On SQLite the transactions take turns, so the logout may
+				// already have committed; the extension must then change nothing.
+				if _, err := s.Sessions().ByTokenHash(ctx, hash("3")); err != nil && !errors.Is(err, app.ErrNotFound) {
 					return false, err
 				}
 				wait()
