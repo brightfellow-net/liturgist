@@ -62,6 +62,14 @@ func (r userRepo) SetPasswordHash(ctx context.Context, id domain.UserID, hash st
 	return r.exec1(ctx, "UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?", hash, r.d.TimeArg(now), id)
 }
 
+func (r userRepo) UpdateProfile(ctx context.Context, id domain.UserID, name string, prefs domain.Preferences, now time.Time) error {
+	p, err := jsonArg(prefs)
+	if err != nil {
+		return err
+	}
+	return r.exec1(ctx, "UPDATE users SET name = ?, preferences = ?, updated_at = ? WHERE id = ?", name, p, r.d.TimeArg(now), id)
+}
+
 func (r userRepo) Touch(ctx context.Context, id domain.UserID, now time.Time) error {
 	return r.exec1(ctx, "UPDATE users SET last_seen_at = ? WHERE id = ?", r.d.TimeArg(now), id)
 }

@@ -178,6 +178,7 @@ func (s *Server) Close() error
 ```
 
 - Every option has a community default; `New` with no options gives the community edition.
+- `New` fills zero-valued `SessionTTL`, `SessionMaxAge` and `Logger` with the same defaults as the environment variables, so a `Config` built in code (the SaaS) can't produce sessions that expire immediately.
 - `WithRoutes` panics at startup if it registers an operation ID or method+path that already exists.
 
 ## 8. HTTP basics

@@ -16,6 +16,7 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/brightfellow-net/liturgist/adapters/httpapi"
 	"github.com/danielgtaylor/huma/v2"
 )
 
@@ -191,7 +192,7 @@ func TestNoCORS(t *testing.T) {
 func TestAPINotFoundIsProblem(t *testing.T) {
 	h := testHandler(t, testConfig(t, "http://localhost:8080", nil))
 	rec := do(h, http.MethodGet, "/api/v1/nope", "localhost", nil)
-	var p Problem
+	var p httpapi.Problem
 	if err := json.Unmarshal(rec.Body.Bytes(), &p); err != nil {
 		t.Fatalf("body is not JSON: %q", rec.Body.String())
 	}
@@ -220,11 +221,11 @@ func TestPanicBecomesProblem(t *testing.T) {
 
 // TC-F-006 (part): Huma's own errors carry a code; 5xx details are hidden.
 func TestHumaErrorsCarryCode(t *testing.T) {
-	p, ok := newProblem(http.StatusUnprocessableEntity, "bad input").(*Problem)
+	p, ok := httpapi.NewProblem(http.StatusUnprocessableEntity, "bad input").(*httpapi.Problem)
 	if !ok || p.Code != "validation_failed" || p.Detail != "bad input" {
 		t.Errorf("422: %+v", p)
 	}
-	p = newProblem(http.StatusInternalServerError, "db password wrong").(*Problem)
+	p = httpapi.NewProblem(http.StatusInternalServerError, "db password wrong").(*httpapi.Problem)
 	if p.Code != "internal" || p.Detail != "" {
 		t.Errorf("500 must hide details: %+v", p)
 	}

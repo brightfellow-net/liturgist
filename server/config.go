@@ -41,6 +41,21 @@ type Config struct {
 	Logger                *slog.Logger
 }
 
+// withDefaults fills settings a hand-built Config (e.g. the SaaS) may leave
+// zero, with the same defaults as the environment variables (01 §5).
+func withDefaults(cfg Config) Config {
+	if cfg.SessionTTL == 0 {
+		cfg.SessionTTL = 2160 * time.Hour
+	}
+	if cfg.SessionMaxAge == 0 {
+		cfg.SessionMaxAge = 8760 * time.Hour
+	}
+	if cfg.Logger == nil {
+		cfg.Logger = slog.New(slog.DiscardHandler)
+	}
+	return cfg
+}
+
 // StartupWarnings returns the configuration warnings of 01 §5 (logged, never fatal).
 func StartupWarnings(cfg Config) []string {
 	var w []string

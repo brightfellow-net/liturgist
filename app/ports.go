@@ -62,6 +62,7 @@ type UserRepo interface {
 	ByID(ctx context.Context, id domain.UserID) (domain.User, error)             // ErrNotFound
 	Create(ctx context.Context, u domain.User) error                             // UniqueError users_email_key / users_phone_key
 	SetPasswordHash(ctx context.Context, id domain.UserID, hash string, now time.Time) error
+	UpdateProfile(ctx context.Context, id domain.UserID, name string, prefs domain.Preferences, now time.Time) error
 	Touch(ctx context.Context, id domain.UserID, now time.Time) error // last_seen_at
 	MembershipChurchIDs(ctx context.Context, id domain.UserID) ([]domain.ChurchID, error)
 }

@@ -177,3 +177,50 @@ func (a *Auth) Logout(ctx context.Context, tokenHash string) error {
 func (a *Auth) EndOtherSessions(ctx context.Context, user domain.UserID, keepHash string) error {
 	return a.Tx.Write(ctx, func(s Store) error { return s.Sessions().DeleteOthers(ctx, user, keepHash) })
 }
+
+// CheckPassword verifies a logged-in user's current password with the same
+// throttling as a login (03 §9: a wrong current password counts as a login
+// failure). Hashing happens outside any transaction.
+func (a *Auth) CheckPassword(ctx context.Context, user domain.User, password, clientAddr string) error {
+	now := a.Clock.Now()
+	keys := domain.ThrottleKeys(primaryIdentifier(user), clientAddr)
+	allKeys := []string{keys[domain.ThrottleIP], keys[domain.ThrottleIdentifierIP], keys[domain.ThrottleIdentifier]}
+	err := a.Tx.Read(ctx, func(s Store) error {
+		until, err := s.AuthThrottle().LockedUntil(ctx, allKeys, now)
+		if err == nil && !until.IsZero() {
+			return &TooManyAttemptsError{RetryAfter: until.Sub(now)}
+		}
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	ok, _, err := a.Hasher.Verify(ctx, user.PasswordHash, password)
+	if err != nil {
+		return err
+	}
+	if ok {
+		return nil
+	}
+	err = a.Tx.Write(ctx, func(s Store) error {
+		for kind, key := range keys {
+			if err := s.AuthThrottle().RecordFailure(ctx, key, domain.ThrottleRules[kind], now); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return ErrInvalidCredentials
+}
+
+// primaryIdentifier is what a user's identifier counters are keyed by: the
+// email if they have one, otherwise the phone (as a login would key them).
+func primaryIdentifier(u domain.User) string {
+	if u.Email != "" {
+		return u.Email
+	}
+	return u.Phone
+}

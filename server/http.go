@@ -19,15 +19,25 @@ import (
 	"sync"
 	"time"
 
+	"github.com/brightfellow-net/liturgist/adapters/httpapi"
 	"github.com/brightfellow-net/liturgist/web"
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
 )
 
-func newHandler(cfg Config, o options, ready func(context.Context) error) (http.Handler, error) {
+// deps carries what the API needs at request time; nil fields only when the
+// OpenAPI document is built without a database.
+type deps struct {
+	auth    httpapi.AuthDeps
+	session func(http.Handler) http.Handler // nil: no session middleware (OpenAPI only)
+}
+
+func newHandler(cfg Config, o options, ready func(context.Context) error, d deps) (http.Handler, error) {
 	r := chi.NewRouter()
-	r.Use(recoverer(cfg.Logger), requestID, allowedHosts(cfg), securityHeaders(cfg), accessLog(cfg.Logger), noOptions)
+	r.Use(recoverer(cfg.Logger), requestID, allowedHosts(cfg), securityHeaders(cfg),
+		httpapi.RequestInfoMiddleware(cfg.TrustedProxies, cfg.ClientIPHeader, cfg.Logger),
+		accessLog(cfg.Logger), noOptions)
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok")) })
 	r.Get("/readyz", func(w http.ResponseWriter, req *http.Request) {
@@ -43,18 +53,26 @@ func newHandler(cfg Config, o options, ready func(context.Context) error) (http.
 	})
 
 	apiRouter := chi.NewRouter()
-	apiRouter.NotFound(func(w http.ResponseWriter, _ *http.Request) {
-		writeProblem(w, &Problem{Status: http.StatusNotFound, Title: "Not Found", Code: "not_found"})
-	})
-	newAPI(apiRouter, o)
-	r.Mount("/api/v1", apiRouter)
-
-	app, err := newSPA(o.dist)
+	csrf, err := httpapi.CSRF(cfg.BaseURL)
 	if err != nil {
 		return nil, err
 	}
-	r.Handle("/assets/*", app.assets())
-	r.NotFound(app.index)
+	if d.session != nil {
+		apiRouter.Use(d.session)
+	}
+	apiRouter.Use(csrf)
+	apiRouter.NotFound(func(w http.ResponseWriter, _ *http.Request) {
+		httpapi.WriteProblem(w, &httpapi.Problem{Status: http.StatusNotFound, Title: "Not Found", Code: "not_found"})
+	})
+	newAPI(apiRouter, o, d)
+	r.Mount("/api/v1", apiRouter)
+
+	spaApp, err := newSPA(o.dist)
+	if err != nil {
+		return nil, err
+	}
+	r.Handle("/assets/*", spaApp.assets())
+	r.NotFound(spaApp.index)
 	r.MethodNotAllowed(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	})
@@ -62,7 +80,7 @@ func newHandler(cfg Config, o options, ready func(context.Context) error) (http.
 }
 
 // newAPI registers all operations. router may be nil (OpenAPI export only).
-func newAPI(router chi.Router, o options) huma.API {
+func newAPI(router chi.Router, o options, d deps) huma.API {
 	cfg := huma.DefaultConfig("Liturgist API", Version)
 	cfg.Servers = []*huma.Server{{URL: "/api/v1"}}
 	cfg.OpenAPIPath = "/openapi" // served as /api/v1/openapi.json
@@ -71,7 +89,7 @@ func newAPI(router chi.Router, o options) huma.API {
 		router = chi.NewRouter()
 	}
 	api := &guardedAPI{API: humachi.New(router, cfg), seen: map[string]bool{}}
-	// Core operations are registered here by later slices.
+	httpapi.RegisterAuth(api, d.auth)
 	for _, fn := range o.routes {
 		fn(api)
 	}
@@ -203,12 +221,17 @@ func accessLog(log *slog.Logger) func(http.Handler) http.Handler {
 			start := time.Now()
 			sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 			next.ServeHTTP(sw, r)
-			log.Info("request",
+			attrs := []any{
 				"method", r.Method,
 				"path", r.URL.Path, // never the query string
 				"status", sw.status,
 				"duration_ms", time.Since(start).Milliseconds(),
-				"request_id", RequestIDFrom(r.Context()))
+				"request_id", RequestIDFrom(r.Context()),
+			}
+			if uid := httpapi.RequestInfoFrom(r.Context()).UserID; uid != "" {
+				attrs = append(attrs, "user_id", string(uid))
+			}
+			log.Info("request", attrs...)
 		})
 	}
 }
@@ -223,7 +246,7 @@ func recoverer(log *slog.Logger) func(http.Handler) http.Handler {
 					}
 					log.Error("panic", "error", fmt.Sprint(v), "stack", string(debug.Stack()),
 						"request_id", RequestIDFrom(r.Context()))
-					writeProblem(w, &Problem{Status: http.StatusInternalServerError, Title: "Internal Server Error", Code: "internal"})
+					httpapi.WriteProblem(w, &httpapi.Problem{Status: http.StatusInternalServerError, Title: "Internal Server Error", Code: "internal"})
 				}
 			}()
 			next.ServeHTTP(w, r)

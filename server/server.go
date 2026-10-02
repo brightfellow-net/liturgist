@@ -12,7 +12,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/brightfellow-net/liturgist/adapters/argon2pw"
+	"github.com/brightfellow-net/liturgist/adapters/httpapi"
 	"github.com/brightfellow-net/liturgist/adapters/sqlstore"
+	"github.com/brightfellow-net/liturgist/adapters/sysclock"
+	"github.com/brightfellow-net/liturgist/app"
 	"github.com/danielgtaylor/huma/v2"
 )
 
@@ -43,6 +47,7 @@ func New(ctx context.Context, cfg Config, opts ...Option) (*Server, error) {
 	for _, opt := range opts {
 		opt(&o)
 	}
+	cfg = withDefaults(cfg)
 	db, mo, err := openDB(ctx, cfg)
 	if err != nil {
 		return nil, err
@@ -51,12 +56,23 @@ func New(ctx context.Context, cfg Config, opts ...Option) (*Server, error) {
 		_ = db.Close()
 		return nil, err
 	}
-	h, err := newHandler(cfg, o, readyCheck(db, mo))
+	clock := sysclock.Clock{}
+	hasher := argon2pw.New(argon2pw.Default)
+	auth := &app.Auth{Tx: db, Hasher: hasher, Clock: clock, SessionTTL: cfg.SessionTTL, SessionMaxAge: cfg.SessionMaxAge}
+	cookies := httpapi.Cookies{Secure: cfg.BaseURL.Scheme == "https"}
+	d := deps{
+		auth: httpapi.AuthDeps{
+			Auth: auth, Account: &app.Account{Tx: db, Hasher: hasher, Clock: clock, Auth: auth},
+			Cookies: cookies, Clock: clock, Log: cfg.Logger,
+		},
+		session: httpapi.SessionMiddleware(auth, cookies, clock, cfg.Logger),
+	}
+	h, err := newHandler(cfg, o, readyCheck(db, mo), d)
 	if err != nil {
 		_ = db.Close()
 		return nil, err
 	}
-	return &Server{cfg: cfg, db: db, handler: h}, nil
+	return &Server{cfg: cfg, db: db, handler: h}, nil // cfg includes the defaults
 }
 
 // Handler returns the server's root HTTP handler.
@@ -102,6 +118,6 @@ func OpenAPI(opts ...Option) ([]byte, error) {
 	for _, opt := range opts {
 		opt(&o)
 	}
-	api := newAPI(nil, o)
+	api := newAPI(nil, o, deps{})
 	return api.OpenAPI().MarshalJSON()
 }
