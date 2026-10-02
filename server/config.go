@@ -1,6 +1,8 @@
 // Copyright 2026 Brightfellow contributors
 // SPDX-License-Identifier: Apache-2.0
 
+// Package server is the composition root: it wires adapters to the use cases
+// and serves the HTTP API and web app (01 §7).
 package server
 
 import (

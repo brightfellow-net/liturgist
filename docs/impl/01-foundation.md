@@ -13,7 +13,8 @@ Repository layout, toolchain, build, configuration, command line, the `server` b
 |---|---|
 | Go | 1.27; `go.mod` declares `go 1.27` **[P-01]** |
 | Module path | `github.com/brightfellow-net/liturgist` |
-| Node.js / pnpm | Node 24 LTS, pnpm 11 (pinned with `packageManager` in the root `package.json`) |
+| Node.js / pnpm | Node 24 LTS, pnpm 11.25 (pinned with `packageManager` in the root `package.json`) |
+| Web toolchain | Vite 8.3, React 19.3, TypeScript 5.9 (TypeScript 7 once `openapi-typescript` supports it) |
 | Linter | golangci-lint v2, pinned in CI **[P-01]** |
 | Containers for tests | Docker (for testcontainers, see [02 §6](02-persistence.md#6-testing-strategy)) |
 
@@ -58,6 +59,8 @@ docs/                     SPEC, PILOT, impl/, reference/
 | `domain` | stdlib | anything else in this module; third-party |
 | `app` | `domain`, stdlib | `adapters/...`, `server`, `net/http`, `database/sql`, third-party |
 | `adapters/...` | `app`, `domain`, third-party | `server`, `cmd/...`, any other adapter package (adapters meet only through `app` ports, wired in `server`) |
+
+`depguard` cannot express "an adapter must not import a *different* adapter"; that rule is checked in code review.
 | `server` | everything above | `cmd/...` |
 | `cmd/liturgist` | `server`, `internal/...` | `app`, `domain`, `adapters` directly |
 
@@ -71,7 +74,7 @@ docs/                     SPEC, PILOT, impl/, reference/
 | `make test` | `go test ./...` (SQLite only) and `pnpm -r test` |
 | `make test-pg` | `LITURGIST_TEST_POSTGRES=1 go test ./...` |
 | `make lint` | golangci-lint, license-header check, `pnpm -r lint` |
-| `make dev` | Go server on `:8080` and Vite dev server on `:5173` (Vite proxies `/api` to Go) |
+| `make dev` | Go server on `127.0.0.1:8080` and Vite dev server on `:5173` (Vite proxies `/api` to Go). Unix shells only; on Windows run `go run ./cmd/liturgist serve` and `pnpm --filter web dev` in two terminals |
 
 - **Generator versions are pinned:** `openapi-typescript` (and every other JS tool) is a dev dependency in `packages/api-client/package.json`, locked by `pnpm-lock.yaml`; Go-side generation uses only this module's code. `make gen` is the only supported way to regenerate, and CI runs exactly that with `pnpm install --frozen-lockfile`.
 - **Generated files are committed [P-07]:** `packages/api-client/openapi.json` and `packages/api-client/src/schema.d.ts`. CI runs `make gen` and fails if `git diff --exit-code` is non-empty.

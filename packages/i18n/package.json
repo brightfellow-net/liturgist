@@ -1,0 +1,8 @@
+{
+  "name": "@liturgist/i18n",
+  "private": true,
+  "scripts": {
+    "lint": "echo ok",
+    "test": "echo \"completeness test arrives in slice 5\""
+  }
+}

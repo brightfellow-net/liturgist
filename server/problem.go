@@ -21,8 +21,13 @@ type Problem struct {
 	Errors []*huma.ErrorDetail `json:"errors,omitempty"`
 }
 
-func (p *Problem) Error() string             { return p.Detail }
-func (p *Problem) GetStatus() int            { return p.Status }
+// Error implements error.
+func (p *Problem) Error() string { return p.Detail }
+
+// GetStatus implements huma.StatusError.
+func (p *Problem) GetStatus() int { return p.Status }
+
+// ContentType implements huma.ContentTypeFilter.
 func (p *Problem) ContentType(string) string { return "application/problem+json" }
 
 // defaultCodes maps statuses Huma produces on its own (validation, routing) to codes.

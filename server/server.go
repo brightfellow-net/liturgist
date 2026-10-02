@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net"
 	"net/http"
 	"time"
@@ -19,6 +20,7 @@ type Option func(*options)
 
 type options struct {
 	routes []func(api huma.API)
+	dist   fs.FS // built frontend; nil = the embedded web/dist (tests inject their own)
 }
 
 // WithRoutes lets the SaaS add operations. It may only add: registering an

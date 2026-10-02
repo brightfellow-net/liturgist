@@ -7,12 +7,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/danielgtaylor/huma/v2"
 )
@@ -128,9 +130,30 @@ func TestAccessLogOmitsQuery(t *testing.T) {
 	}
 }
 
-// IT-F-003: no frontend build in the repository during tests.
+func withDist(dist fs.FS) Option { return func(o *options) { o.dist = dist } }
+
+// IT-F-002
+func TestFrontendBuilt(t *testing.T) {
+	dist := fstest.MapFS{
+		"index.html":      {Data: []byte("<!doctype html><title>app</title>")},
+		"assets/app-1.js": {Data: []byte("console.log(1)")},
+	}
+	h := testHandler(t, testConfig(t, "http://localhost:8080", nil), withDist(dist))
+
+	rec := do(h, http.MethodGet, "/members", "localhost", nil)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "<title>app</title>") ||
+		rec.Header().Get("Cache-Control") != "no-cache" {
+		t.Errorf("SPA route: %d %q %q", rec.Code, rec.Body.String(), rec.Header().Get("Cache-Control"))
+	}
+	rec = do(h, http.MethodGet, "/assets/app-1.js", "localhost", nil)
+	if rec.Code != http.StatusOK || rec.Header().Get("Cache-Control") != "public, max-age=31536000, immutable" {
+		t.Errorf("asset: %d %q", rec.Code, rec.Header().Get("Cache-Control"))
+	}
+}
+
+// IT-F-003
 func TestFrontendNotBuilt(t *testing.T) {
-	h := testHandler(t, testConfig(t, "http://localhost:8080", nil))
+	h := testHandler(t, testConfig(t, "http://localhost:8080", nil), withDist(fstest.MapFS{".keep": {}}))
 	rec := do(h, http.MethodGet, "/members", "localhost", nil)
 	if rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), "Frontend not built") {
 		t.Errorf("got %d %q", rec.Code, rec.Body.String())

@@ -49,7 +49,7 @@ func newHandler(cfg Config, o options, ready func(context.Context) error) (http.
 	newAPI(apiRouter, o)
 	r.Mount("/api/v1", apiRouter)
 
-	app, err := newSPA()
+	app, err := newSPA(o.dist)
 	if err != nil {
 		return nil, err
 	}
@@ -238,10 +238,13 @@ type spa struct {
 	built bool
 }
 
-func newSPA() (*spa, error) {
-	dist, err := fs.Sub(web.Dist, "dist")
-	if err != nil {
-		return nil, err
+func newSPA(dist fs.FS) (*spa, error) {
+	if dist == nil {
+		sub, err := fs.Sub(web.Dist, "dist")
+		if err != nil {
+			return nil, err
+		}
+		dist = sub
 	}
 	_, statErr := fs.Stat(dist, "index.html")
 	if statErr != nil && !errors.Is(statErr, fs.ErrNotExist) {
