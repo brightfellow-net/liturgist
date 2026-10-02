@@ -74,6 +74,16 @@ One user may hold several roles. Multimedia team is a team-member role for now; 
 - Search by title, hymnal number, and lyric text. Chinese text is searched by substring matching (Chinese has no spaces between words, so full-text search can't find words inside a line); Indonesian and English use full-text search. Both sit behind the search interface.
 - Usage history: which liturgies used this song (useful for planning and future license reporting).
 
+**Importing existing content.** An empty library is the biggest hurdle to adoption, so getting a church's existing lyrics in must be quick:
+- **Paste and split** (MVP, an everyday tool): the user pastes lyrics; the app splits them at blank lines and recognises section labels in Indonesian, English and Chinese ("1.", "Bait 1", "Ayat 1" → verse 1; "Reff", "Refrein", "Chorus", "副歌" → chorus; "Bridge", "Pre-Chorus", "Interlude"), suggesting an unlabelled block repeated after each verse as the chorus. The user checks and adjusts the preview before saving.
+- **File formats**, each an `Importer` implementation (8.2):
+  - MVP: OpenLyrics XML (OpenLP) and ChordPro (`.cho`).
+  - For the pilot: EasyWorship 6/7 song databases (believed to be SQLite with lyrics stored as RTF; the exact version is to be confirmed with the pilot church), then PowerPoint (`.pptx`) for songs that only exist as slides. Until the EasyWorship importer exists, the free OpenLP's EasyWorship importer plus OpenLyrics export is the fallback route.
+  - Later: Word (`.docx`) liturgy documents, spreadsheets (song metadata), other presentation software (e.g. ProPresenter).
+- **Review step for file imports:** an import creates a batch of candidates. The admin accepts, edits, merges with an existing song, or skips each one (or accepts all). Duplicates are detected by hymnal source and number (e.g. KJ 1) or by normalised title.
+- Accepted candidates are saved through the normal use cases, so validation, church scoping and limits apply exactly as when typing songs in. Imported readings get their translation's attribution.
+- Imported content is the church's own material in its own install, consistent with "ships no lyrics".
+
 ### 5.4 Readings
 - **The app ships with no Bible text.** Modern Indonesian translations (e.g. LAI Terjemahan Baru) are copyrighted.
 - MVP approach: user enters a reference and pastes the text once; the app stores it keyed by reference + translation and reuses it next time the same reference is chosen.
@@ -110,6 +120,8 @@ Draft ──submit──▶ In Review ──approve──▶ Approved ──publ
 - Hosted SaaS operations: billing, plans, signup, church onboarding. *(Only the entitlement stub in 8.2 is in MVP scope.)* *(The community tenancy foundation in 8.1 is in scope from the start, so the SaaS needs no rework later; multi-church hosting itself (8.1.1) is SaaS-only.)*
 - Volunteer rostering, availability, rotation.
 - Lectionary integration.
+- AI-assisted import (a language model turning messy documents into structured songs). *(Later, opt-in only: bring-your-own API key, or a SaaS service used only with the church's explicit consent, because it sends church content to an outside service. It would be another `Importer`.)*
+- Importing past liturgies as history. *(Not planned; songs matter far more than old services.)*
 
 ## 7. Data model sketch
 
@@ -130,6 +142,8 @@ Starting point, not final. Refine as needed.
 - **Song**: id, church_id, song_group_id?, language, title, alt_titles, hymnal_source, hymnal_number, author, default_key, license_notes, default_arrangement? (ordered list of section ids)
 - **SongSection**: id, song_id, position, kind (verse, pre_chorus, chorus, bridge, tag, intro, ending, other), number?, label (Verse 1, Chorus…), text
 - **SingingPart**: id, church_id, name (e.g. Semua, Pemandu, Jemaat, Pria, Wanita, Paduan Suara; seeded with defaults, editable per church)
+- **ImportBatch**: id, church_id, source_format (e.g. paste, openlyrics, chordpro, easyworship, pptx), created_by, created_at, status
+- **ImportCandidate**: id, batch_id, kind (song, reading), parsed_data, duplicate_of_id?, decision (pending, accept, merge, skip)
 - **Reading**: id, church_id, reference (standard form, e.g. `JHN 3:16-21`), reference_display (as typed, e.g. "Yoh 3:16-21"), translation_id, text, attribution, source_provider *(unique per church + standard reference + translation)*
 - **Translation**: id, code (e.g. `TB`, `CUV`), name, language *(language codes are BCP 47: `id`, `zh-Hans`, `zh-Hant`, `en`)*
 - **SongGroup**: id, church_id, name? *(links the language versions of the same song)*
@@ -199,6 +213,7 @@ e.g. https://liturgist.brightfellow.net/gky-citragarden/liturgies/2026-10-11
 | `Storage` | Store generated files and future media | Local filesystem | Object storage (S3-compatible) |
 | `AuthProvider` | Authenticate users | Per open decision 2 | SSO / Google login |
 | `EventBus` | Deliver live "liturgy changed" and presence events to open editors | In-memory (one process) | PostgreSQL `LISTEN/NOTIFY` across several server instances (SaaS) |
+| `Importer` | Turn a file or pasted text into import candidates (songs, readings) | Paste and split, OpenLyrics, ChordPro; then EasyWorship 6/7 and `.pptx` for the pilot | `.docx`, other presentation software; AI-assisted extraction (opt-in) |
 
 Rules:
 - Core code depends only on the interfaces, never on a concrete implementation.
@@ -392,3 +407,5 @@ Record resolved decisions here (date, decision, reason). Move items from section
 | 2026-10-02 | HTTPS: built-in automatic HTTPS (Let's Encrypt via `certmagic`) when a domain is set; documented guides for a reverse proxy and for Cloudflare Tunnel/Tailscale; plain HTTP on the local network allowed with a warning | Phones outside church need HTTPS for secure cookies and the PWA; office PCs often have no public IP address |
 | 2026-10-02 | Update check is off by default; a church admin can turn it on | The server should not contact outside services without the church's consent |
 | 2026-10-02 | Operations basics: `/healthz` and `/readyz`; `slog` logs with request IDs and no personal data; disk-space warnings, with backups checking for space first; a system page for church admins; releases with semantic versions, release notes and signed checksums | Gives volunteers visibility without command-line skills; keeps logs safe under UU PDP |
+| 2026-10-02 | Importing content: an `Importer` port; paste and split (with Indonesian, English and Chinese section labels), OpenLyrics and ChordPro in the MVP; EasyWorship 6/7 (version to be confirmed with the pilot church; OpenLP's importer plus OpenLyrics as the fallback route) and `.pptx` for the pilot; `.docx`, spreadsheets and other formats later. File imports go through a review step (`ImportBatch`, `ImportCandidate`) with duplicate detection by hymnal number or normalised title; accepted candidates are saved through the normal use cases | An empty library is the biggest hurdle to adoption; the pilot church is assumed to use EasyWorship and PowerPoint, and EasyWorship already holds lyrics split into sections |
+| 2026-10-02 | AI-assisted import is a later, opt-in option only (bring-your-own key, or a SaaS service with the church's explicit consent). Past liturgies are not imported as history | AI extraction sends church content to an outside service and must not be required for self-hosting; old services add little value compared with songs |
