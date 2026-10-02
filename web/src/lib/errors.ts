@@ -56,8 +56,9 @@ export function isCode(err: unknown, code: string): boolean {
 }
 
 // errorText translates an error by its code, never by the server's detail
-// text (05 §8). Unknown codes get the generic message.
-export function errorText(t: TFunction, err: unknown): string {
+// text (05 §8). Unknown codes get the generic message. scopeName turns a
+// scope such as "liturgy.edit" into its description, when known.
+export function errorText(t: TFunction, err: unknown, scopeName: (scope: string) => string = (s) => s): string {
   if (err instanceof NetworkError) return t("errors.network");
   if (!(err instanceof ApiError)) return t("errors.generic");
   const p = err.problem;
@@ -74,7 +75,7 @@ export function errorText(t: TFunction, err: unknown): string {
     case "limit_reached":
       return t("errors.limit_reached", { max: p.max ?? 0 });
     case "scope_not_held":
-      return t("errors.scope_not_held", { scopes: (p.scopes ?? []).join(", ") });
+      return t("errors.scope_not_held", { scopes: (p.scopes ?? []).map(scopeName).join("; ") });
   }
   if (p.code) {
     const text = t(`errors.${p.code}`, { defaultValue: "" });

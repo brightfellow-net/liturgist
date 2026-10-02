@@ -34,6 +34,14 @@ describe("TC-W-002 error messages", () => {
     expect(errorText(t, new Error("boom"))).toBe("Something went wrong. Please try again.");
   });
 
+  it("names missing permissions by their descriptions when known", () => {
+    const err = apiError(403, { code: "scope_not_held", scopes: ["liturgy.edit", "x.new"] });
+    const names: Record<string, string> = { "liturgy.edit": "Create and edit liturgies" };
+    expect(errorText(t, err, (s) => names[s] ?? s)).toBe(
+      "You can only give permissions you have yourself: Create and edit liturgies; x.new.",
+    );
+  });
+
   it("explains network failures", () => {
     expect(errorText(t, new NetworkError("x"))).toBe("Can't reach the server. Check your connection.");
   });

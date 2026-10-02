@@ -9,7 +9,8 @@
     "home": "Beranda",
     "privacy": "Privasi",
     "log_out": "Keluar",
-    "profile": "Profil"
+    "profile": "Profil",
+    "settings": "Pengaturan"
   },
   "common": {
     "language": "Bahasa",
@@ -22,7 +23,17 @@
     "too_long": "Paling banyak {{max}} karakter.",
     "link_incomplete": "Tautan ini tidak lengkap. Minta tautan baru kepada admin gereja Anda.",
     "back": "Kembali",
-    "password_hint": "Minimal 10 karakter. Beberapa kata yang digabung mudah diingat."
+    "password_hint": "Minimal 10 karakter. Beberapa kata yang digabung mudah diingat.",
+    "cancel": "Batal",
+    "done": "Selesai",
+    "no": "Tidak, biarkan"
+  },
+  "share": {
+    "copy": "Salin tautan",
+    "whatsapp": "Bagikan ke WhatsApp",
+    "copied": "Tautan disalin.",
+    "copy_failed": "Tidak bisa menyalin. Pilih tautannya dan salin sendiri.",
+    "expires": "Berlaku sampai {{when}}."
   },
   "language": {
     "en": "English",
@@ -124,6 +135,69 @@
     "devices_text": "HP Anda hilang? Keluar dari semua perangkat kecuali perangkat ini.",
     "end_others": "Keluar dari semua perangkat lain",
     "others_ended": "Anda sudah dikeluarkan dari semua perangkat lain."
+  },
+  "settings": {
+    "title": "Pengaturan",
+    "church": "Gereja",
+    "members": "Anggota",
+    "roles": "Peran"
+  },
+  "church": {
+    "read_only": "Hanya anggota yang boleh mengubah pengaturan gereja yang bisa mengubah ini.",
+    "feedback_url": "Tautan masukan",
+    "feedback_url_hint": "Opsional. Tautan yang diawali https:// untuk jemaat mengirim masukan.",
+    "feedback_url_invalid": "Tautan harus diawali https://.",
+    "privacy_contact": "Kontak privasi",
+    "privacy_contact_hint": "Opsional. Tampil di halaman privasi, misalnya nama dan nomor HP."
+  },
+  "members": {
+    "title": "Anggota",
+    "usage": "{{used}} dari {{max}} anggota tim (termasuk undangan yang masih terbuka).",
+    "team_member": "Anggota tim (tanpa peran)",
+    "server_admin": "administrator server",
+    "reset_used": "Tautan atur ulang dipakai pada {{when}}.",
+    "reset_open": "Tautan atur ulang dibuat oleh {{name}}, berlaku sampai {{when}}.",
+    "reset_link": "Tautan atur ulang untuk {{name}}",
+    "reset_message": "{{name}}, pakai tautan ini untuk mengatur kata sandi Liturgist yang baru: {{link}}",
+    "edit_roles": "Ubah peran",
+    "create_reset_link": "Buat tautan atur ulang",
+    "remove": "Keluarkan dari gereja",
+    "remove_question": "Keluarkan {{name}} dari gereja? Akunnya tetap ada, tetapi tidak bisa lagi melihat gereja ini.",
+    "remove_confirm": "Keluarkan {{name}}",
+    "roles": "Peran",
+    "roles_hint": "Tanpa peran = anggota tim."
+  },
+  "invites": {
+    "title": "Undangan",
+    "new": "Undang seseorang",
+    "none": "Tidak ada undangan terbuka.",
+    "message": "{{name}}, Anda diundang bergabung dengan {{church}} di Liturgist. Buka tautan ini: {{link}}",
+    "pending": "Diundang oleh {{name}}, berlaku sampai {{when}}.",
+    "expired": "Kedaluwarsa pada {{when}}.",
+    "link": "Tautan undangan untuk {{name}}",
+    "regenerate": "Tautan baru",
+    "cancel": "Batalkan undangan",
+    "cancel_question": "Batalkan undangan untuk {{name}}? Tautannya tidak bisa dipakai lagi.",
+    "cancel_confirm": "Batalkan undangan",
+    "created": "Undangan untuk {{name}} sudah dibuat. Kirim tautan ini; tautan hanya ditampilkan sekarang.",
+    "name": "Nama",
+    "contact_hint": "Isi minimal satu.",
+    "create": "Buat undangan"
+  },
+  "roles": {
+    "title": "Peran",
+    "intro": "Peran adalah sekumpulan izin. Seorang anggota bisa memegang beberapa peran.",
+    "new": "Peran baru",
+    "member_count_other": "{{count}} anggota memegang peran ini.",
+    "no_scopes": "Tanpa izin",
+    "edit": "Ubah",
+    "delete": "Hapus peran",
+    "delete_question_other": "Hapus peran {{name}}? {{count}} anggota akan kehilangan peran ini.",
+    "delete_confirm": "Hapus {{name}}",
+    "edit_title": "Ubah {{name}}",
+    "name": "Nama peran",
+    "description": "Keterangan (opsional)",
+    "scopes": "Izin"
   },
   "membership": {
     "not_member": "Anda sudah bukan anggota gereja ini."

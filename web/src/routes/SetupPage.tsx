@@ -14,14 +14,12 @@ import { Field } from "@/components/Field";
 import { PasswordInput } from "@/components/PasswordInput";
 import { api, call } from "@/lib/api";
 import { fieldErrors } from "@/lib/errors";
+import { contentLanguages, timeZones } from "@/lib/church";
 import { languages } from "@/lib/i18n";
 import { useFragmentToken } from "@/lib/fragmentToken";
 import { setupStatusQuery, translationsQuery } from "@/lib/queries";
 import { PublicLayout } from "./PublicLayout";
 import { paths } from "./paths";
-
-const contentLanguages = ["id", "en", "zh-Hans", "zh-Hant"] as const;
-const timeZones = ["Asia/Jakarta", "Asia/Makassar", "Asia/Jayapura"] as const; // 03 §10
 
 // Instant feedback only; the server's rules decide (05 §4).
 const schema = z.object({

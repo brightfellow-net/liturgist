@@ -9,6 +9,10 @@ import { NotFoundPage } from "./routes/NotFoundPage";
 import { PrivacyPage } from "./routes/PrivacyPage";
 import { ProfilePage } from "./routes/ProfilePage";
 import { ResetPage } from "./routes/ResetPage";
+import { ChurchSettingsPage } from "./routes/settings/ChurchSettingsPage";
+import { MembersPage } from "./routes/settings/MembersPage";
+import { RolesPage } from "./routes/settings/RolesPage";
+import { SettingsLayout } from "./routes/settings/SettingsLayout";
 import { SetupPage } from "./routes/SetupPage";
 import { paths } from "./routes/paths";
 
@@ -23,6 +27,14 @@ export const router = createBrowserRouter([
     children: [
       { path: paths.home, element: <HomePage /> },
       { path: paths.profile, element: <ProfilePage /> },
+      {
+        element: <SettingsLayout />,
+        children: [
+          { path: paths.churchSettings, element: <ChurchSettingsPage /> },
+          { path: paths.members, element: <MembersPage /> },
+          { path: paths.roles, element: <RolesPage /> },
+        ],
+      },
     ],
   },
   { path: "*", element: <NotFoundPage /> },

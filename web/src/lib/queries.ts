@@ -20,3 +20,29 @@ export const translationsQuery = queryOptions({
   queryFn: () => call(api.GET("/translations")),
   staleTime: Infinity,
 });
+
+export const churchQuery = queryOptions({
+  queryKey: ["church"],
+  queryFn: () => call(api.GET("/church")),
+});
+
+export const membersQuery = queryOptions({
+  queryKey: ["members"],
+  queryFn: () => call(api.GET("/members")),
+});
+
+export const invitesQuery = queryOptions({
+  queryKey: ["invites"],
+  queryFn: () => call(api.GET("/invites")),
+});
+
+export const rolesQuery = queryOptions({
+  queryKey: ["roles"],
+  queryFn: () => call(api.GET("/roles")),
+});
+
+export const scopesQuery = queryOptions({
+  queryKey: ["scopes"],
+  queryFn: () => call(api.GET("/scopes")),
+  staleTime: Infinity,
+});
