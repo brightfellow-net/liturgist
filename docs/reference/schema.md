@@ -244,7 +244,7 @@ Issuing a token is one upsert on `id = 1` (`INSERT … ON CONFLICT (id) DO UPDAT
 
 ## Step 2 tables
 
-Added by migration `00002_library.sql` (both dialects, same version). Church-owned, with the church-leading indexes the conventions require.
+Added by three migrations after `00001_initial.sql`, each in both dialect folders with the same number: `00002_songs.sql` (song_groups, songs, song_sections, song_arrangement_entries, song_search), `00003_readings.sql` (readings) and `00004_imports.sql` (import_batches, import_candidates). Church-owned, with the church-leading indexes the conventions require.
 
 ### song_groups
 
@@ -274,7 +274,7 @@ Church-owned. **[P-46] [P-53]**
 | `alt_titles` | json | no | Array of 0–10 strings (app); `[]` when none |
 | `hymnal_source` | text | no | 0–40 chars (app); empty string when none |
 | `hymnal_number` | text | no | 0–10 chars (app); empty string when none |
-| `hymnal_key` | text | yes | `<SOURCE KEY>:<number lower-case>` (app); null iff `hymnal_number = ''` |
+| `hymnal_key` | text | yes | `HymnalKey(source, number)` (app): `Fold(source)` without spaces, `:`, `Fold(number)` without spaces, e.g. `kj:12`; null iff `hymnal_number = ''` |
 | `lyricist`, `composer`, `translator` | text | no | 0–200 chars (app); empty string when none |
 | `default_key` | text | no | Empty or `^[A-G][#b]?m?$` (app) |
 | `copyright_holder` | text | no | 0–200 chars (app) |
@@ -282,7 +282,6 @@ Church-owned. **[P-46] [P-53]**
 | `ccli_song_number` | text | no | Empty or 1–12 digits (app) |
 | `licence_status` | text | no | `CHECK (licence_status IN ('unknown','public_domain','church_licence','permission_obtained'))` `songs_licence_status_check` |
 | `licence_notes` | text | no | 0–2000 chars (app) |
-| `default_arrangement` | json | no | Array of 0–100 section IDs of this song (app); `[]` when none |
 | `version` | int | no | `CHECK (version >= 1)` `songs_version_check` |
 | `created_at` | ts | no | |
 | `updated_at` | ts | no | |
@@ -309,8 +308,25 @@ Church-owned. Order is `position`; IDs are stable **[P-46]**.
 | `label` | text | yes | 1–60 chars (app); null = derived from kind and number |
 | `text` | text | no | 1–5000 chars (app), normalised |
 
+- UNIQUE `song_sections_church_song_id_key` (`church_id`, `song_id`, `id`) — target of the arrangement foreign key; church-leading.
 - UNIQUE partial index `song_sections_verse_key` (`song_id`, `number`) `WHERE kind = 'verse'` — no two verses with one number.
 - Index `song_sections_church_song_idx` (`church_id`, `song_id`, `position`) — church-leading.
+
+### song_arrangement_entries
+
+Church-owned. A song's default arrangement: the ordered list of its sections, a section possibly several times **[P-46]**. Empty = no arrangement defined.
+
+| Column | Type | Null | Constraint |
+|---|---|---|---|
+| `church_id` | id | no | |
+| `song_id` | id | no | |
+| `position` | int | no | `CHECK (position >= 0 AND position < 100)` `song_arrangement_position_check`; dense 0..n-1 per song (app) |
+| `section_id` | id | no | |
+
+- PK `song_arrangement_entries_pkey` (`song_id`, `position`).
+- FK `song_arrangement_song_fkey` (`church_id`, `song_id`) → `songs(church_id, id)` ON DELETE CASCADE.
+- FK `song_arrangement_section_fkey` (`church_id`, `song_id`, `section_id`) → `song_sections(church_id, song_id, id)` ON DELETE CASCADE — an entry can only name an existing section **of the same song**, and deleting a section removes its entries.
+- Index `song_arrangement_church_song_idx` (`church_id`, `song_id`, `position`) — church-leading.
 
 ### song_search
 
@@ -321,15 +337,15 @@ Church-owned. Search index, written by the songs repository **in the same transa
 | `church_id` | id | no | |
 | `song_id` | id | no | |
 | `language` | text | no | Copy of `songs.language` |
-| `title_fold` | text | no | Folded title and alternative titles |
-| `hymnal_fold` | text | no | Folded hymnal source and number |
-| `lyrics_fold` | text | no | Folded section texts, in order |
-| `fts` | tsvector | no | **PostgreSQL only**; `to_tsvector('simple', …)` of the three `_fold` columns, maintained by the application (no generated column, so both dialects share the write path) |
+| `head_fold` | text | no | Folded title, alternative titles, hymnal source and hymnal number, joined by spaces |
+| `lyrics_fold` | text | no | Folded section texts, in order, joined by spaces |
+| `fts_head` | tsvector | no | **PostgreSQL only**; `to_tsvector('simple', head_fold)`, written by the application (no generated column, so both dialects share the write path) |
+| `fts_lyrics` | tsvector | no | **PostgreSQL only**; `to_tsvector('simple', lyrics_fold)`, written by the application |
 
 - PK `song_search_pkey` (`church_id`, `song_id`) — church-leading.
 - FK `song_search_song_fkey` (`church_id`, `song_id`) → `songs(church_id, id)` ON DELETE CASCADE.
-- PostgreSQL: GIN index `song_search_fts_idx` on `fts`.
-- SQLite: the FTS5 virtual table `song_fts(title, hymnal, lyrics, church_id UNINDEXED, song_id UNINDEXED)`, tokenizer `unicode61`, `prefix='2 3'`. A virtual table has no keys or cascades, so the repository deletes its rows explicitly whenever it deletes a `song_search` row. **Exception to the church-leading-index rule**: `song_fts` has none, because every query filters on `church_id` through the join with `song_search`; the exception is listed here as the conventions require.
+- PostgreSQL: GIN indexes `song_search_fts_head_idx` on `fts_head` and `song_search_fts_lyrics_idx` on `fts_lyrics`.
+- SQLite: the FTS5 virtual table `song_fts(head, lyrics, church_id UNINDEXED, song_id UNINDEXED)`, tokenizer `unicode61`, `prefix='2 3'`. A virtual table has no keys or cascades, so the repository deletes its rows explicitly whenever it deletes a `song_search` row. **Exception to the church-leading-index rule**: `song_fts` has none, because every query filters on `church_id` through the join with `song_search`; the exception is listed here as the conventions require.
 
 ### readings
 
@@ -344,7 +360,7 @@ Church-owned. **[P-50]**
 | `translation_id` | id | no | FK → `translations(id)` `readings_translation_fkey` |
 | `text` | text | no | 1–20000 chars (app), normalised |
 | `attribution` | text | no | 0–300 chars (app) |
-| `source_provider` | text | no | `manual` or a provider ID, 1–40 chars (app) |
+| `source_provider` | text | no | `manual` or a provider ID, 1–40 chars; set by the server only (app) |
 | `search_fold` | text | no | Folded `reference_display`, Indonesian book name and text (app); substring search |
 | `version` | int | no | `CHECK (version >= 1)` `readings_version_check` |
 | `created_at` | ts | no | |
@@ -384,9 +400,12 @@ Church-owned.
 | `duplicate_of_id` | id | yes | The suspected duplicate when the batch was created; **not** a foreign key (the song may be deleted) |
 | `decision` | text | no | `CHECK (decision IN ('pending','accept','merge','skip'))` `import_candidates_decision_check` |
 | `merge_into` | id | yes | Song to merge into; not a foreign key; `CHECK ((decision = 'merge') = (merge_into IS NOT NULL))` `import_candidates_merge_check` |
+| `merge_target_version` | int | yes | The target song's `version` when the decision was saved; `CHECK ((decision = 'merge') = (merge_target_version IS NOT NULL))` `import_candidates_merge_version_check` |
+| `remove_unmatched` | bool | no | Written by the application (no default); true only with `merge` (app) |
 | `warnings` | json | no | Array of warning codes |
-| `applied_song_id` | id | yes | Set by Apply; not a foreign key |
-| `error_code` | text | yes | Set by Apply when a candidate failed |
+| `outcome` | text | yes | `CHECK (outcome IS NULL OR outcome IN ('applied','failed'))` `import_candidates_outcome_check`; `CHECK (outcome IS NULL OR decision IN ('accept','merge'))` `import_candidates_outcome_decision_check` |
+| `applied_song_id` | id | yes | Not a foreign key; `CHECK ((COALESCE(outcome, '') = 'applied') = (applied_song_id IS NOT NULL))` `import_candidates_applied_check` |
+| `error_code` | text | yes | `CHECK ((COALESCE(outcome, '') = 'failed') = (error_code IS NOT NULL))` `import_candidates_failed_check` |
 
 - Index `import_candidates_church_batch_idx` (`church_id`, `batch_id`, `position`) — church-leading.
 

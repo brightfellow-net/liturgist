@@ -250,8 +250,8 @@ RFC 9457 problem details (`application/problem+json`, Huma's default) extended w
 | `csrf_rejected` | 403 | CSRF check failed ([03 §6](03-identity-auth.md#6-csrf-protection)) |
 | `invite_identifier_mismatch` | 403 | The invite's identifier belongs to another account than the logged-in one |
 | `limit_reached` | 403 | Entitlement limit reached; `limit`: limit name, `used`, `max` |
-| `invalid_reference` | 422 | A Bible reference cannot be parsed; `reason`: `empty`, `unknown_book`, `missing_chapter`, `bad_number`, `bad_range`, `unsupported` ([07 §2](07-readings.md#2-references)) |
-| `import_unreadable` | 422 | An import file or text cannot be read; `reason`: `not_utf8`, `not_xml`, `no_song`, `too_many_sections` ([08 §4.4](08-import.md#44-errors)) |
+| `invalid_reference` | 422 | A Bible reference cannot be parsed; `reason`: `empty`, `too_long`, `unknown_book`, `missing_chapter`, `bad_number`, `bad_range`, `unsupported` ([07 §2](07-readings.md#2-references)) |
+| `import_unreadable` | 422 | An import file or text cannot be read; `reason`: `not_utf8`, `not_xml`, `no_song`, `too_many_sections`, `file_too_large`, `too_complex` ([08 §4.4](08-import.md#44-errors-and-failure-granularity)) |
 | `not_found` | 404 | Resource missing, or caller not a member of the church |
 | `invalid_token` | 400 | Invite/reset/setup token unusable; `reason`: `unknown`, `expired`, `used`, `cancelled` |
 | `already_set_up` | 409 | Setup attempted when a church exists |
@@ -267,6 +267,7 @@ RFC 9457 problem details (`application/problem+json`, Huma's default) extended w
 | `reading_in_use` | 409 | The reading is used by an unpublished liturgy |
 | `reading_exists` | 409 | The church already has this reference in this translation; `reading_id` |
 | `group_conflict` | 409 | Linking song versions failed; `reason`: `already_grouped`, `language_taken` |
+| `import_conflict` | 409 | An import candidate cannot be changed or applied; `reason`: `already_applied`, `target_changed` ([08 §2.1](08-import.md#21-states)) |
 | `reset_not_allowed` | 409 | Admin reset for a user who belongs to another church |
 | `too_many_attempts` | 429 | Login throttled; `Retry-After` header in seconds |
 | `internal` | 500 | Unexpected error; details only in the log |
