@@ -115,6 +115,49 @@ Draft ──submit──▶ In Review ──approve──▶ Approved ──publ
 - **Mobile-friendly web view** of a published liturgy, shareable by link, plus a "my assignments" view for each team member.
 - **Open decision:** layout of the PDF. Get GKY Citragarden's current liturgy document as the reference design.
 
+- **WhatsApp messages** (MVP; no WhatsApp API, no cost, no setup). After publishing, the app offers ready-made texts:
+  1. **Team summary** for the WhatsApp group, with **Copy** and **Share to WhatsApp** (`https://wa.me/?text=…`, which opens WhatsApp's chat picker with the text filled in).
+  2. **Personal messages**: a list of everyone assigned, each with **Send via WhatsApp** (`https://wa.me/<phone>?text=…`, which opens a chat with that person with the text filled in; the sender presses send). People without a phone number get a Copy button; free-text assignees are listed without a button.
+  3. **Change summary** after republishing: compares with the previous `PublishedVersion` and lists what changed (songs, readings, assignments).
+  - **Never include lyrics or Bible text**: only titles, hymnal numbers, keys, reading references and assignments, plus the link to the full liturgy (which needs login).
+  - Checkboxes to include or leave out songs, keys and readings.
+  - WhatsApp formatting only: `*bold*` and plain URLs (no Markdown links); short lines that read well on a phone.
+  - Tone of personal messages: a friendly greeting with the person's name, avoiding "kamu" or "Bapak/Ibu".
+  - Message texts use the app's translations (Indonesian and English in the MVP, Mandarin later). Message templates each church can edit come later.
+
+  Example team summary:
+
+  ```
+  *Liturgi Ibadah Umum 1*
+  Minggu, 11 Oktober 2026 · 07:00
+
+  *Petugas*
+  Liturgis: Andreas
+  Pemandu Pujian: Budi
+  Pemusik: Clara, Daniel
+
+  *Lagu*
+  1. KJ 1 · Haleluya, Pujilah · Do = G
+
+  *Bacaan:* Yoh 3:16-21
+
+  Liturgi lengkap:
+  https://…
+  ```
+
+  Example personal message:
+
+  ```
+  Shalom Budi 🙏
+  Mengingatkan tugas pelayanan:
+  *Pemandu Pujian* · Ibadah Umum 1
+  Minggu, 11 Oktober 2026 · 07:00
+
+  Liturgi lengkap:
+  https://…
+  Terima kasih atas pelayanannya!
+  ```
+
 ### 5.7 First-time experience
 - **Setup wizard** (the setup page from the decisions log): church name and first admin (name, email or phone, password); default language; default Bible translation; time zone (WIB, WITA or WIT); key display ("Do = G" or "G"); regular services. Everything can be changed later in settings.
 - **Seeded defaults**, created as normal editable data in the church's default language:
@@ -130,7 +173,7 @@ Draft ──submit──▶ In Review ──approve──▶ Approved ──publ
 ## 6. Out of scope for MVP (but design for it)
 
 - Presentation slides / export to PowerPoint, Google Slides, OpenLP, or a built-in presenter. *(Keep lyrics sectioned and content separate from formatting so this is just another renderer.)*
-- WhatsApp or email notifications. *(A copyable text summary of the published liturgy is a cheap MVP stand-in if time allows.)*
+- Automatic WhatsApp or email notifications and reminders (e.g. the day before), and message templates each church can edit. *(The MVP has copyable messages and wa.me links instead; see 5.6. Automatic WhatsApp sending is a SaaS `Notifier` using the WhatsApp Business API.)*
 - Multilingual parallel text (e.g. Indonesian + Mandarin/English side by side) and pinyin under Chinese lyrics. *(Avoid assumptions that each item has exactly one language. The MVP model leaves room: liturgies, templates and songs carry a language; songs in different languages are linked through a song group; readings refer to a translation with a language. Parallel text later adds secondary-language text alongside the existing single-language content. Until then, bilingual singing uses a medley of the linked language versions.)*
 - Hosted SaaS operations: billing, plans, signup, church onboarding. *(Only the entitlement stub in 8.2 is in MVP scope.)* *(The community tenancy foundation in 8.1 is in scope from the start, so the SaaS needs no rework later; multi-church hosting itself (8.1.1) is SaaS-only.)*
 - Volunteer rostering, availability, rotation.
@@ -226,7 +269,7 @@ e.g. https://liturgist.brightfellow.net/gky-citragarden/liturgies/2026-10-11
 
 | Extension point | Responsibility | Community implementation (MVP) | Possible premium / later implementations |
 |---|---|---|---|
-| `Notifier` | Tell team members a liturgy was published or changed | Copyable text summary (and optionally email if configured) | WhatsApp Business API, managed email |
+| `Notifier` | Tell team members a liturgy was published or changed | Team summary, personal wa.me messages and change summary to copy or share (5.6); email when configured, later | WhatsApp Business API (automatic sending, reminders), managed email |
 | `BibleTextProvider` | Return text for a reference + translation | Manual entry with reuse (5.4) | Licensed provider API, public-domain translations |
 | `Exporter` | Render a liturgy to an output format | PDF, web view | Slides (PPTX/OpenLP/presenter), other print layouts |
 | `Storage` | Store generated files and future media | Local filesystem | Object storage (S3-compatible) |
@@ -432,3 +475,4 @@ Record resolved decisions here (date, decision, reason). Move items from section
 | 2026-10-02 | First-time experience: a setup wizard (church and first admin, default language, default translation, time zone, key display, regular services); seeded editable defaults in the church's language (role types, singing parts, translation names without text, a starter template with titles only, to be aligned with GKY's order of service); an onboarding checklist and helpful empty screens; a team-member welcome on "Tugas saya" with home-screen instructions. No sample data in installs; a public demo site later | A church should reach its first real liturgy quickly without help; Bible text and hymn lyrics can't be shipped as defaults or samples |
 | 2026-10-02 | Services: a church defines regular services (`Service`: name, language, default template) with one or more weekly times on any weekday (`ServiceTime`). "Prepare next week" lists all scheduled occurrences and creates the ticked ones in one click. One-off services are created individually. Liturgies keep a copy of the service name. Monthly patterns are later | Most services repeat weekly, but not only on Sundays and sometimes on several days; preparing a whole week at once saves the most time |
 | 2026-10-02 | "Prepare next week" respects the free-plan limits: it shows how many liturgies fit, and when more slots are needed it offers one explicit button, "Archive last week's N published liturgies and create these N". Automatic archiving was considered and rejected | Nearly as convenient as auto-archiving while keeping the earlier decision that nothing is archived automatically and the church stays in control; only relevant to the SaaS free plan (community installs are unlimited) |
+| 2026-10-02 | WhatsApp messages in the MVP (community `Notifier`): a team summary (Copy, Share to WhatsApp via `wa.me/?text=`), personal messages per assigned person (Send via WhatsApp via `wa.me/<phone>?text=`), and a change summary after republishing (diff against the previous `PublishedVersion`). Content: titles, hymnal numbers, keys, reading references, assignments and the link; never lyrics or Bible text; checkboxes for songs, keys and readings. WhatsApp `*bold*` and plain URLs only. Friendly tone with the person's name, avoiding "kamu" or "Bapak/Ibu". Editable message templates, automatic sending, reminders and email notifications come later | WhatsApp is how Indonesian church teams communicate; wa.me links give most of the value with no API, cost or setup; copyrighted text stays behind login |
