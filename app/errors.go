@@ -35,13 +35,15 @@ func (e *UniqueError) Error() string {
 	return fmt.Sprintf("unique constraint %q violated", e.Constraint)
 }
 
-// Errors of the setup and church use cases (01 §10).
+// Errors of the setup, church, role and member use cases (01 §10).
 var (
-	ErrNotSetUp        = errors.New("not set up")           // 409 not_set_up
-	ErrAlreadySetUp    = errors.New("already set up")       // 409 already_set_up
-	ErrForbidden       = errors.New("forbidden")            // 403 forbidden
-	ErrIdentifierTaken = errors.New("identifier taken")     // 409 identifier_taken
-	ErrTooManyChurches = errors.New("more than one church") // serve exit 7
+	ErrNotSetUp        = errors.New("not set up")                              // 409 not_set_up
+	ErrAlreadySetUp    = errors.New("already set up")                          // 409 already_set_up
+	ErrForbidden       = errors.New("forbidden")                               // 403 forbidden
+	ErrLockout         = errors.New("change would leave nobody to administer") // 409 lockout_prevented
+	ErrRoleNameTaken   = errors.New("role name taken")                         // 409 role_name_taken
+	ErrIdentifierTaken = errors.New("identifier taken")                        // 409 identifier_taken
+	ErrTooManyChurches = errors.New("more than one church")                    // serve exit 7
 )
 
 // NotFoundError is ErrNotFound with the reason that is logged, never shown
@@ -61,6 +63,11 @@ const (
 )
 
 func notFound(reason string) error { return &NotFoundError{Reason: reason} }
+
+// ScopeNotHeldError maps to 403 scope_not_held with the missing scopes.
+type ScopeNotHeldError struct{ Scopes []domain.Scope }
+
+func (e *ScopeNotHeldError) Error() string { return fmt.Sprintf("scopes not held: %v", e.Scopes) }
 
 // InvalidTokenError maps to 400 invalid_token with a reason.
 type InvalidTokenError struct{ Reason domain.TokenReason }

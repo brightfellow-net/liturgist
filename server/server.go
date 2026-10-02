@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/brightfellow-net/liturgist/adapters/argon2pw"
+	"github.com/brightfellow-net/liturgist/adapters/entitlements/unlimited"
 	"github.com/brightfellow-net/liturgist/adapters/httpapi"
 	"github.com/brightfellow-net/liturgist/adapters/sqlstore"
 	"github.com/brightfellow-net/liturgist/adapters/sysclock"
@@ -27,11 +28,12 @@ import (
 type Option func(*options)
 
 type options struct {
-	routes   []func(api huma.API)
-	dist     fs.FS // built frontend; nil = the embedded web/dist (tests inject their own)
-	resolver httpapi.TenantResolver
-	urls     app.URLBuilder
-	clock    app.Clock // tests only
+	routes       []func(api huma.API)
+	dist         fs.FS // built frontend; nil = the embedded web/dist (tests inject their own)
+	resolver     httpapi.TenantResolver
+	entitlements app.Entitlements
+	urls         app.URLBuilder
+	clock        app.Clock // tests only
 }
 
 // WithRoutes lets the SaaS add operations. It may only add: registering an
@@ -45,6 +47,9 @@ func WithRoutes(fn func(api huma.API)) Option {
 func WithTenantResolver(r httpapi.TenantResolver) Option {
 	return func(o *options) { o.resolver = r }
 }
+
+// WithEntitlements replaces the community "everything allowed" stub (04 §8).
+func WithEntitlements(e app.Entitlements) Option { return func(o *options) { o.entitlements = e } }
 
 // WithURLBuilder replaces the community no-prefix URL builder (04 §4).
 func WithURLBuilder(b app.URLBuilder) Option { return func(o *options) { o.urls = b } }
@@ -65,6 +70,8 @@ type useCases struct {
 	account  *app.Account
 	setup    *app.Setup
 	churches *app.Churches
+	members  *app.Members
+	roles    *app.Roles
 }
 
 // wire builds the use cases on db with the options' adapters.
@@ -72,6 +79,9 @@ func wire(cfg Config, db app.Tx, o *options, refresh func()) useCases {
 	clock := o.clock
 	if clock == nil {
 		clock = sysclock.Clock{}
+	}
+	if o.entitlements == nil {
+		o.entitlements = unlimited.Entitlements{}
 	}
 	if o.urls == nil {
 		o.urls = tenancy.NoPrefix{BaseURL: cfg.BaseURL}
@@ -84,6 +94,8 @@ func wire(cfg Config, db app.Tx, o *options, refresh func()) useCases {
 		account:  &app.Account{Tx: db, Hasher: hasher, Clock: clock, Auth: auth},
 		setup:    &app.Setup{Tx: db, Hasher: hasher, Clock: clock, IDs: ids, Auth: auth, OnDone: refresh},
 		churches: &app.Churches{Tx: db, Clock: clock},
+		members:  &app.Members{Tx: db, Clock: clock, Entitlements: o.entitlements},
+		roles:    &app.Roles{Tx: db, Clock: clock, IDs: ids},
 	}
 }
 
@@ -122,8 +134,9 @@ func New(ctx context.Context, cfg Config, opts ...Option) (*Server, error) {
 	s.urls = o.urls
 	cookies := httpapi.Cookies{Secure: cfg.BaseURL.Scheme == "https"}
 	d := deps{
-		auth:     httpapi.AuthDeps{Auth: s.uc.auth, Account: s.uc.account, Cookies: cookies, Clock: s.uc.auth.Clock, Log: cfg.Logger},
-		church:   httpapi.ChurchDeps{Setup: s.uc.setup, Churches: s.uc.churches, Cookies: cookies, Clock: s.uc.auth.Clock, Log: cfg.Logger},
+		auth: httpapi.AuthDeps{Auth: s.uc.auth, Account: s.uc.account, Cookies: cookies, Clock: s.uc.auth.Clock, Log: cfg.Logger},
+		church: httpapi.ChurchDeps{Setup: s.uc.setup, Churches: s.uc.churches, Members: s.uc.members, Roles: s.uc.roles,
+			Cookies: cookies, Clock: s.uc.auth.Clock, Log: cfg.Logger},
 		session:  httpapi.SessionMiddleware(s.uc.auth, cookies, s.uc.auth.Clock, cfg.Logger),
 		resolver: o.resolver,
 	}

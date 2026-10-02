@@ -45,6 +45,24 @@ func (a Actor) Require(s domain.Scope) error {
 	return ErrForbidden
 }
 
+// RequireAny returns ErrForbidden unless the actor holds one of scopes.
+func (a Actor) RequireAny(scopes ...domain.Scope) error {
+	for _, s := range scopes {
+		if a.Scopes.Has(s) {
+			return nil
+		}
+	}
+	return ErrForbidden
+}
+
+// RequireHeld is safeguard 2 (no escalation): the actor must hold every scope in want.
+func (a Actor) RequireHeld(want domain.ScopeSet) error {
+	if m := a.Scopes.Missing(want); len(m) > 0 {
+		return &ScopeNotHeldError{Scopes: m}
+	}
+	return nil
+}
+
 // churchScope is what a church-scoped use case works with inside one transaction.
 type churchScope struct {
 	cs    ChurchStore

@@ -6,11 +6,13 @@ package app_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/brightfellow-net/liturgist/adapters/argon2pw"
+	"github.com/brightfellow-net/liturgist/adapters/entitlements/unlimited"
 	"github.com/brightfellow-net/liturgist/adapters/sqlstore"
 	"github.com/brightfellow-net/liturgist/adapters/sqlstore/sqlstoretest"
 	"github.com/brightfellow-net/liturgist/adapters/ulidgen"
@@ -26,6 +28,8 @@ type cenv struct {
 	ids      app.IDGenerator
 	setup    *app.Setup
 	churches *app.Churches
+	members  *app.Members
+	roles    *app.Roles
 	account  *app.Account
 	auth     *app.Auth
 	church   domain.ChurchID
@@ -33,24 +37,29 @@ type cenv struct {
 	admin    *domain.Session
 }
 
-func wireChurch(t *testing.T, db *sqlstore.DB) cenv {
+func wireChurch(t *testing.T, db *sqlstore.DB, ent app.Entitlements) cenv {
 	t.Helper()
 	c := &clock{now: time.Date(2026, 10, 2, 9, 0, 0, 0, time.UTC)}
 	ids := ulidgen.New()
 	h := argon2pw.New(fast)
 	auth := &app.Auth{Tx: db, Hasher: h, Clock: c, SessionTTL: 90 * 24 * time.Hour, SessionMaxAge: 365 * 24 * time.Hour}
+	if ent == nil {
+		ent = unlimited.Entitlements{}
+	}
 	return cenv{t: t, db: db, clock: c, ids: ids, auth: auth,
 		setup:    &app.Setup{Tx: db, Hasher: h, Clock: c, IDs: ids, Auth: auth},
 		churches: &app.Churches{Tx: db, Clock: c},
+		members:  &app.Members{Tx: db, Clock: c, Entitlements: ent},
+		roles:    &app.Roles{Tx: db, Clock: c, IDs: ids},
 		account:  &app.Account{Tx: db, Hasher: h, Clock: c, Auth: auth},
 		ctx:      ctx,
 	}
 }
 
 // newChurch sets up "GKY Citragarden" with admin@example.org as Church admin.
-func newChurch(t *testing.T, db *sqlstore.DB) cenv {
+func newChurch(t *testing.T, db *sqlstore.DB, ent app.Entitlements) cenv {
 	t.Helper()
-	e := wireChurch(t, db)
+	e := wireChurch(t, db, ent)
 	res, err := e.setup.Run(ctx, app.SetupInput{ViaCLI: true, Church: churchInput(), AdminName: "Admin",
 		AdminIdentifier: "admin@example.org", AdminPassword: password})
 	if err != nil {
@@ -65,6 +74,21 @@ func newChurch(t *testing.T, db *sqlstore.DB) cenv {
 func churchInput() app.ChurchInput {
 	return app.ChurchInput{Name: "GKY Citragarden", DefaultUILanguage: "en", DefaultLanguage: "id",
 		DefaultTranslationCode: "TB", TimeZone: "Asia/Jakarta", KeyDisplay: "do"}
+}
+
+// role returns the role with the given origin.
+func (e cenv) role(o domain.RoleOrigin) domain.Role {
+	e.t.Helper()
+	var r domain.Role
+	e.write(func(s app.Store) error {
+		cs, err := s.ForChurch(ctx, e.church)
+		if err != nil {
+			return err
+		}
+		r, err = cs.Roles().ByOrigin(ctx, o)
+		return err
+	})
+	return r
 }
 
 func (e cenv) write(fn func(s app.Store) error) {
@@ -94,9 +118,29 @@ func (e cenv) member(email string, roles ...domain.RoleID) (*domain.Session, dom
 	return &domain.Session{UserID: uid}, mid
 }
 
+func (e cenv) membershipOf(sess *domain.Session) domain.MembershipID {
+	e.t.Helper()
+	var id domain.MembershipID
+	e.write(func(s app.Store) error {
+		cs, err := s.ForChurch(ctx, e.church)
+		if err != nil {
+			return err
+		}
+		m, err := cs.Memberships().ByUser(ctx, sess.UserID)
+		id = m.ID
+		return err
+	})
+	return id
+}
+
 func isNotFound(err error, reason string) bool {
 	var nf *app.NotFoundError
 	return errors.As(err, &nf) && nf.Reason == reason
+}
+
+func scopeNotHeld(err error, want ...domain.Scope) bool {
+	var e *app.ScopeNotHeldError
+	return errors.As(err, &e) && slices.Equal(e.Scopes, want)
 }
 
 func tokenReason(err error) domain.TokenReason {
@@ -110,7 +154,7 @@ func tokenReason(err error) domain.TokenReason {
 // IT-A-001 (use case): tokens, ready-made roles, refusal once set up.
 func TestSetup(t *testing.T) {
 	db := sqlstoretest.NewSQLite(t)
-	e := wireChurch(t, db)
+	e := wireChurch(t, db, nil)
 
 	if done, err := e.setup.Status(ctx); err != nil || done {
 		t.Fatalf("status before setup: %v %v", done, err)
@@ -156,22 +200,14 @@ func TestSetup(t *testing.T) {
 		t.Error("status after setup")
 	}
 	e.church, e.ctx, e.admin = res.Church.ID, app.WithTenant(ctx, res.Church.ID), &domain.Session{UserID: res.User.ID}
-	var roles []domain.Role
-	e.write(func(s app.Store) error {
-		cs, err := s.ForChurch(ctx, e.church)
-		if err != nil {
-			return err
-		}
-		roles, err = cs.Roles().List(ctx)
-		return err
-	})
-	if len(roles) != 3 {
-		t.Fatalf("roles: %+v", roles)
+	roles, err := e.roles.List(e.ctx, e.admin)
+	if err != nil || len(roles) != 3 {
+		t.Fatalf("roles: %+v %v", roles, err)
 	}
 	for _, r := range roles {
-		rm, _ := domain.ReadyMade(r.Origin)
-		if r.Name != rm.Name("en") || len(r.Scopes) != len(rm.Scopes) {
-			t.Errorf("ready-made role %+v", r)
+		rm, _ := domain.ReadyMade(r.Role.Origin)
+		if r.Role.Name != rm.Name("en") || len(r.Role.Scopes) != len(rm.Scopes) {
+			t.Errorf("ready-made role %+v", r.Role)
 		}
 	}
 	me, err := e.account.MeView(e.ctx, e.admin)
@@ -194,7 +230,7 @@ func TestSetup(t *testing.T) {
 
 // IT-T-001, IT-T-002 (use case): not a member → 404 not_member; missing scope → 403.
 func TestMembershipAndScopeChecks(t *testing.T) {
-	e := newChurch(t, sqlstoretest.NewSQLite(t))
+	e := newChurch(t, sqlstoretest.NewSQLite(t), nil)
 	outsider := &domain.Session{UserID: domain.UserID(e.ids.NewID())}
 	team, _ := e.member("team@example.org")
 
@@ -212,8 +248,31 @@ func TestMembershipAndScopeChecks(t *testing.T) {
 		t.Errorf("baseline church view: %+v %v", c, err)
 	}
 	name := "X"
-	if _, err := e.churches.Update(e.ctx, team, app.ChurchChange{Name: &name}); !errors.Is(err, app.ErrForbidden) {
-		t.Errorf("update church by team member: %v", err)
+	for op, err := range map[string]error{
+		"update church": func() error { _, err := e.churches.Update(e.ctx, team, app.ChurchChange{Name: &name}); return err }(),
+		"list members":  func() error { _, err := e.members.List(e.ctx, team); return err }(),
+		"create role":   func() error { _, err := e.roles.Create(e.ctx, team, app.RoleInput{Name: "R"}); return err }(),
+		"list roles":    func() error { _, err := e.roles.List(e.ctx, team); return err }(),
+		"list scopes":   func() error { _, err := e.roles.Scopes(e.ctx, team); return err }(),
+	} {
+		if !errors.Is(err, app.ErrForbidden) {
+			t.Errorf("%s by team member: %v", op, err)
+		}
+	}
+
+	viewer, err := e.roles.Create(e.ctx, e.admin, app.RoleInput{Name: "Viewer", Scopes: []domain.Scope{domain.ScopeMembersView}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, _ := e.member("viewer@example.org", viewer.Role.ID)
+	list, err := e.members.List(e.ctx, v)
+	if err != nil || len(list.Members) != 3 || list.Used != 3 || list.Max != nil {
+		t.Fatalf("viewer lists members: %+v %v", list, err)
+	}
+	for _, m := range list.Members {
+		if m.Actions != (app.MemberActions{}) {
+			t.Errorf("members.view only must have no actions: %+v", m)
+		}
 	}
 
 	// Church settings: PATCH semantics.
@@ -236,5 +295,150 @@ func TestMembershipAndScopeChecks(t *testing.T) {
 	}
 	if _, err := e.churches.Update(e.ctx, e.admin, app.ChurchChange{Name: &empty}); !errors.As(err, &invalid) {
 		t.Errorf("empty name: %v", err)
+	}
+}
+
+// IT-T-007, TC-A-007, TC-A-009: role editor safeguards.
+func TestRoleSafeguards(t *testing.T) {
+	e := newChurch(t, sqlstoretest.NewSQLite(t), nil)
+	admin := e.role(domain.OriginChurchAdmin)
+	lit := e.role(domain.OriginLiturgist)
+	l, _ := e.member("lit@example.org", lit.ID)
+
+	noRolesManage := []domain.Scope{domain.ScopeChurchSettings, domain.ScopeMembersView, domain.ScopeMembersManage}
+	if _, err := e.roles.Update(e.ctx, e.admin, admin.ID, app.RoleChange{Scopes: &noRolesManage}); !errors.Is(err, app.ErrLockout) {
+		t.Errorf("removing roles.manage from the only holder: %v", err)
+	}
+	if err := e.roles.Delete(e.ctx, e.admin, admin.ID); !errors.Is(err, app.ErrLockout) {
+		t.Errorf("deleting the only admin role: %v", err)
+	}
+	name := "Mine"
+	if _, err := e.roles.Update(e.ctx, l, lit.ID, app.RoleChange{Name: &name}); !errors.Is(err, app.ErrForbidden) {
+		t.Errorf("liturgist edits roles: %v", err)
+	}
+	if _, err := e.roles.Create(e.ctx, e.admin, app.RoleInput{Name: "Approver", Scopes: []domain.Scope{domain.ScopeLiturgyApprove}}); !scopeNotHeld(err, domain.ScopeLiturgyApprove) {
+		t.Errorf("granting a scope not held: %v", err)
+	}
+	if _, err := e.roles.Create(e.ctx, e.admin, app.RoleInput{Name: " church ADMIN "}); !errors.Is(err, app.ErrRoleNameTaken) {
+		t.Errorf("duplicate name: %v", err)
+	}
+	var invalid *domain.InvalidInputError
+	if _, err := e.roles.Create(e.ctx, e.admin, app.RoleInput{Name: "X", Scopes: []domain.Scope{"liturgy.fly"}}); !errors.As(err, &invalid) {
+		t.Errorf("unknown scope: %v", err)
+	}
+
+	// Another member holding both scopes through a custom role lifts the lock-out.
+	keeper, err := e.roles.Create(e.ctx, e.admin, app.RoleInput{Name: "Keeper", Description: "Backup",
+		Scopes: []domain.Scope{domain.ScopeRolesManage, domain.ScopeMembersManage}})
+	if err != nil || keeper.MemberCount != 0 || !keeper.Actions.Delete {
+		t.Fatalf("keeper: %+v %v", keeper, err)
+	}
+	e.member("keeper@example.org", keeper.Role.ID)
+	updated, err := e.roles.Update(e.ctx, e.admin, admin.ID, app.RoleChange{Scopes: &noRolesManage})
+	if err != nil || updated.Role.Scopes.Has(domain.ScopeRolesManage) || updated.Role.Origin != domain.OriginChurchAdmin || updated.MemberCount != 1 {
+		t.Errorf("allowed with a second holder: %+v %v", updated, err)
+	}
+	// The admin lost roles.manage, so can no longer edit roles.
+	if _, err := e.roles.List(e.ctx, e.admin); err != nil {
+		t.Errorf("members.manage may still list roles: %v", err)
+	}
+	if _, err := e.roles.Update(e.ctx, e.admin, admin.ID, app.RoleChange{Name: &name}); !errors.Is(err, app.ErrForbidden) {
+		t.Errorf("after losing roles.manage: %v", err)
+	}
+}
+
+// TC-T-002, TC-A-009 and member safeguards.
+func TestMemberSafeguardsAndActions(t *testing.T) {
+	e := newChurch(t, sqlstoretest.NewSQLite(t), nil)
+	admin := e.role(domain.OriginChurchAdmin)
+	lit := e.role(domain.OriginLiturgist)
+	editor := e.role(domain.OriginEditor)
+	_, teamID := e.member("team@example.org")
+	_, litID := e.member("lit@example.org", lit.ID)
+	adminID := e.membershipOf(e.admin)
+
+	list, err := e.members.List(e.ctx, e.admin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actions := map[domain.MembershipID]app.MemberActions{}
+	for _, m := range list.Members {
+		actions[m.Member.ID] = m.Actions
+	}
+	if a := actions[adminID]; a.Remove || !a.EditRoles {
+		t.Errorf("own row as the only admin: %+v", a)
+	}
+	if a := actions[teamID]; !a.Remove || !a.EditRoles {
+		t.Errorf("team member row: %+v", a)
+	}
+	if a := actions[litID]; a.Remove || a.EditRoles {
+		t.Errorf("liturgist holds scopes the admin lacks: %+v", a)
+	}
+
+	if _, err := e.members.SetRoles(e.ctx, e.admin, teamID, []domain.RoleID{lit.ID}); !scopeNotHeld(err, domain.ScopeLiturgyApprove, domain.ScopeLiturgyComment, domain.ScopeLiturgyEdit) {
+		t.Errorf("assigning Liturgist: %v", err)
+	}
+	if err := e.members.Remove(e.ctx, e.admin, litID); !scopeNotHeld(err, domain.ScopeLiturgyApprove, domain.ScopeLiturgyComment, domain.ScopeLiturgyEdit) {
+		t.Errorf("removing someone more powerful: %v", err)
+	}
+	if err := e.members.Remove(e.ctx, e.admin, adminID); !errors.Is(err, app.ErrLockout) {
+		t.Errorf("only admin leaves: %v", err)
+	}
+	if _, err := e.members.SetRoles(e.ctx, e.admin, adminID, nil); !errors.Is(err, app.ErrLockout) {
+		t.Errorf("only admin drops own role: %v", err)
+	}
+	if _, err := e.members.SetRoles(e.ctx, e.admin, teamID, []domain.RoleID{"01JNOSUCHROLE0000000000000"}); err == nil {
+		t.Error("unknown role accepted")
+	}
+	if _, err := e.members.SetRoles(e.ctx, e.admin, "01JNOSUCHMEMBER00000000000", nil); !isNotFound(err, app.ReasonMissing) {
+		t.Errorf("unknown member: %v", err)
+	}
+
+	// Escalation is checked per changed role: give the team member Church admin.
+	v, err := e.members.SetRoles(e.ctx, e.admin, teamID, []domain.RoleID{admin.ID, admin.ID})
+	if err != nil || len(v.Roles) != 1 || !v.Scopes.CanAdminister() {
+		t.Fatalf("make team member admin: %+v %v", v, err)
+	}
+	if err := e.members.Remove(e.ctx, e.admin, adminID); err != nil {
+		t.Errorf("admin leaves when another admin exists: %v", err)
+	}
+	if _, err := e.churches.Get(e.ctx, e.admin); !isNotFound(err, app.ReasonNotMember) {
+		t.Errorf("removed member: %v", err)
+	}
+	if me, err := e.account.MeView(e.ctx, e.admin); err != nil || me.Membership != nil || me.Church != nil {
+		t.Errorf("removed member's /me: %+v %v", me, err)
+	}
+
+	// TC-A-010: effective scopes are the union.
+	custom, _ := e.roles.Create(e.ctx, &domain.Session{UserID: v.Member.UserID}, app.RoleInput{Name: "Settings", Scopes: []domain.Scope{domain.ScopeChurchSettings}})
+	s, _ := e.member("both@example.org", editor.ID, custom.Role.ID)
+	me, err := e.account.MeView(e.ctx, s)
+	want := domain.NewScopeSet(append(slices.Clone(domain.ReadyMadeRoles[2].Scopes), domain.ScopeChurchSettings)...)
+	if err != nil || len(me.Membership.Scopes) != len(want) || len(me.Membership.Scopes.Missing(want)) != 0 {
+		t.Errorf("union of scopes: %v %v", me.Membership.Scopes, err)
+	}
+}
+
+// Deleting a role held by members needs its scopes and removes it from them.
+func TestDeleteRole(t *testing.T) {
+	e := newChurch(t, sqlstoretest.NewSQLite(t), nil)
+	editor := e.role(domain.OriginEditor)
+	_, mid := e.member("ed@example.org", editor.ID)
+	if err := e.roles.Delete(e.ctx, e.admin, editor.ID); !scopeNotHeld(err, domain.ScopeLibraryEdit, domain.ScopeLiturgyComment, domain.ScopeLiturgyEdit) {
+		t.Errorf("delete a held role with scopes not held: %v", err)
+	}
+	e.write(func(s app.Store) error { // nobody holds it any more
+		cs, _ := s.ForChurch(ctx, e.church)
+		return cs.Memberships().SetRoles(ctx, mid, nil)
+	})
+	if err := e.roles.Delete(e.ctx, e.admin, editor.ID); err != nil {
+		t.Errorf("delete an unheld role: %v", err)
+	}
+	if err := e.roles.Delete(e.ctx, e.admin, editor.ID); !isNotFound(err, app.ReasonMissing) {
+		t.Errorf("delete again: %v", err)
+	}
+	scopes, err := e.roles.Scopes(e.ctx, e.admin)
+	if err != nil || len(scopes) != 10 || scopes[0].Description != "Change church settings" {
+		t.Errorf("scopes: %+v %v", scopes, err)
 	}
 }

@@ -4,11 +4,20 @@
 package app
 
 import (
+	"context"
+	"errors"
 	"slices"
 	"strings"
 
 	"github.com/brightfellow-net/liturgist/domain"
 )
+
+// Members holds the member list and role-assignment use cases (04 §6).
+type Members struct {
+	Tx           Tx
+	Clock        Clock
+	Entitlements Entitlements
+}
 
 // MemberActions are the advisory actions on a member (04 §5).
 type MemberActions struct {
@@ -22,6 +31,13 @@ type MemberView struct {
 	Roles   []domain.Role // the member's roles, by name
 	Scopes  domain.ScopeSet
 	Actions MemberActions
+}
+
+// MemberList is GET /members.
+type MemberList struct {
+	Members []MemberView
+	Used    int
+	Max     *int // nil = unlimited
 }
 
 // memberView computes a member's roles and actions as seen by the actor.
@@ -43,6 +59,14 @@ func (c churchScope) memberView(m domain.Member, all []domain.Member) MemberView
 	return v
 }
 
+func memberships(all []domain.Member) []domain.Membership {
+	out := make([]domain.Membership, len(all))
+	for i, m := range all {
+		out[i] = m.Membership
+	}
+	return out
+}
+
 func membershipsWithout(all []domain.Member, id domain.MembershipID) []domain.Membership {
 	out := make([]domain.Membership, 0, len(all))
 	for _, m := range all {
@@ -53,4 +77,182 @@ func membershipsWithout(all []domain.Member, id domain.MembershipID) []domain.Me
 	return out
 }
 
+// teamUsage returns the number of memberships (invites join in a later slice).
+func teamUsage(ctx context.Context, cs ChurchStore) (int, error) {
+	return cs.Memberships().Count(ctx)
+}
+
+// teamLimit asks Entitlements before the transaction (no outside calls inside
+// a transaction); an error is unavailable, never "allowed" (04 §8).
+func teamLimit(ctx context.Context, e Entitlements) (Limit, error) {
+	t, err := TenantFrom(ctx)
+	if err != nil {
+		return Limit{}, err
+	}
+	l, err := e.Limit(ctx, t.ChurchID, LimitMaxTeamMembers)
+	if err != nil {
+		return Limit{}, errors.Join(ErrUnavailable, err)
+	}
+	return l, nil
+}
+
+// List returns the members (members.view) with usage.
+func (u *Members) List(ctx context.Context, sess *domain.Session) (MemberList, error) {
+	if _, err := TenantFrom(ctx); err != nil {
+		return MemberList{}, err
+	}
+	limit, err := teamLimit(ctx, u.Entitlements)
+	if err != nil {
+		return MemberList{}, err
+	}
+	var res MemberList
+	err = u.Tx.Read(ctx, func(s Store) error {
+		sc, err := actorIn(ctx, s, sess, false)
+		if err != nil {
+			return err
+		}
+		if err := sc.actor.Require(domain.ScopeMembersView); err != nil {
+			return err
+		}
+		all, err := sc.cs.Memberships().List(ctx)
+		if err != nil {
+			return err
+		}
+		res = MemberList{}
+		for _, m := range all {
+			res.Members = append(res.Members, sc.memberView(m, all))
+		}
+		res.Used, err = teamUsage(ctx, sc.cs)
+		return err
+	})
+	if err == nil && !limit.Unlimited {
+		res.Max = &limit.Max
+	}
+	return res, err
+}
+
+// SetRoles replaces a member's roles (roles.manage). The actor must hold the
+// scopes of every role added or removed; the lock-out rule applies.
+func (u *Members) SetRoles(ctx context.Context, sess *domain.Session, id domain.MembershipID, roleIDs []domain.RoleID) (MemberView, error) {
+	var res MemberView
+	err := u.Tx.Write(ctx, func(s Store) error {
+		sc, err := actorIn(ctx, s, sess, true)
+		if err != nil {
+			return err
+		}
+		if err := sc.actor.Require(domain.ScopeRolesManage); err != nil {
+			return err
+		}
+		m, err := sc.cs.Memberships().ByID(ctx, id)
+		if errors.Is(err, ErrNotFound) {
+			return notFound(ReasonMissing)
+		}
+		if err != nil {
+			return err
+		}
+		roleIDs = uniqueRoles(roleIDs)
+		for _, r := range roleIDs {
+			if _, ok := sc.roles[r]; !ok {
+				return &domain.InvalidInputError{Field: "role_ids", Message: "Unknown role."}
+			}
+		}
+		changed := domain.ScopeSet{}
+		for _, r := range symmetricDiff(m.RoleIDs, roleIDs) {
+			changed.Add(sc.roles[r].Scopes)
+		}
+		if err := sc.actor.RequireHeld(changed); err != nil {
+			return err
+		}
+		if err := sc.cs.Memberships().SetRoles(ctx, id, roleIDs); err != nil {
+			return err
+		}
+		all, err := checkLockout(ctx, sc.cs)
+		if err != nil {
+			return err
+		}
+		for _, mm := range all {
+			if mm.ID == id {
+				res = sc.memberView(mm, all)
+				return nil
+			}
+		}
+		return ErrNotFound
+	})
+	return res, err
+}
+
+// Remove deletes a membership (members.manage); the user account and sessions
+// remain. The actor must hold the member's scopes; the lock-out rule applies.
+func (u *Members) Remove(ctx context.Context, sess *domain.Session, id domain.MembershipID) error {
+	return u.Tx.Write(ctx, func(s Store) error {
+		sc, err := actorIn(ctx, s, sess, true)
+		if err != nil {
+			return err
+		}
+		if err := sc.actor.Require(domain.ScopeMembersManage); err != nil {
+			return err
+		}
+		m, err := sc.cs.Memberships().ByID(ctx, id)
+		if errors.Is(err, ErrNotFound) {
+			return notFound(ReasonMissing)
+		}
+		if err != nil {
+			return err
+		}
+		if err := sc.actor.RequireHeld(sc.scopesOf(m.RoleIDs)); err != nil {
+			return err
+		}
+		if err := sc.cs.Memberships().Delete(ctx, id); err != nil {
+			return err
+		}
+		_, err = checkLockout(ctx, sc.cs)
+		return err
+	})
+}
+
+// checkLockout re-reads memberships and roles after a change and returns
+// ErrLockout if nobody holds both roles.manage and members.manage (03 §8 rule 1).
+func checkLockout(ctx context.Context, cs ChurchStore) ([]domain.Member, error) {
+	all, err := cs.Memberships().List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	roles, err := roleMap(ctx, cs)
+	if err != nil {
+		return nil, err
+	}
+	if !domain.SomeoneCanAdminister(memberships(all), roles) {
+		return nil, ErrLockout
+	}
+	return all, nil
+}
+
+// reloadRoles returns c with the role map re-read (after roles changed in this transaction).
+func (c churchScope) reloadRoles(ctx context.Context) (churchScope, error) {
+	roles, err := roleMap(ctx, c.cs)
+	c.roles = roles
+	return c, err
+}
+
 func compareFold(a, b string) int { return strings.Compare(strings.ToLower(a), strings.ToLower(b)) }
+
+func uniqueRoles(ids []domain.RoleID) []domain.RoleID {
+	out := slices.Clone(ids)
+	slices.Sort(out)
+	return slices.Compact(out)
+}
+
+func symmetricDiff(a, b []domain.RoleID) []domain.RoleID {
+	var out []domain.RoleID
+	for _, x := range a {
+		if !slices.Contains(b, x) {
+			out = append(out, x)
+		}
+	}
+	for _, x := range b {
+		if !slices.Contains(a, x) {
+			out = append(out, x)
+		}
+	}
+	return out
+}

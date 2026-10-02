@@ -27,6 +27,7 @@ type Problem struct {
 	Code   string              `json:"code"`
 	Detail string              `json:"detail,omitempty"`
 	Reason string              `json:"reason,omitempty"`
+	Scopes []string            `json:"scopes,omitempty"` // scope_not_held
 	Errors []*huma.ErrorDetail `json:"errors,omitempty"`
 }
 
@@ -89,6 +90,7 @@ func MapError(ctx context.Context, err error, log *slog.Logger) error {
 		weak     *domain.WeakPasswordError
 		invalid  *domain.InvalidInputError
 		many     *app.TooManyAttemptsError
+		notHeld  *app.ScopeNotHeldError
 		badToken *app.InvalidTokenError
 		nf       *app.NotFoundError
 	)
@@ -112,6 +114,13 @@ func MapError(ctx context.Context, err error, log *slog.Logger) error {
 		return p
 	case errors.Is(err, domain.ErrInvalidIdentifier):
 		return problem(http.StatusUnprocessableEntity, "invalid_identifier", "Enter a valid email address or phone number.")
+	case errors.As(err, &notHeld):
+		p := problem(http.StatusForbidden, "scope_not_held", "You can only grant permissions you hold yourself.")
+		for _, sc := range notHeld.Scopes {
+			p.Scopes = append(p.Scopes, string(sc))
+		}
+		log.Info("scope_not_held", "user_id", string(info.UserID), "request_id", info.RequestID)
+		return p
 	case errors.As(err, &badToken):
 		p := problem(http.StatusBadRequest, "invalid_token", "This link can no longer be used.")
 		p.Reason = string(badToken.Reason)
@@ -143,6 +152,8 @@ func MapError(ctx context.Context, err error, log *slog.Logger) error {
 var conflicts = map[error]*Problem{
 	app.ErrNotSetUp:        problem(http.StatusConflict, "not_set_up", "Liturgist is not set up yet."),
 	app.ErrAlreadySetUp:    problem(http.StatusConflict, "already_set_up", "Liturgist is already set up."),
+	app.ErrLockout:         problem(http.StatusConflict, "lockout_prevented", "Someone must keep the permissions to manage roles and members."),
+	app.ErrRoleNameTaken:   problem(http.StatusConflict, "role_name_taken", "Another role already has this name."),
 	app.ErrIdentifierTaken: problem(http.StatusConflict, "identifier_taken", "This email or phone number belongs to another account."),
 }
 

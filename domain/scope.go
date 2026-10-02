@@ -34,6 +34,42 @@ var AllScopes = []Scope{
 // ValidScope reports whether s is a known scope.
 func ValidScope(s Scope) bool { return slices.Contains(AllScopes, s) }
 
+// scopeDescriptions are shown in the role editor (GET /scopes), per UI language.
+var scopeDescriptions = map[string]map[Scope]string{
+	"en": {
+		ScopeChurchSettings: "Change church settings",
+		ScopeMembersView:    "See the member list with contact details",
+		ScopeMembersManage:  "Invite and remove members; create password-reset links",
+		ScopeRolesManage:    "Create, edit and delete roles; assign roles to members",
+		ScopeLibraryEdit:    "Maintain songs and readings; imports",
+		ScopeTemplatesEdit:  "Maintain templates and regular services",
+		ScopeLiturgyEdit:    "Create and edit liturgies, assign the team, submit for review",
+		ScopeLiturgyComment: "Comment on liturgy items; resolve comments",
+		ScopeLiturgyApprove: "Approve, request changes, publish, reopen",
+		ScopeLiturgyManage:  "Archive and unarchive published liturgies; delete unpublished liturgies",
+	},
+	"id": {
+		ScopeChurchSettings: "Mengubah pengaturan gereja",
+		ScopeMembersView:    "Melihat daftar anggota beserta kontaknya",
+		ScopeMembersManage:  "Mengundang dan mengeluarkan anggota; membuat tautan atur ulang kata sandi",
+		ScopeRolesManage:    "Membuat, mengubah dan menghapus peran; memberikan peran kepada anggota",
+		ScopeLibraryEdit:    "Mengelola lagu dan bacaan; impor",
+		ScopeTemplatesEdit:  "Mengelola templat dan ibadah rutin",
+		ScopeLiturgyEdit:    "Membuat dan mengubah liturgi, menugaskan tim, mengajukan untuk ditinjau",
+		ScopeLiturgyComment: "Mengomentari butir liturgi; menyelesaikan komentar",
+		ScopeLiturgyApprove: "Menyetujui, meminta perubahan, menerbitkan, membuka kembali",
+		ScopeLiturgyManage:  "Mengarsipkan dan membatalkan arsip liturgi terbit; menghapus liturgi yang belum terbit",
+	},
+}
+
+// ScopeDescription returns the description in lang ("en" | "id"; anything else → en).
+func ScopeDescription(s Scope, lang string) string {
+	if d, ok := scopeDescriptions[lang]; ok {
+		return d[s]
+	}
+	return scopeDescriptions["en"][s]
+}
+
 // ScopeSet is a set of scopes.
 type ScopeSet map[Scope]bool
 

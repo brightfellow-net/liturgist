@@ -107,6 +107,28 @@ func ValidateChurch(c *Church, fieldPrefix string) error {
 	return nil
 }
 
+// ValidateRole trims and checks a role's name and description (03 §8).
+func ValidateRole(name, description *string, scopes []Scope) error {
+	if name != nil {
+		*name = strings.TrimSpace(*name)
+		if n := utf8.RuneCountInString(*name); n < 1 || n > 60 {
+			return &InvalidInputError{Field: "name", Message: "Name must be 1 to 60 characters."}
+		}
+	}
+	if description != nil {
+		*description = strings.TrimSpace(*description)
+		if utf8.RuneCountInString(*description) > 200 {
+			return &InvalidInputError{Field: "description", Message: "At most 200 characters."}
+		}
+	}
+	for _, s := range scopes {
+		if !ValidScope(s) {
+			return &InvalidInputError{Field: "scopes", Message: "Unknown scope " + string(s) + "."}
+		}
+	}
+	return nil
+}
+
 // ValidatePersonName trims and checks a person's name (1–120 characters).
 func ValidatePersonName(name *string, field string) error {
 	*name = strings.TrimSpace(*name)

@@ -4,11 +4,13 @@
 package httpapi
 
 import (
+	"time"
+
 	"github.com/brightfellow-net/liturgist/app"
 	"github.com/brightfellow-net/liturgist/domain"
 )
 
-// JSON shapes of the church and membership resources (04 §6).
+// JSON shapes of the church, member and role resources (04 §6).
 
 // ChurchView is the church.
 type ChurchView struct {
@@ -46,12 +48,48 @@ func roleRefs(roles []domain.Role) []RoleRef {
 	return out
 }
 
+// MemberView is one member.
+type MemberView struct {
+	ID       string            `json:"id"`
+	UserID   string            `json:"user_id"`
+	Name     string            `json:"name"`
+	Email    *string           `json:"email"`
+	Phone    *string           `json:"phone"`
+	Roles    []RoleRef         `json:"roles"`
+	JoinedAt time.Time         `json:"joined_at"`
+	Actions  app.MemberActions `json:"actions"`
+}
+
+func memberView(v app.MemberView) MemberView {
+	u := v.Member.User
+	out := MemberView{ID: string(v.Member.ID), UserID: string(u.ID), Name: u.Name, Email: optional(u.Email),
+		Phone: optional(u.Phone), Roles: roleRefs(v.Roles), JoinedAt: v.Member.CreatedAt, Actions: v.Actions}
+	return out
+}
+
 // MembershipView is the logged-in user's membership in GET /me.
 type MembershipView struct {
 	ID      string            `json:"id"`
 	Roles   []RoleRef         `json:"roles"`
 	Scopes  []string          `json:"scopes"`
 	Actions app.MemberActions `json:"actions"`
+}
+
+// RoleView is one role.
+type RoleView struct {
+	ID          string          `json:"id"`
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	Origin      *string         `json:"origin" doc:"Ready-made role this started as; null for custom roles"`
+	Scopes      []string        `json:"scopes"`
+	MemberCount int             `json:"member_count"`
+	Actions     app.RoleActions `json:"actions"`
+}
+
+func roleView(v app.RoleView) RoleView {
+	return RoleView{ID: string(v.Role.ID), Name: v.Role.Name, Description: v.Role.Description,
+		Origin: optional(string(v.Role.Origin)), Scopes: scopeStrings(v.Role.Scopes),
+		MemberCount: v.MemberCount, Actions: v.Actions}
 }
 
 func scopeStrings(s domain.ScopeSet) []string {

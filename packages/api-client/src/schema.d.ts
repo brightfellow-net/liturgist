@@ -108,6 +108,94 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Members of the church */
+        get: operations["listMembers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/members/{membershipId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a member */
+        delete: operations["removeMember"];
+        options?: never;
+        head?: never;
+        /** Assign roles to a member */
+        patch: operations["setMemberRoles"];
+        trace?: never;
+    };
+    "/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Roles of the church */
+        get: operations["listRoles"];
+        put?: never;
+        /** Create a role */
+        post: operations["createRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/roles/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a role */
+        delete: operations["deleteRole"];
+        options?: never;
+        head?: never;
+        /** Rename a role or change its scopes */
+        patch: operations["updateRole"];
+        trace?: never;
+    };
+    "/scopes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Scopes with descriptions */
+        get: operations["listScopes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/setup": {
         parameters: {
             query?: never;
@@ -210,6 +298,17 @@ export interface components {
             privacy_contact: string | null;
             time_zone: string;
         };
+        CreateRoleRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/CreateRoleRequest.json
+             */
+            readonly $schema?: string;
+            description?: string;
+            name: string;
+            scopes: string[] | null;
+        };
         ErrorDetail: {
             /** @description Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id' */
             location?: string;
@@ -222,6 +321,10 @@ export interface components {
             code: string;
             language: string;
             name: string;
+        };
+        Item1: {
+            description: string;
+            scope: string;
         };
         LoginRequest: {
             /**
@@ -251,6 +354,33 @@ export interface components {
             edit_roles: boolean;
             remove: boolean;
         };
+        MemberView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/MemberView.json
+             */
+            readonly $schema?: string;
+            actions: components["schemas"]["MemberActions"];
+            email: string | null;
+            id: string;
+            /** Format: date-time */
+            joined_at: string;
+            name: string;
+            phone: string | null;
+            roles: components["schemas"]["RoleRef"][] | null;
+            user_id: string;
+        };
+        MembersOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/MembersOutputBody.json
+             */
+            readonly $schema?: string;
+            members: components["schemas"]["MemberView"][] | null;
+            usage: components["schemas"]["UsageStruct"];
+        };
         MembershipView: {
             actions: components["schemas"]["MemberActions"];
             id: string;
@@ -276,13 +406,44 @@ export interface components {
             detail?: string;
             errors?: components["schemas"]["ErrorDetail"][] | null;
             reason?: string;
+            scopes?: string[] | null;
             /** Format: int64 */
             status: number;
             title: string;
         };
+        RoleActions: {
+            delete: boolean;
+            edit: boolean;
+        };
         RoleRef: {
             id: string;
             name: string;
+        };
+        RoleView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/RoleView.json
+             */
+            readonly $schema?: string;
+            actions: components["schemas"]["RoleActions"];
+            description: string;
+            id: string;
+            /** Format: int64 */
+            member_count: number;
+            name: string;
+            /** @description Ready-made role this started as; null for custom roles */
+            origin: string | null;
+            scopes: string[] | null;
+        };
+        SetMemberRolesRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/SetMemberRolesRequest.json
+             */
+            readonly $schema?: string;
+            role_ids: string[] | null;
         };
         SetupRequest: {
             /**
@@ -303,6 +464,15 @@ export interface components {
              */
             readonly $schema?: string;
             set_up: boolean;
+        };
+        TeamMembersStruct: {
+            /**
+             * Format: int64
+             * @description null when unlimited
+             */
+            max: number | null;
+            /** Format: int64 */
+            used: number;
         };
         UpdateChurchRequest: {
             /**
@@ -331,6 +501,20 @@ export interface components {
             readonly $schema?: string;
             name?: string;
             preferences?: components["schemas"]["PreferencesStruct"];
+        };
+        UpdateRoleRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/UpdateRoleRequest.json
+             */
+            readonly $schema?: string;
+            description?: string;
+            name?: string;
+            scopes?: string[];
+        };
+        UsageStruct: {
+            team_members: components["schemas"]["TeamMembersStruct"];
         };
         UserView: {
             /**
@@ -584,6 +768,254 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembersOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    removeMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                membershipId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    setMemberRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                membershipId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetMemberRolesRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleView"][] | null;
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    createRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    deleteRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    updateRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listScopes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Item1"][] | null;
+                };
             };
             /** @description Error */
             default: {

@@ -10,6 +10,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -145,25 +146,33 @@ func TestSetupHTTP(t *testing.T) {
 // IT-T-001: a logged-in non-member gets byte-identical 404s everywhere.
 func TestNotMemberHTTP(t *testing.T) {
 	h := harnessWith(t)
-	h.setupChurch()
+	admin := h.setupChurch()
+	missing := h.do(req{method: "DELETE", path: "/api/v1/members/01JNOSUCHMEMBER00000000000", cookies: []*http.Cookie{admin}})
+	if missing.Code != http.StatusNotFound {
+		t.Fatalf("missing member: %d %s", missing.Code, missing.Body.String())
+	}
 	h.user("01JOUTSIDER000000000000000", "out@example.org", "")
 	out := sessionCookie(t, h.login("out@example.org", testPassword))
 
-	var first string
 	for _, r := range []req{
 		{method: "GET", path: "/api/v1/church"},
 		{method: "PATCH", path: "/api/v1/church", body: map[string]any{"name": "X"}},
+		{method: "GET", path: "/api/v1/members"},
+		{method: "PATCH", path: "/api/v1/members/01JNOSUCHMEMBER00000000000", body: map[string]any{"role_ids": []string{}}},
+		{method: "DELETE", path: "/api/v1/members/01JNOSUCHMEMBER00000000000"},
+		{method: "GET", path: "/api/v1/roles"},
+		{method: "POST", path: "/api/v1/roles", body: map[string]any{"name": "R", "scopes": []string{}}},
+		{method: "PATCH", path: "/api/v1/roles/01JNOSUCHROLE0000000000000", body: map[string]any{}},
+		{method: "DELETE", path: "/api/v1/roles/01JNOSUCHROLE0000000000000"},
+		{method: "GET", path: "/api/v1/scopes"},
 	} {
 		r.cookies = []*http.Cookie{out}
 		rec := h.do(r)
-		if first == "" {
-			first = rec.Body.String()
-		}
-		if rec.Code != http.StatusNotFound || rec.Body.String() != first {
+		if rec.Code != http.StatusNotFound || rec.Body.String() != missing.Body.String() {
 			t.Errorf("%s %s: %d %s", r.method, r.path, rec.Code, rec.Body.String())
 		}
 	}
-	if !strings.Contains(h.log.String(), `"not_found_reason":"not_member"`) {
+	if !strings.Contains(h.log.String(), `"not_found_reason":"not_member"`) || !strings.Contains(h.log.String(), `"not_found_reason":"missing"`) {
 		t.Error("404 reasons must be logged")
 	}
 	me := decode(t, h.get("/api/v1/me", out))
@@ -172,25 +181,90 @@ func TestNotMemberHTTP(t *testing.T) {
 	}
 }
 
-// IT-T-002: a team member without church.settings gets 403 forbidden.
+// IT-T-002, TC-T-001 (part), IT-T-004: missing scopes and removed members.
 func TestScopesHTTP(t *testing.T) {
 	h := harnessWith(t)
 	admin := h.setupChurch()
 	team := h.member("team@example.org")
-	rec := h.do(req{method: "PATCH", path: "/api/v1/church", cookies: []*http.Cookie{team}, body: map[string]any{"name": "X"}})
-	if rec.Code != http.StatusForbidden || problemCode(t, rec)["code"] != "forbidden" {
-		t.Errorf("PATCH /church by team member: %d %s", rec.Code, rec.Body.String())
+
+	for _, r := range []req{
+		{method: "PATCH", path: "/api/v1/church", body: map[string]any{"name": "X"}},
+		{method: "GET", path: "/api/v1/members"},
+		{method: "POST", path: "/api/v1/roles", body: map[string]any{"name": "R", "scopes": []string{}}},
+	} {
+		r.cookies = []*http.Cookie{team}
+		if rec := h.do(r); rec.Code != http.StatusForbidden || problemCode(t, rec)["code"] != "forbidden" {
+			t.Errorf("%s %s by team member: %d %s", r.method, r.path, rec.Code, rec.Body.String())
+		}
 	}
-	if rec := h.get("/api/v1/church", team); rec.Code != 200 || decode(t, rec)["actions"].(map[string]any)["edit"] != false {
-		t.Errorf("baseline GET /church: %d %s", rec.Code, rec.Body.String())
+	if rec := h.get("/api/v1/church", team); rec.Code != 200 {
+		t.Errorf("baseline GET /church: %d", rec.Code)
 	}
-	me := decode(t, h.get("/api/v1/me", team))
-	if m, _ := me["membership"].(map[string]any); m == nil || len(m["scopes"].([]any)) != 0 {
-		t.Errorf("team member's /me: %v", me)
+
+	// A custom role with only members.view.
+	rec := h.do(req{method: "POST", path: "/api/v1/roles", cookies: []*http.Cookie{admin},
+		body: map[string]any{"name": "Viewer", "scopes": []string{"members.view"}}})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create role: %d %s", rec.Code, rec.Body.String())
 	}
-	if me := decode(t, h.get("/api/v1/me", admin)); me["membership"].(map[string]any)["actions"].(map[string]any)["remove"] != false {
-		t.Errorf("the only admin can't be removed: %v", me)
+	viewerRole := decode(t, rec)["id"].(string)
+	viewer := h.member("viewer@example.org", viewerRole)
+	if rec := h.get("/api/v1/members", viewer); rec.Code != 200 {
+		t.Errorf("viewer lists members: %d %s", rec.Code, rec.Body.String())
 	}
+	// Escalation is 403 scope_not_held with the scopes.
+	rec = h.do(req{method: "POST", path: "/api/v1/roles", cookies: []*http.Cookie{admin},
+		body: map[string]any{"name": "Approver", "scopes": []string{"liturgy.approve"}}})
+	if p := problemCode(t, rec); rec.Code != http.StatusForbidden || p["code"] != "scope_not_held" || p["scopes"].([]any)[0] != "liturgy.approve" {
+		t.Errorf("escalation: %d %s", rec.Code, rec.Body.String())
+	}
+
+	// IT-T-004: the removed member's next request is 404; the session still works for /me.
+	members := decode(t, h.get("/api/v1/members", admin))["members"].([]any)
+	var teamID string
+	for _, m := range members {
+		if mm := m.(map[string]any); mm["email"] == "team@example.org" {
+			teamID = mm["id"].(string)
+		}
+	}
+	rec = h.do(req{method: "PATCH", path: "/api/v1/members/" + teamID, cookies: []*http.Cookie{admin},
+		body: map[string]any{"role_ids": []string{viewerRole}}})
+	if rec.Code != 200 || len(decode(t, rec)["roles"].([]any)) != 1 {
+		t.Errorf("assign roles: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := h.do(req{method: "DELETE", path: "/api/v1/members/" + teamID, cookies: []*http.Cookie{admin}}); rec.Code != 204 {
+		t.Fatalf("remove: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := h.get("/api/v1/church", team); rec.Code != http.StatusNotFound {
+		t.Errorf("removed member: %d", rec.Code)
+	}
+	if rec := h.get("/api/v1/me", team); rec.Code != 200 || decode(t, rec)["membership"] != nil {
+		t.Errorf("removed member's /me: %d %s", rec.Code, rec.Body.String())
+	}
+	// The admin can't remove themselves (lock-out).
+	me := decode(t, h.get("/api/v1/me", admin))
+	adminID := me["membership"].(map[string]any)["id"].(string)
+	if rec := h.do(req{method: "DELETE", path: "/api/v1/members/" + adminID, cookies: []*http.Cookie{admin}}); rec.Code != http.StatusConflict ||
+		problemCode(t, rec)["code"] != "lockout_prevented" {
+		t.Errorf("only admin leaves: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+// IT-T-005: the team-member limit comes from Entitlements.
+func TestLimitHTTP(t *testing.T) {
+	h := harnessWith(t, WithEntitlements(limitOne{}))
+	admin := h.setupChurch()
+	usage := decode(t, h.get("/api/v1/members", admin))["usage"].(map[string]any)["team_members"].(map[string]any)
+	if usage["used"] != 1.0 || usage["max"] != 1.0 {
+		t.Errorf("usage: %v", usage)
+	}
+}
+
+type limitOne struct{}
+
+func (limitOne) Has(context.Context, domain.ChurchID, app.Feature) (bool, error) { return true, nil }
+func (limitOne) Limit(context.Context, domain.ChurchID, app.LimitName) (app.Limit, error) {
+	return app.Limit{Max: 1}, nil
 }
 
 // IT-T-008: every operation's tenancy; undeclared operations count as church.
@@ -198,7 +272,9 @@ func TestTenancyDeclarations(t *testing.T) {
 	want := map[string]string{
 		"login": "platform", "logout": "platform", "getMe": "optional", "updateMe": "platform", "changePassword": "platform",
 		"endOtherSessions": "platform", "getSetupStatus": "platform", "setup": "platform", "listTranslations": "platform",
-		"getChurch": "church", "updateChurch": "church",
+		"getChurch": "church", "updateChurch": "church", "listMembers": "church", "setMemberRoles": "church",
+		"removeMember": "church", "listRoles": "church", "createRole": "church",
+		"updateRole": "church", "deleteRole": "church", "listScopes": "church",
 		"saasExtra": "church", // added through WithRoutes without a declaration
 	}
 	extra := WithRoutes(func(api huma.API) {
@@ -272,25 +348,60 @@ func TestOtherTenantHTTP(t *testing.T) {
 	if rec := saas.do(req{method: "GET", path: "/api/v1/church", cookies: []*http.Cookie{admin}, headers: map[string]string{"X-Test-Church": churchA}}); rec.Code != 200 {
 		t.Errorf("own church: %d", rec.Code)
 	}
-	for _, path := range []string{"/api/v1/church"} {
+	for _, path := range []string{"/api/v1/church", "/api/v1/members", "/api/v1/roles"} {
 		if rec := saas.do(req{method: "GET", path: path, cookies: []*http.Cookie{admin}, headers: map[string]string{"X-Test-Church": churchB}}); rec.Code != http.StatusNotFound {
 			t.Errorf("%s of church B: %d", path, rec.Code)
 		}
 	}
 }
 
-// Church settings over HTTP.
-func TestChurchSettingsHTTP(t *testing.T) {
+// Role editing and church settings over HTTP.
+func TestRolesAndChurchHTTP(t *testing.T) {
 	h := harnessWith(t)
 	admin := h.setupChurch()
+	list := h.get("/api/v1/roles", admin)
+	var rs []map[string]any
+	_ = json.Unmarshal(list.Body.Bytes(), &rs)
+	if len(rs) != 3 {
+		t.Fatalf("roles: %s", list.Body.String())
+	}
+	var adminRole map[string]any
+	for _, r := range rs {
+		if r["origin"] == "church_admin" {
+			adminRole = r
+		}
+	}
+	if adminRole["member_count"] != 1.0 || adminRole["actions"].(map[string]any)["delete"] != false {
+		t.Errorf("admin role: %v", adminRole)
+	}
+	rec := h.do(req{method: "PATCH", path: "/api/v1/roles/" + adminRole["id"].(string), cookies: []*http.Cookie{admin},
+		body: map[string]any{"scopes": []string{"members.view"}}})
+	if rec.Code != http.StatusConflict || problemCode(t, rec)["code"] != "lockout_prevented" {
+		t.Errorf("lock-out: %d %s", rec.Code, rec.Body.String())
+	}
+	rec = h.do(req{method: "PATCH", path: "/api/v1/roles/" + adminRole["id"].(string), cookies: []*http.Cookie{admin},
+		body: map[string]any{"name": "Pengurus"}})
+	if rec.Code != 200 || decode(t, rec)["origin"] != "church_admin" {
+		t.Errorf("rename keeps origin: %d %s", rec.Code, rec.Body.String())
+	}
+
 	if rec := h.do(req{method: "PATCH", path: "/api/v1/church", cookies: []*http.Cookie{admin},
 		body: map[string]any{"feedback_url": nil, "unknown": 1}}); rec.Code != http.StatusUnprocessableEntity {
 		t.Errorf("unknown field: %d %s", rec.Code, rec.Body.String())
 	}
-	rec := h.do(req{method: "PATCH", path: "/api/v1/church", cookies: []*http.Cookie{admin},
+	rec = h.do(req{method: "PATCH", path: "/api/v1/church", cookies: []*http.Cookie{admin},
 		body: map[string]any{"privacy_contact": "office@example.org", "default_translation_code": "KJV"}})
 	if c := decode(t, rec); rec.Code != 200 || c["privacy_contact"] != "office@example.org" || c["default_translation_code"] != "KJV" || c["feedback_url"] != nil {
 		t.Errorf("patch church: %d %s", rec.Code, rec.Body.String())
+	}
+	scopes := []string{}
+	var sc []map[string]any
+	_ = json.Unmarshal(h.get("/api/v1/scopes", admin).Body.Bytes(), &sc)
+	for _, s := range sc {
+		scopes = append(scopes, s["scope"].(string))
+	}
+	if !slices.Contains(scopes, "liturgy.manage") || len(scopes) != 10 {
+		t.Errorf("scopes: %v", scopes)
 	}
 }
 

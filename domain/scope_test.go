@@ -70,6 +70,11 @@ func TestReadyMadeRoles(t *testing.T) {
 			t.Errorf("%s names: %v", r.Origin, r.Names)
 		}
 	}
+	for _, s := range AllScopes {
+		if ScopeDescription(s, "en") == "" || ScopeDescription(s, "id") == "" {
+			t.Errorf("%s: missing description", s)
+		}
+	}
 	if RoleNameKey("  Church Admin ") != "church admin" {
 		t.Error("name key")
 	}
