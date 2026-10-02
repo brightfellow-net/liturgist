@@ -95,6 +95,12 @@ func TestOperatorCommands(t *testing.T) {
 	if code, _, errOut := cli("", "auth", "clear-throttle", "--ip", "nonsense"); code != exitError || !strings.Contains(errOut, "not an IP") {
 		t.Errorf("bad IP: %d %q", code, errOut)
 	}
+	if code, out, errOut := cli("", "search", "reindex"); code != exitOK || !strings.Contains(out, "rebuilt for 1 church") {
+		t.Errorf("search reindex: %d %q %q", code, out, errOut)
+	}
+	if code, _, _ := cli("", "search", "reindex", "extra"); code != exitConfig {
+		t.Errorf("search reindex with an argument: %d", code)
+	}
 
 	t.Setenv("LITURGIST_BASE_URL", "")
 	if _, _, errOut := cli("", "user", "reset-password", "admin@example.org"); !strings.Contains(errOut, "LITURGIST_BASE_URL is not set") {

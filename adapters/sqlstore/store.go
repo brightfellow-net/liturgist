@@ -47,6 +47,7 @@ func (c *churchStore) Church() app.ChurchSettingsRepo  { return churchSettingsRe
 func (c *churchStore) Memberships() app.MembershipRepo { return membershipRepo{c} }
 func (c *churchStore) Roles() app.RoleRepo             { return roleRepo{c} }
 func (c *churchStore) Invites() app.InviteRepo         { return inviteRepo{c} }
+func (c *churchStore) Songs() app.SongRepo             { return songRepo{c} }
 
 // in builds "col IN (?, ?, …)" with its arguments; n must be > 0.
 func in(col string, n int) string {

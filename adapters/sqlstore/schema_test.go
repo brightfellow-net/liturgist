@@ -142,6 +142,19 @@ func TestSeededTranslations(t *testing.T) {
 func TestUniqueConstraintNames(t *testing.T) {
 	sqlstoretest.ForEachDialect(t, func(t *testing.T, db *sqlstore.DB) {
 		f := base(t, db)
+		f.churchRepo(func(r app.SongRepo) error {
+			sa, sc := mkSong("SA", "A", "id", f.now, "x"), mkSong("SC", "C", "id", f.now, "z")
+			sa.DefaultArrangement = []domain.SectionID{sa.Sections[0].ID}
+			for _, song := range []domain.Song{sa, sc} {
+				if err := r.Create(ctx, song); err != nil {
+					return err
+				}
+			}
+			if err := r.CreateGroup(ctx, domain.SongGroupID(id("G1")), f.now); err != nil {
+				return err
+			}
+			return r.SetGroup(ctx, []domain.SongID{sa.ID}, domain.SongGroupID(id("G1")), f.now)
+		})
 		for _, u := range []string{"U8", "U9"} { // users without an open reset link
 			if err := f.user(id(u), strings.ToLower(u)+"@example.org", ""); err != nil {
 				t.Fatal(err)
@@ -197,6 +210,33 @@ func TestUniqueConstraintNames(t *testing.T) {
 			},
 			"setup_tokens_pkey": func() error {
 				return f.exec(`INSERT INTO setup_tokens (id, token_hash, created_at, expires_at) VALUES (1, ?, ?, ?)`, hash("a"), f.ts(0), f.ts(time.Hour))
+			},
+			"song_groups_pkey": func() error {
+				return f.exec(`INSERT INTO song_groups (id, church_id, created_at) VALUES (?, ?, ?)`, id("G1"), id("CHB"), f.ts(0))
+			},
+			"songs_pkey": func() error { return f.rawSong("SA", "CHB", "en") },
+			"songs_group_language_key": func() error {
+				return f.exec(`UPDATE songs SET song_group_id = ? WHERE id = ?`, id("G1"), id("SC")) // SA is already the group's "id" song
+			},
+			"song_sections_pkey": func() error {
+				return f.exec(`INSERT INTO song_sections (id, church_id, song_id, position, kind, number, label, text)
+					VALUES (?, ?, ?, 7, 'other', NULL, NULL, 'x')`, id("SAV1"), id("CHA"), id("SC")) // another song: only the primary key collides
+			},
+			"song_sections_verse_key": func() error {
+				return f.exec(`INSERT INTO song_sections (id, church_id, song_id, position, kind, number, label, text)
+					VALUES (?, ?, ?, 7, 'verse', 1, NULL, 'x')`, id("SAV9"), id("CHA"), id("SA"))
+			},
+			"song_arrangement_entries_pkey": func() error {
+				return f.exec(`INSERT INTO song_arrangement_entries (church_id, song_id, position, section_id) VALUES (?, ?, 0, ?)`,
+					id("CHA"), id("SA"), id("SAV1"))
+			},
+			"song_search_pkey": func() error {
+				if db.Dialect().Name() == "postgres" { // its tsvector columns are NOT NULL
+					return f.exec(`INSERT INTO song_search (church_id, song_id, language, head_fold, lyrics_fold, fts_head, fts_lyrics)
+						VALUES (?, ?, 'id', '', '', to_tsvector('simple', ''), to_tsvector('simple', ''))`, id("CHA"), id("SA"))
+				}
+				return f.exec(`INSERT INTO song_search (church_id, song_id, language, head_fold, lyrics_fold) VALUES (?, ?, 'id', '', '')`,
+					id("CHA"), id("SA"))
 			},
 		}
 		for want, violate := range cases {

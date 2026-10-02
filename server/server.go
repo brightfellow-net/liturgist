@@ -90,6 +90,7 @@ type useCases struct {
 	roles    *app.Roles
 	invites  *app.Invites
 	resets   *app.Resets
+	songs    *app.Songs
 	operator *app.Operator
 	cleanup  *app.Cleanup
 }
@@ -127,6 +128,7 @@ func wire(cfg Config, db app.Tx, o *options, refresh func()) useCases {
 		roles:    &app.Roles{Tx: db, Clock: clock, IDs: ids},
 		invites: &app.Invites{Tx: db, Hasher: hasher, Clock: clock, IDs: ids, URLs: o.urls,
 			Entitlements: o.entitlements, Auth: auth},
+		songs:    &app.Songs{Tx: db, Clock: clock, IDs: ids, Usage: app.NeverUsed{}},
 		resets:   &app.Resets{Tx: db, Hasher: hasher, Clock: clock, IDs: ids, URLs: o.urls, Auth: auth},
 		operator: &app.Operator{Tx: db, Clock: clock, IDs: ids},
 		cleanup:  &app.Cleanup{Tx: db, Clock: clock},
@@ -171,6 +173,7 @@ func New(ctx context.Context, cfg Config, opts ...Option) (*Server, error) {
 		auth: httpapi.AuthDeps{Auth: s.uc.auth, Account: s.uc.account, Cookies: cookies, Clock: s.uc.auth.Clock, Log: cfg.Logger},
 		church: httpapi.ChurchDeps{Setup: s.uc.setup, Churches: s.uc.churches, Members: s.uc.members, Roles: s.uc.roles,
 			Invites: s.uc.invites, Resets: s.uc.resets, Cookies: cookies, Clock: s.uc.auth.Clock, Log: cfg.Logger},
+		library:  httpapi.LibraryDeps{Songs: s.uc.songs, Log: cfg.Logger},
 		session:  httpapi.SessionMiddleware(s.uc.auth, cookies, s.uc.auth.Clock, cfg.Logger),
 		resolver: o.resolver,
 	}

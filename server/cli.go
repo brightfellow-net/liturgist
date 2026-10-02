@@ -180,6 +180,12 @@ func (o *Operator) GrantAdmin(ctx context.Context, identifier string) error {
 	return nil
 }
 
+// ReindexSongs rebuilds the song search index (06 §5.3) and returns how many
+// churches were rebuilt.
+func (o *Operator) ReindexSongs(ctx context.Context) (int, error) {
+	return o.uc.operator.ReindexSongs(ctx)
+}
+
 // ClearThrottle deletes login-throttle counters for an identifier, an IP
 // address, or all of them.
 func (o *Operator) ClearThrottle(ctx context.Context, identifier, ip string, all bool) error {

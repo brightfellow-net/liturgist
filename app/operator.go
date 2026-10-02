@@ -154,6 +154,38 @@ func (o *Operator) ClearThrottle(ctx context.Context, identifier, addr string, a
 	})
 }
 
+// maxReindexChurches bounds how many churches one reindex run visits.
+const maxReindexChurches = 1_000_000
+
+// ReindexSongs rebuilds the song search index of every church, one church at
+// a time under its lock, so the rebuild is atomic per church and cannot lose a
+// concurrent edit (06 §5.3). It returns the number of churches rebuilt.
+func (o *Operator) ReindexSongs(ctx context.Context) (int, error) {
+	var churches []domain.ChurchID
+	if err := o.Tx.Read(ctx, func(s Store) (err error) {
+		churches, err = s.Churches().IDs(ctx, maxReindexChurches)
+		return err
+	}); err != nil {
+		return 0, err
+	}
+	for _, id := range churches {
+		err := o.Tx.Write(ctx, func(s Store) error {
+			cs, err := s.ForChurch(ctx, id)
+			if err != nil {
+				return err
+			}
+			if err := cs.LockChurch(ctx); err != nil {
+				return err
+			}
+			return cs.Songs().Reindex(ctx)
+		})
+		if err != nil {
+			return 0, err
+		}
+	}
+	return len(churches), nil
+}
+
 // Cleanup is storage housekeeping; expiry itself is decided at use time (03 §11).
 type Cleanup struct {
 	Tx    Tx
