@@ -207,7 +207,7 @@ func (s *Server) Close() error
 ## 9. Logging
 
 - `log/slog` to stdout; handler chosen by `LITURGIST_LOG_FORMAT`.
-- **Request ID:** accept an incoming `X-Request-ID` if it matches `^[A-Za-z0-9-]{8,64}$`, else generate a ULID; echo it in the response header; add `request_id` to every log line of that request.
+- **Request ID:** accept an incoming `X-Request-ID` if it matches `^[A-Za-z0-9-]{8,64}$`, else generate a random 128-bit value as 32 hex characters; echo it in the response header; add `request_id` to every log line of that request.
 - **Access log line** (level info): `method`, `path` (no query string), `status`, `duration_ms`, `request_id`, `user_id` (if logged in). Never request or response bodies, headers, cookies, identifiers (emails/phones) or names.
 - **Redaction at the logger boundary:** a `slog` `ReplaceAttr` function replaces the value of any attribute whose key is `token`, `password`, `email`, `phone`, `identifier`, `cookie`, `authorization` or ends in `_token` with `[redacted]`, so a mistaken log call can't leak them.
 - The setup link is the only secret deliberately logged, through a dedicated call that bypasses redaction ([03 §10](03-identity-auth.md#10-first-time-setup), accepted risk); it expires after 24 hours and is useless once setup is done.
@@ -286,7 +286,7 @@ One workflow on every push and pull request:
 | TC-F-001 | `envconfig` | No variables set | `server.Config` with every default in §5 | — |
 | TC-F-002 | `envconfig` | `LITURGIST_DB_DRIVER=postgres`, no `LITURGIST_DB_URL` | Error naming the missing variable; exit 2 | Several errors reported together |
 | TC-F-003 | `envconfig` | `LITURGIST_BASE_URL=https://x.org/path` | Error: base URL must not have a path | Trailing slash allowed and removed |
-| TC-F-004 | Request ID middleware | Incoming `X-Request-ID: abc` (too short) | New ULID generated and echoed | Valid incoming ID is kept |
+| TC-F-004 | Request ID middleware | Incoming `X-Request-ID: abc` (too short) | New 32-hex-character ID generated and echoed | Valid incoming ID is kept |
 | TC-F-005 | Security headers | Any request | All headers in §8; HSTS only for `https` base URL | — |
 | TC-F-009 | Allowed hosts | `Host: evil.example` | 421, no body | `BaseURL` host with port → allowed; `localhost` base → `127.0.0.1` allowed; `/healthz` with any host → 200 |
 | TC-F-010 | Log redaction | `slog.Info("x", "email", "a@b.c", "reset_token", "t")` | Both values `[redacted]` | Setup-link call is not redacted |

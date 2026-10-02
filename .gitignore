@@ -1,0 +1,4 @@
+web/dist/*
+!web/dist/.keep
+bin/
+node_modules/
