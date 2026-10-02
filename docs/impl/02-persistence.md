@@ -173,7 +173,7 @@ The dialect translates driver errors into `app` errors:
 | Driver condition | SQLite | PostgreSQL | `app` error |
 |---|---|---|---|
 | Unique violation | `SQLITE_CONSTRAINT_UNIQUE` / `_PRIMARYKEY` | `23505` | `app.ErrUnique{Constraint}` — the use case maps it to a specific code (e.g. `identifier_taken`) |
-| Foreign key violation | `SQLITE_CONSTRAINT_FOREIGNKEY` | `23503` | `app.ErrReferenced` |
+| Foreign key violation | `SQLITE_CONSTRAINT_FOREIGNKEY`, or any `SQLITE_CONSTRAINT` whose message is "FOREIGN KEY constraint failed" (a failed `ON DELETE RESTRICT` has another extended code) | `23503` | `app.ErrReferenced` |
 | Check violation | `SQLITE_CONSTRAINT_CHECK` | `23514` | `app.ErrInvalid` (a bug: domain validation should have caught it) |
 | No rows | `sql.ErrNoRows` | `sql.ErrNoRows` | `app.ErrNotFound` |
 | Busy / serialisation | `SQLITE_BUSY` after timeout | `40001`, `40P01` | retried by `Tx.Write` (3×), then `app.ErrUnavailable` |

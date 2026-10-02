@@ -304,7 +304,7 @@ Church-owned. Order is `position`; IDs are stable **[P-46]**.
 | `song_id` | id | no | FK (`church_id`, `song_id`) → `songs(church_id, id)` ON DELETE CASCADE `song_sections_song_fkey` |
 | `position` | int | no | `CHECK (position >= 0)` `song_sections_position_check`; dense 0..n-1 per song (app); not unique, so a reorder can be written row by row |
 | `kind` | text | no | `CHECK (kind IN ('verse','pre_chorus','chorus','bridge','tag','intro','ending','other'))` `song_sections_kind_check` |
-| `number` | int | yes | `CHECK ((kind = 'verse' AND number BETWEEN 1 AND 99) OR (kind <> 'verse' AND number IS NULL))` `song_sections_number_check` |
+| `number` | int | yes | `CHECK ((kind = 'verse' AND number IS NOT NULL AND number BETWEEN 1 AND 99) OR (kind <> 'verse' AND number IS NULL))` `song_sections_number_check` (the explicit `IS NOT NULL` matters: a `CHECK` that evaluates to NULL passes) |
 | `label` | text | yes | 1–60 chars (app); null = derived from kind and number |
 | `text` | text | no | 1–5000 chars (app), normalised |
 

@@ -65,7 +65,7 @@ A group links the language versions of one hymn. It has no name in the UI. A gro
 | `POST /songs/{id}/link {other_song_id}` | The same song twice → 422 `validation_failed`. Neither song grouped: new group with both. One grouped: the other joins that group. Both in the same group: no change (200). Both in different groups, or the joining song's language is already in the group → 409 `group_conflict` (`reason`: `already_grouped`, `language_taken`) |
 | `DELETE /songs/{id}/link` | Removes the song from its group. A group left with one song is deleted and that song becomes ungrouped. Not grouped → 204, no change |
 
-Link and unlink requests carry no `version`: the church lock serialises them. Every song whose group membership changes gets `version` + 1, so an editor holding an older copy of that song gets 409 `version_conflict` on its next save and reloads.
+Link and unlink requests carry no `version`: the church lock serialises them. Every song whose group changes (the song that joins, and the songs that leave) gets `version` + 1; songs that stay in a group keep their version. So an editor holding an older copy of that song gets 409 `version_conflict` on its next save and reloads.
 
 Changing a grouped song's `language` to one that another song of its group already has → 409 `group_conflict` (`reason`: `language_taken`).
 
@@ -84,7 +84,7 @@ All paths under `/api/v1`. **View** = any member of the church; **edit** = `libr
 
 | Method & path | Scope | Request | Response |
 |---|---|---|---|
-| `GET /songs` | view | query: `q`, `language`, `licence_status`, `hymnal_source`, `hymnal_number` (exact, with `hymnal_source`), `limit` (default 50, max 100), `offset` | `{ items: [SongSummary], total }` |
+| `GET /songs` | view | query: `q`, `language`, `licence_status`, `hymnal_source`, `hymnal_number` (exact, with `hymnal_source`), `limit` (default 50, at most 100; a larger value is lowered to 100), `offset` | `{ items: [SongSummary], total }` |
 | `GET /songs/{id}` | view | — | Song with `sections`, `default_arrangement`, `versions` (the other songs in its group: `id`, `title`, `language`), `version`, `actions: { edit, delete }` |
 | `POST /songs` | edit | all fields of §2.1 and `sections` | 201 Song |
 | `PATCH /songs/{id}` | edit | `version` and any fields; `sections` as in §2.4 | Song |
