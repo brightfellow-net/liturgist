@@ -49,11 +49,11 @@ packages/i18n/              @liturgist/i18n: en.json (source), id.json
 ## 4. API client and data
 
 - `createClient<paths>({ baseUrl: "/api/v1" })` from `openapi-fetch`, typed by the generated `schema.d.ts`. The generated paths have no `/api/v1` prefix (it is in the spec's `servers`), so the client adds it.
-- All server data goes through TanStack Query. Query keys: `["me"]`, `["church"]`, `["members"]`, `["invites"]`, `["translations"]`.
+- All server data goes through TanStack Query. Query keys: `["me"]`, `["church"]`, `["members"]`, `["invites"]`, `["roles"]`, `["scopes"]`, `["translations"]`.
 - On a 401 `unauthenticated` from any query: clear the cache and go to `/login?next=<current path>`.
 - On 409 `not_set_up`: go to `/setup`.
 - Forms: React Hook Form + Zod. Zod schemas mirror the server rules (lengths, required fields) for instant feedback only; the server's 422 `errors` are mapped onto fields and always win.
-- Buttons and menu items are shown or hidden from `actions` in API responses only. `actions` are advisory: a 403 can still happen if permissions changed meanwhile, and is shown with the normal error message.
+- Buttons and menu items are shown or hidden from `actions` in API responses only. Where the API has no `actions` (the settings tabs, the Invites section with its "Invite a person" button, "New role"), `membership.scopes` decides, as for the menu. `actions` are advisory: a 403 can still happen if permissions changed meanwhile, and is shown with the normal error message.
 - Every `POST`, `PUT`, `PATCH` and `DELETE` is sent with `Content-Type: application/json`, including bodyless ones (empty body `{}`) ([03 §6](03-identity-auth.md#6-csrf-protection)).
 
 ## 5. Links and routing
