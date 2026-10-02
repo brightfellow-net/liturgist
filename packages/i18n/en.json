@@ -1,3 +1,133 @@
 {
-  "app.name": "Liturgist"
+  "app": {
+    "name": "Liturgist",
+    "skip_to_content": "Skip to content",
+    "loading": "Loading…"
+  },
+  "nav": {
+    "label": "Main menu",
+    "home": "Home",
+    "privacy": "Privacy",
+    "log_out": "Log out"
+  },
+  "common": {
+    "language": "Language",
+    "show_password": "Show password",
+    "hide_password": "Hide password",
+    "retry": "Try again",
+    "go_to_login": "Go to login",
+    "field_invalid": "Check this field.",
+    "required": "This field is required.",
+    "too_long": "At most {{max}} characters."
+  },
+  "language": {
+    "en": "English",
+    "id": "Bahasa Indonesia"
+  },
+  "login": {
+    "title": "Log in",
+    "identifier": "Email or phone number",
+    "password": "Password",
+    "submit": "Log in",
+    "forgot": "Forgot password?",
+    "forgot_text": "Ask your church admin to send you a reset link."
+  },
+  "setup": {
+    "title": "Set up Liturgist",
+    "intro": "Create your church and the first church admin. You can change the church settings later.",
+    "church_section": "Church",
+    "church_name": "Church name",
+    "ui_language": "Language of the app",
+    "content_language": "Main language of the liturgy",
+    "translation": "Bible translation",
+    "time_zone": "Time zone",
+    "key_display": "How song keys are shown",
+    "key_do": "Do = G",
+    "key_letter": "G",
+    "admin_section": "First church admin",
+    "admin_name": "Your name",
+    "admin_identifier": "Your email or phone number",
+    "admin_password": "Password",
+    "password_hint": "At least 10 characters. A few words together are easy to remember.",
+    "submit": "Create church",
+    "already": "Liturgist is already set up.",
+    "incomplete": "This link is incomplete. Open the setup link printed in the server log.",
+    "content_languages": {
+      "id": "Indonesian",
+      "en": "English",
+      "zh-Hans": "Chinese (simplified)",
+      "zh-Hant": "Chinese (traditional)"
+    },
+    "time_zones": {
+      "Asia/Jakarta": "WIB (Jakarta)",
+      "Asia/Makassar": "WITA (Makassar)",
+      "Asia/Jayapura": "WIT (Jayapura)"
+    }
+  },
+  "home": {
+    "title": "Welcome, {{name}}",
+    "church": "You are a member of {{church}}.",
+    "assignments": "Your assignments will appear here."
+  },
+  "membership": {
+    "not_member": "You are no longer a member of this church."
+  },
+  "privacy": {
+    "title": "Privacy",
+    "what_title": "What we store",
+    "what": "Names, email addresses and phone numbers of the people your church invites, and the liturgies you prepare together.",
+    "ip_title": "IP addresses",
+    "ip": "IP addresses are kept only briefly, to block people guessing passwords, and are deleted within an hour.",
+    "why_title": "Why",
+    "why": "To let your church team prepare and publish liturgies together.",
+    "who_title": "Who can see it",
+    "who": "Members who are allowed to see the member list can see contact details. The server's administrator can see everything stored on the server.",
+    "contact_title": "Questions",
+    "contact_default": "Ask your church admin.",
+    "contact_church": "Contact: {{contact}}"
+  },
+  "not_found": {
+    "title": "Page not found",
+    "text": "This page doesn't exist.",
+    "home": "Go to the home page"
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "network": "Can't reach the server. Check your connection.",
+    "validation_failed": "Some fields need attention.",
+    "weak_password": {
+      "too_short": "The password must be at least 10 characters.",
+      "too_long": "The password must be at most 128 characters.",
+      "common": "This password is too common. Choose another.",
+      "matches_identity": "The password must not be your name, email, phone number or church name.",
+      "unknown": "Choose a stronger password."
+    },
+    "invalid_identifier": "Enter a valid email address or phone number.",
+    "unauthenticated": "Please log in again.",
+    "invalid_credentials": "The email/phone or password is incorrect.",
+    "forbidden": "You don't have permission to do this.",
+    "scope_not_held": "You can only give permissions you have yourself: {{scopes}}.",
+    "csrf_rejected": "Your request was blocked. Reload the page and try again.",
+    "invite_identifier_mismatch": "This invite is for another account. Log out and log in as that person.",
+    "limit_reached": "Your church has reached its limit of {{max}} team members.",
+    "not_found": "Not found.",
+    "invalid_token": {
+      "unknown": "This link can't be used. Ask your church admin for a new one.",
+      "expired": "This link has expired. Ask your church admin for a new one.",
+      "used": "This link has already been used.",
+      "cancelled": "This link was cancelled. Ask your church admin for a new one."
+    },
+    "already_set_up": "Liturgist is already set up.",
+    "not_set_up": "Liturgist is not set up yet.",
+    "already_member": "This person is already a member of the church.",
+    "invite_exists": "This person already has an open invite.",
+    "identifier_taken": "This email or phone number belongs to another account.",
+    "lockout_prevented": "Someone must keep the permissions to manage roles and members.",
+    "role_name_taken": "Another role already has this name.",
+    "reset_not_allowed": "This person also belongs to another church, so you can't reset their password.",
+    "too_many_attempts_one": "Too many attempts. Try again in {{count}} minute.",
+    "too_many_attempts_other": "Too many attempts. Try again in {{count}} minutes.",
+    "internal": "Something went wrong on the server.",
+    "unavailable": "The server is busy. Please try again."
+  }
 }

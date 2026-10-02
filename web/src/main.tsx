@@ -2,12 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { RouterProvider } from "react-router/dom";
+import { QueryClientProvider } from "@tanstack/react-query";
+import "./lib/i18n";
+import "./index.css";
+import { queryClient } from "./queryClient";
+import { router } from "./router";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <main>
-      <h1>Liturgist</h1>
-      <p>Web app coming in step 1, slice 5.</p>
-    </main>
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
   </StrictMode>,
 );
