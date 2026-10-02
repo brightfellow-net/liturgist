@@ -208,7 +208,7 @@ type Entitlements interface {
 |---|---|---|---|---|
 | IT-T-001 | Not a member | User U with no membership, logged in | Every church endpoint in §6 → 404 `not_found`, body identical to a request for a non-existent member ID; log line has `not_found_reason=not_member`; `GET /me` → `membership: null`, `church: null` | — |
 | IT-T-002 | Missing scope | Logged-in team member (no roles) | `PATCH /church`, `GET /members`, `POST /invites`, `POST /roles` → 403 `forbidden` | Custom role with only `members.view` → `GET /members` 200, `POST /invites` 403 |
-| IT-T-007 | Role editor safeguards | Church admin A and liturgist L | A removes `roles.manage` from Church admin role while A is the only holder → 409 `lockout_prevented`; L (no `roles.manage`) can't edit roles; A creates role with a scope A lacks → 403 `scope_not_held` | — |
+| IT-T-007 | Role editor safeguards | Church admin A and liturgist L | A removes `roles.manage` from Church admin role while A is the only holder → 409 `lockout_prevented`; L (no `roles.manage`) can't edit roles; after `liturgy.approve` is removed from the Church admin role, A creates a role with it → 403 `scope_not_held` | — |
 | IT-T-003 | Not set up | Fresh install, logged out | `GET /api/v1/church` → 409 `not_set_up`; `GET /api/v1/setup/status` → 200 | — |
 | IT-T-004 | Removed member | Member M removed by admin | M's next request → 404; M's session still valid for `GET /me` | — |
 | IT-T-005 | Limit through entitlements | `WithEntitlements` stub with `max_team_members = 1`, 1 member | `GET /members` shows `used:1, max:1`; invite → 403 `limit_reached` with `limit`, `used`, `max` | — |

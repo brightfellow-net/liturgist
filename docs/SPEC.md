@@ -56,7 +56,7 @@ What a member may do is decided by **roles**, which each church defines itself. 
 
 | Role | Scopes | Matches today's job at GKY |
 |---|---|---|
-| Church admin | `church.settings`, `members.view`, `members.manage`, `roles.manage`, `templates.edit`, `liturgy.manage` | Whoever manages the app for the church |
+| Church admin | All ten scopes | Whoever manages the app for the church; holding every scope lets them give every role (safeguard 2) |
 | Liturgist | `members.view`, `liturgy.edit`, `liturgy.comment`, `liturgy.approve`, `liturgy.manage` | The liturgist |
 | Editor | `members.view`, `library.edit`, `liturgy.edit`, `liturgy.comment` | The administrator who drafts the document |
 
@@ -553,6 +553,7 @@ Record resolved decisions here (date, decision, reason). Move items from section
 | 2026-10-02 | Adversarial review round 1 (index only) handled: P-33 (all unsafe API requests must be JSON), P-34 (per-church lock before role safeguards), P-35 (throttle-clearing command and proxy misconfiguration warning), P-36 (precedence between SPEC and implementation documents), plus clarifications | Recorded in the [review log](impl/README.md#6-review-log) |
 | 2026-10-02 | Adversarial review round 2 (implementation documents and schema) handled: atomic operations for all single-use tokens, counters and setup (P-37); binary listens on 127.0.0.1 by default (P-38); allowed-host check and supported deployment setups (P-39); live invite roles in a join table (P-40); optional strict upgrade mode (P-41); setup link in logs accepted as a risk (P-42); changing one's own email/phone deferred (P-43) | All CRITICAL findings fixed and every HIGH finding decided; see the [review log](impl/README.md#6-review-log) |
 | 2026-10-02 | Login throttling uses three counters (identifier + IP: 5 failures/15 min; identifier: 50/hour; IP: 100/15 min) and trusts client IPs only from configured reverse proxies, both in build step 1 | Most installs sit behind a proxy or tunnel; Indonesian mobile carriers and church Wi-Fi share IP addresses; counting per identifier + IP stops one person locking another out |
+| 2026-10-02 | The ready-made Church admin role holds all ten scopes (amends P-15) | With the earlier six scopes, safeguard 2 meant nobody in a new church could ever give the Liturgist or Editor role or any `library.*`/`liturgy.*` scope; found while testing the members page in build step 1 |
 
 ## 12. References
 
