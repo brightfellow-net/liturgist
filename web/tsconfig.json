@@ -21,10 +21,9 @@
       "node"
     ],
     "resolveJsonModule": true,
-    "baseUrl": ".",
     "paths": {
       "@/*": [
-        "src/*"
+        "./src/*"
       ]
     }
   },
