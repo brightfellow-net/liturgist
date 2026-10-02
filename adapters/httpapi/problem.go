@@ -6,6 +6,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -81,13 +82,17 @@ func WriteProblem(w http.ResponseWriter, p *Problem) {
 }
 
 // MapError turns use-case errors into problems (01 §10). Unknown errors are
-// logged and become 500 internal without details.
-func MapError(err error, log *slog.Logger) error {
+// logged and become 500 internal without details. Every 404 has the same
+// body; its reason is only logged (04 §5).
+func MapError(ctx context.Context, err error, log *slog.Logger) error {
 	var (
-		weak    *domain.WeakPasswordError
-		invalid *domain.InvalidInputError
-		many    *app.TooManyAttemptsError
+		weak     *domain.WeakPasswordError
+		invalid  *domain.InvalidInputError
+		many     *app.TooManyAttemptsError
+		badToken *app.InvalidTokenError
+		nf       *app.NotFoundError
 	)
+	info := RequestInfoFrom(ctx)
 	switch {
 	case errors.Is(err, app.ErrInvalidCredentials):
 		return problem(http.StatusUnauthorized, "invalid_credentials", "The email/phone or password is incorrect.")
@@ -107,11 +112,46 @@ func MapError(err error, log *slog.Logger) error {
 		return p
 	case errors.Is(err, domain.ErrInvalidIdentifier):
 		return problem(http.StatusUnprocessableEntity, "invalid_identifier", "Enter a valid email address or phone number.")
+	case errors.As(err, &badToken):
+		p := problem(http.StatusBadRequest, "invalid_token", "This link can no longer be used.")
+		p.Reason = string(badToken.Reason)
+		log.Info("invalid_token", "reason", p.Reason, "request_id", info.RequestID)
+		return p
+	case errors.Is(err, app.ErrForbidden):
+		log.Info("forbidden", "user_id", string(info.UserID), "request_id", info.RequestID)
+		return problem(http.StatusForbidden, "forbidden", "You don't have permission to do this.")
 	case errors.Is(err, app.ErrNotFound):
+		reason := app.ReasonMissing
+		if errors.As(err, &nf) {
+			reason = nf.Reason
+		}
+		log.Info("not_found", "not_found_reason", reason, "user_id", string(info.UserID), "request_id", info.RequestID)
 		return problem(http.StatusNotFound, "not_found", "")
 	case errors.Is(err, app.ErrUnavailable):
 		return problem(http.StatusServiceUnavailable, "unavailable", "")
 	}
-	log.Error("unexpected error", "error", err)
+	if p, ok := conflicts[errorKey(err)]; ok {
+		log.Info(p.Code, "user_id", string(info.UserID), "request_id", info.RequestID)
+		c := *p
+		return &c
+	}
+	log.Error("unexpected error", "error", err, "request_id", info.RequestID)
 	return problem(http.StatusInternalServerError, "internal", "")
+}
+
+// conflicts are the plain sentinel errors with their problems.
+var conflicts = map[error]*Problem{
+	app.ErrNotSetUp:        problem(http.StatusConflict, "not_set_up", "Liturgist is not set up yet."),
+	app.ErrAlreadySetUp:    problem(http.StatusConflict, "already_set_up", "Liturgist is already set up."),
+	app.ErrIdentifierTaken: problem(http.StatusConflict, "identifier_taken", "This email or phone number belongs to another account."),
+}
+
+// errorKey returns the sentinel in conflicts that err wraps, if any.
+func errorKey(err error) error {
+	for k := range conflicts {
+		if errors.Is(err, k) {
+			return k
+		}
+	}
+	return nil
 }

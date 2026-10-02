@@ -30,3 +30,14 @@ func (o *OptString) UnmarshalJSON(b []byte) error {
 func (OptString) Schema(huma.Registry) *huma.Schema {
 	return &huma.Schema{Type: huma.TypeString, Nullable: true}
 }
+
+// ptr returns nil when omitted, a pointer to "" for null, else the value.
+func (o OptString) ptr() *string {
+	switch {
+	case !o.Set:
+		return nil
+	case o.Null:
+		return new(string)
+	}
+	return &o.Value
+}

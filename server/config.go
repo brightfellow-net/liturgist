@@ -6,6 +6,7 @@
 package server
 
 import (
+	"io"
 	"log/slog"
 	"net"
 	"net/netip"
@@ -39,6 +40,7 @@ type Config struct {
 	TrustedProxies        []netip.Prefix
 	ClientIPHeader        string
 	Logger                *slog.Logger
+	Notices               io.Writer // where serve prints the framed setup link (stderr); nil = log only
 }
 
 // withDefaults fills settings a hand-built Config (e.g. the SaaS) may leave

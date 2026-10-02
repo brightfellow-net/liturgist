@@ -96,20 +96,10 @@ func (a *Auth) Login(ctx context.Context, in LoginInput) (LoginResult, error) {
 		return LoginResult{}, ErrInvalidCredentials
 	}
 
-	token, hash := domain.NewToken()
-	sess := domain.Session{
-		TokenHash: hash, UserID: user.ID, UserAgent: domain.TruncateUserAgent(in.UserAgent),
-		CreatedAt: now, LastSeenAt: now,
-		ExpiresAt: domain.SessionExpiry(now, now, a.SessionTTL, a.SessionMaxAge),
-	}
+	var res LoginResult
 	err = a.Tx.Write(ctx, func(s Store) error {
 		if err := s.AuthThrottle().Delete(ctx, keys[domain.ThrottleIdentifierIP]); err != nil {
 			return err
-		}
-		if in.PreviousTokenHash != "" {
-			if err := s.Sessions().Delete(ctx, in.PreviousTokenHash); err != nil {
-				return err
-			}
 		}
 		if newHash != "" {
 			if err := s.Users().SetPasswordHash(ctx, user.ID, newHash, now); err != nil {
@@ -119,12 +109,32 @@ func (a *Auth) Login(ctx context.Context, in LoginInput) (LoginResult, error) {
 		if err := s.Users().Touch(ctx, user.ID, now); err != nil {
 			return err
 		}
-		return s.Sessions().Create(ctx, sess)
+		var err error
+		res.Token, res.Session, err = a.newSession(ctx, s, user.ID, in.UserAgent, in.PreviousTokenHash, now)
+		return err
 	})
 	if err != nil {
 		return LoginResult{}, err
 	}
-	return LoginResult{Token: token, Session: sess}, nil
+	return res, nil
+}
+
+// newSession creates a session with a new token inside the caller's
+// transaction and deletes the session the browser already had (03 §4:
+// every login, setup, accept and reset issues a new token).
+func (a *Auth) newSession(ctx context.Context, s Store, user domain.UserID, userAgent, previousHash string, now time.Time) (string, domain.Session, error) {
+	if previousHash != "" {
+		if err := s.Sessions().Delete(ctx, previousHash); err != nil {
+			return "", domain.Session{}, err
+		}
+	}
+	token, hash := domain.NewToken()
+	sess := domain.Session{
+		TokenHash: hash, UserID: user, UserAgent: domain.TruncateUserAgent(userAgent),
+		CreatedAt: now, LastSeenAt: now,
+		ExpiresAt: domain.SessionExpiry(now, now, a.SessionTTL, a.SessionMaxAge),
+	}
+	return token, sess, s.Sessions().Create(ctx, sess)
 }
 
 // Authenticate validates a session token and extends the session when

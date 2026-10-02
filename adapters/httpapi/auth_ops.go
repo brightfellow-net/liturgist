@@ -13,7 +13,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 )
 
-// Tenancy declarations (04 §2); enforced by the tenant middleware in slice 4.
+// Tenancy declarations (04 §2), enforced by TenantMiddleware.
 const (
 	TenancyKey      = "tenancy"
 	TenancyChurch   = "church"
@@ -57,9 +57,9 @@ func userView(u domain.User) UserView {
 
 type meOutput struct {
 	Body struct {
-		User       UserView  `json:"user"`
-		Membership *struct{} `json:"membership" doc:"Arrives with churches (slice 4)."`
-		Church     *struct{} `json:"church"`
+		User       UserView        `json:"user"`
+		Membership *MembershipView `json:"membership" doc:"null before setup or when not a member of the church"`
+		Church     *ChurchView     `json:"church" doc:"null before setup or when not a member of the church"`
 	}
 }
 
@@ -72,7 +72,7 @@ func op(id, method, path, tenancy string, status int, summary string) huma.Opera
 
 // RegisterAuth registers /auth and /me operations (03 §4–§9, 04 §6).
 func RegisterAuth(api huma.API, d AuthDeps) {
-	fail := func(err error) error { return MapError(err, d.Log) }
+	fail := func(ctx context.Context, err error) error { return MapError(ctx, err, d.Log) }
 
 	huma.Register(api, op("login", http.MethodPost, "/auth/login", TenancyPlatform, http.StatusNoContent, "Log in"),
 		func(ctx context.Context, in *struct {
@@ -87,7 +87,7 @@ func RegisterAuth(api huma.API, d AuthDeps) {
 				UserAgent: info.UserAgent, PreviousTokenHash: info.PresentedTokenHash,
 			})
 			if err != nil {
-				return nil, fail(err)
+				return nil, fail(ctx, err)
 			}
 			return &cookiesOutput{SetCookie: d.Cookies.Set(res.Token, res.Session.ExpiresAt, d.Clock.Now())}, nil
 		})
@@ -96,7 +96,7 @@ func RegisterAuth(api huma.API, d AuthDeps) {
 		func(ctx context.Context, _ *struct{}) (*cookiesOutput, error) {
 			if h := RequestInfoFrom(ctx).PresentedTokenHash; h != "" {
 				if err := d.Auth.Logout(ctx, h); err != nil {
-					return nil, fail(err)
+					return nil, fail(ctx, err)
 				}
 			}
 			return &cookiesOutput{SetCookie: d.Cookies.Clear()}, nil
@@ -104,12 +104,20 @@ func RegisterAuth(api huma.API, d AuthDeps) {
 
 	huma.Register(api, op("getMe", http.MethodGet, "/me", TenancyOptional, http.StatusOK, "The logged-in user"),
 		func(ctx context.Context, _ *struct{}) (*meOutput, error) {
-			u, err := d.Account.Me(ctx, RequestInfoFrom(ctx).Session)
+			me, err := d.Account.MeView(ctx, RequestInfoFrom(ctx).Session)
 			if err != nil {
-				return nil, fail(err)
+				return nil, fail(ctx, err)
 			}
 			out := &meOutput{}
-			out.Body.User = userView(u)
+			out.Body.User = userView(me.User)
+			if me.Church != nil {
+				c := churchView(*me.Church)
+				out.Body.Church = &c
+			}
+			if m := me.Membership; m != nil {
+				out.Body.Membership = &MembershipView{ID: string(m.Member.ID), Roles: roleRefs(m.Roles),
+					Scopes: scopeStrings(m.Scopes), Actions: m.Actions}
+			}
 			return out, nil
 		})
 
@@ -134,7 +142,7 @@ func RegisterAuth(api huma.API, d AuthDeps) {
 			}
 			u, err := d.Account.UpdateProfile(ctx, RequestInfoFrom(ctx).Session, ch)
 			if err != nil {
-				return nil, fail(err)
+				return nil, fail(ctx, err)
 			}
 			return &userOutput{Body: userView(u)}, nil
 		})
@@ -148,7 +156,7 @@ func RegisterAuth(api huma.API, d AuthDeps) {
 		}) (*struct{}, error) {
 			info := RequestInfoFrom(ctx)
 			if err := d.Account.ChangePassword(ctx, info.Session, info.ClientAddr, in.Body.CurrentPassword, in.Body.NewPassword); err != nil {
-				return nil, fail(err)
+				return nil, fail(ctx, err)
 			}
 			return nil, nil
 		})
@@ -157,10 +165,10 @@ func RegisterAuth(api huma.API, d AuthDeps) {
 		func(ctx context.Context, _ *struct{}) (*struct{}, error) {
 			s := RequestInfoFrom(ctx).Session
 			if s == nil {
-				return nil, fail(app.ErrUnauthenticated)
+				return nil, fail(ctx, app.ErrUnauthenticated)
 			}
 			if err := d.Auth.EndOtherSessions(ctx, s.UserID, s.TokenHash); err != nil {
-				return nil, fail(err)
+				return nil, fail(ctx, err)
 			}
 			return nil, nil
 		})

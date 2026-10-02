@@ -6,6 +6,7 @@ package sqlstore
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/brightfellow-net/liturgist/app"
@@ -18,14 +19,20 @@ func (s *store) Users() app.UserRepo { return userRepo{s} }
 
 const userColumns = "id, name, email, phone, password_hash, preferences, last_seen_at, created_at, updated_at"
 
-func (r userRepo) scan(row interface{ Scan(...any) error }) (domain.User, error) {
+type scanner interface{ Scan(...any) error }
+
+func (r userRepo) scan(row scanner) (domain.User, error) { return r.scanWith(row) }
+
+// scanWith scans leading columns into before, then the user columns.
+func (r userRepo) scanWith(row scanner, before ...any) (domain.User, error) {
 	var (
 		u            domain.User
 		email, phone sql.NullString
 		lastSeen     NullTime
 		created, upd Time
 	)
-	err := row.Scan(&u.ID, &u.Name, &email, &phone, &u.PasswordHash, jsonValue{&u.Preferences}, &lastSeen, &created, &upd)
+	dest := append(before, &u.ID, &u.Name, &email, &phone, &u.PasswordHash, jsonValue{&u.Preferences}, &lastSeen, &created, &upd)
+	err := row.Scan(dest...)
 	if err != nil {
 		return domain.User{}, r.d.MapError(err)
 	}
@@ -90,6 +97,15 @@ func (s *store) exec1(ctx context.Context, q string, args ...any) error {
 		return app.ErrNotFound
 	}
 	return nil
+}
+
+// prefixed qualifies each column of a comma-separated list.
+func prefixed(prefix, cols string) string {
+	parts := strings.Split(cols, ",")
+	for i, p := range parts {
+		parts[i] = prefix + strings.TrimSpace(p)
+	}
+	return strings.Join(parts, ", ")
 }
 
 func nullString(s string) any {

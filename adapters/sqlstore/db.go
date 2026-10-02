@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math/rand/v2"
 	"os"
 	"path/filepath"
@@ -19,11 +20,12 @@ import (
 
 // Config selects and sizes the database.
 type Config struct {
-	Driver     string // "sqlite" | "postgres"
-	DataDir    string // SQLite file lives at DataDir/liturgist.db
-	URL        string // PostgreSQL
-	MaxConns   int    // PostgreSQL pool; 0 = 10
-	MaxReaders int    // SQLite readers; 0 = 4
+	Driver     string       // "sqlite" | "postgres"
+	DataDir    string       // SQLite file lives at DataDir/liturgist.db
+	URL        string       // PostgreSQL
+	MaxConns   int          // PostgreSQL pool; 0 = 10
+	MaxReaders int          // SQLite readers; 0 = 4
+	Logger     *slog.Logger // warnings about unknown stored scopes; nil = discard
 }
 
 // DB implements app.Tx.
@@ -32,6 +34,7 @@ type DB struct {
 	writer *sqlx.DB
 	reader *sqlx.DB // == writer on PostgreSQL
 	path   string   // SQLite file, "" on PostgreSQL
+	log    *slog.Logger
 }
 
 var _ app.Tx = (*DB)(nil)
@@ -56,13 +59,13 @@ func Open(ctx context.Context, cfg Config) (*DB, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &DB{d: sqliteDialect{}, writer: w, reader: r, path: path}, nil
+		return &DB{d: sqliteDialect{}, writer: w, reader: r, path: path, log: logger(cfg.Logger)}, nil
 	case "postgres":
 		db, err := openPostgres(ctx, cfg.URL, orDefault(cfg.MaxConns, 10))
 		if err != nil {
 			return nil, err
 		}
-		return &DB{d: postgresDialect{}, writer: db, reader: db}, nil
+		return &DB{d: postgresDialect{}, writer: db, reader: db, log: logger(cfg.Logger)}, nil
 	}
 	return nil, fmt.Errorf("unknown database driver %q", cfg.Driver)
 }
@@ -131,7 +134,7 @@ func (db *DB) attempt(ctx context.Context, pool *sqlx.DB, opts *sql.TxOptions, f
 	if err != nil {
 		return db.d.MapError(err)
 	}
-	if err := fn(&store{tx: tx, d: db.d}); err != nil {
+	if err := fn(&store{tx: tx, d: db.d, log: db.log}); err != nil {
 		_ = tx.Rollback()
 		return err
 	}
@@ -141,6 +144,13 @@ func (db *DB) attempt(ctx context.Context, pool *sqlx.DB, opts *sql.TxOptions, f
 // jitter returns d ± 50 %.
 func jitter(d time.Duration) time.Duration {
 	return d/2 + time.Duration(rand.Int64N(int64(d))) //nolint:gosec // jitter needs no crypto randomness
+}
+
+func logger(l *slog.Logger) *slog.Logger {
+	if l == nil {
+		return slog.New(slog.DiscardHandler)
+	}
+	return l
 }
 
 func orDefault(v, def int) int {

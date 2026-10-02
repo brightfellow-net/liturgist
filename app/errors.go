@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/brightfellow-net/liturgist/domain"
 )
 
 // Errors returned by persistence adapters (02 §8).
@@ -32,3 +34,35 @@ type UniqueError struct{ Constraint string }
 func (e *UniqueError) Error() string {
 	return fmt.Sprintf("unique constraint %q violated", e.Constraint)
 }
+
+// Errors of the setup and church use cases (01 §10).
+var (
+	ErrNotSetUp        = errors.New("not set up")           // 409 not_set_up
+	ErrAlreadySetUp    = errors.New("already set up")       // 409 already_set_up
+	ErrForbidden       = errors.New("forbidden")            // 403 forbidden
+	ErrIdentifierTaken = errors.New("identifier taken")     // 409 identifier_taken
+	ErrTooManyChurches = errors.New("more than one church") // serve exit 7
+)
+
+// NotFoundError is ErrNotFound with the reason that is logged, never shown
+// (04 §5): missing, not_member or not_visible.
+type NotFoundError struct{ Reason string }
+
+func (e *NotFoundError) Error() string { return "not found (" + e.Reason + ")" }
+
+// Is makes errors.Is(err, ErrNotFound) true.
+func (e *NotFoundError) Is(target error) bool { return target == ErrNotFound }
+
+// Not-found reasons.
+const (
+	ReasonMissing    = "missing"
+	ReasonNotMember  = "not_member"
+	ReasonNotVisible = "not_visible"
+)
+
+func notFound(reason string) error { return &NotFoundError{Reason: reason} }
+
+// InvalidTokenError maps to 400 invalid_token with a reason.
+type InvalidTokenError struct{ Reason domain.TokenReason }
+
+func (e *InvalidTokenError) Error() string { return "invalid token: " + string(e.Reason) }

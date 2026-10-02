@@ -10,4 +10,10 @@ type (
 	ChurchID string
 	// UserID identifies a user.
 	UserID string
+	// MembershipID identifies a user's membership in a church.
+	MembershipID string
+	// RoleID identifies a church's role.
+	RoleID string
+	// TranslationID identifies a Bible translation.
+	TranslationID string
 )

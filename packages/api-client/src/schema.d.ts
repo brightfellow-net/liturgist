@@ -38,6 +38,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/church": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The church */
+        get: operations["getChurch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change church settings */
+        patch: operations["updateChurch"];
+        trace?: never;
+    };
     "/me": {
         parameters: {
             query?: never;
@@ -90,10 +108,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create the church and its first admin */
+        post: operations["setup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/setup/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether the church has been set up */
+        get: operations["getSetupStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/translations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bible translations */
+        get: operations["listTranslations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AdminStruct: {
+            identifier: string;
+            name: string;
+            password: string;
+        };
         ChangePasswordRequest: {
             /**
              * Format: uri
@@ -104,7 +178,38 @@ export interface components {
             current_password: string;
             new_password: string;
         };
-        ChurchStruct: Record<string, never>;
+        ChurchActions: {
+            edit: boolean;
+        };
+        ChurchStruct: {
+            default_language: string;
+            default_translation_code: string;
+            default_ui_language: string;
+            key_display: string;
+            name: string;
+            time_zone: string;
+        };
+        ChurchView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/ChurchView.json
+             */
+            readonly $schema?: string;
+            actions: components["schemas"]["ChurchActions"];
+            /** @enum {string} */
+            default_language: "id" | "en" | "zh-Hans" | "zh-Hant";
+            default_translation_code: string;
+            /** @enum {string} */
+            default_ui_language: "en" | "id";
+            feedback_url: string | null;
+            id: string;
+            /** @enum {string} */
+            key_display: "do" | "letter";
+            name: string;
+            privacy_contact: string | null;
+            time_zone: string;
+        };
         ErrorDetail: {
             /** @description Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id' */
             location?: string;
@@ -112,6 +217,11 @@ export interface components {
             message?: string;
             /** @description The value at the given location */
             value?: unknown;
+        };
+        Item: {
+            code: string;
+            language: string;
+            name: string;
         };
         LoginRequest: {
             /**
@@ -131,12 +241,22 @@ export interface components {
              * @example /api/v1/schemas/MeOutputBody.json
              */
             readonly $schema?: string;
-            church: components["schemas"]["ChurchStruct"];
-            /** @description Arrives with churches (slice 4). */
-            membership: components["schemas"]["MembershipStruct"];
+            /** @description null before setup or when not a member of the church */
+            church: components["schemas"]["ChurchView"];
+            /** @description null before setup or when not a member of the church */
+            membership: components["schemas"]["MembershipView"];
             user: components["schemas"]["UserView"];
         };
-        MembershipStruct: Record<string, never>;
+        MemberActions: {
+            edit_roles: boolean;
+            remove: boolean;
+        };
+        MembershipView: {
+            actions: components["schemas"]["MemberActions"];
+            id: string;
+            roles: components["schemas"]["RoleRef"][] | null;
+            scopes: string[] | null;
+        };
         Preferences: {
             text_size?: string;
             ui_language?: string;
@@ -159,6 +279,48 @@ export interface components {
             /** Format: int64 */
             status: number;
             title: string;
+        };
+        RoleRef: {
+            id: string;
+            name: string;
+        };
+        SetupRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/SetupRequest.json
+             */
+            readonly $schema?: string;
+            admin: components["schemas"]["AdminStruct"];
+            church: components["schemas"]["ChurchStruct"];
+            token: string;
+        };
+        StatusOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/StatusOutputBody.json
+             */
+            readonly $schema?: string;
+            set_up: boolean;
+        };
+        UpdateChurchRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/UpdateChurchRequest.json
+             */
+            readonly $schema?: string;
+            default_language?: string;
+            default_translation_code?: string;
+            default_ui_language?: string;
+            /** @description null or "" clears */
+            feedback_url?: string | null;
+            key_display?: string;
+            name?: string;
+            /** @description null or "" clears */
+            privacy_contact?: string | null;
+            time_zone?: string;
         };
         UpdateMeRequest: {
             /**
@@ -240,6 +402,68 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getChurch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChurchView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    updateChurch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateChurchRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChurchView"];
+                };
             };
             /** @description Error */
             default: {
@@ -360,6 +584,96 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    setup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetupRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getSetupStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listTranslations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Item"][] | null;
+                };
             };
             /** @description Error */
             default: {

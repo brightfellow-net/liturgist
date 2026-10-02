@@ -206,7 +206,8 @@ func TestAPINotFoundIsProblem(t *testing.T) {
 func TestPanicBecomesProblem(t *testing.T) {
 	var buf bytes.Buffer
 	h := testHandler(t, testConfig(t, "http://localhost:8080", &buf), WithRoutes(func(api huma.API) {
-		huma.Register(api, huma.Operation{OperationID: "boom", Method: http.MethodGet, Path: "/boom"},
+		huma.Register(api, huma.Operation{OperationID: "boom", Method: http.MethodGet, Path: "/boom",
+			Metadata: map[string]any{httpapi.TenancyKey: httpapi.TenancyPlatform}},
 			func(context.Context, *struct{}) (*struct{}, error) { panic("kaboom") })
 	}))
 	rec := do(h, http.MethodGet, "/api/v1/boom", "localhost", nil)

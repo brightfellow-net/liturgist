@@ -29,14 +29,16 @@ import (
 // deps carries what the API needs at request time; nil fields only when the
 // OpenAPI document is built without a database.
 type deps struct {
-	auth    httpapi.AuthDeps
-	session func(http.Handler) http.Handler // nil: no session middleware (OpenAPI only)
+	auth     httpapi.AuthDeps
+	church   httpapi.ChurchDeps
+	session  func(http.Handler) http.Handler // nil: no session middleware (OpenAPI only)
+	resolver httpapi.TenantResolver          // nil: no tenant middleware (OpenAPI only)
 }
 
 func newHandler(cfg Config, o options, ready func(context.Context) error, d deps) (http.Handler, error) {
 	r := chi.NewRouter()
 	r.Use(recoverer(cfg.Logger), requestID, allowedHosts(cfg), securityHeaders(cfg),
-		httpapi.RequestInfoMiddleware(cfg.TrustedProxies, cfg.ClientIPHeader, cfg.Logger),
+		httpapi.RequestInfoMiddleware(cfg.TrustedProxies, cfg.ClientIPHeader, RequestIDFrom, cfg.Logger),
 		accessLog(cfg.Logger), noOptions)
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok")) })
@@ -89,7 +91,12 @@ func newAPI(router chi.Router, o options, d deps) huma.API {
 		router = chi.NewRouter()
 	}
 	api := &guardedAPI{API: humachi.New(router, cfg), seen: map[string]bool{}}
+	if d.resolver != nil {
+		// Before any operation: Huma captures the middleware stack at registration.
+		api.UseMiddleware(httpapi.TenantMiddleware(d.resolver, d.auth.Log))
+	}
 	httpapi.RegisterAuth(api, d.auth)
+	httpapi.RegisterChurch(api, d.church)
 	for _, fn := range o.routes {
 		fn(api)
 	}

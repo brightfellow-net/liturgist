@@ -74,7 +74,7 @@ func SessionMiddleware(auth *app.Auth, c Cookies, clock app.Clock, log *slog.Log
 					setCookies(w, c.Clear())
 				default:
 					var p *Problem
-					if !errors.As(MapError(err, log), &p) {
+					if !errors.As(MapError(r.Context(), err, log), &p) {
 						p = problem(http.StatusServiceUnavailable, "unavailable", "")
 					}
 					WriteProblem(w, p)

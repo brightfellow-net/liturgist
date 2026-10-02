@@ -20,6 +20,7 @@ type RequestInfo struct {
 	PresentedTokenHash string          // hash of the session cookie sent, valid or not
 	Session            *domain.Session // nil when not logged in
 	UserID             domain.UserID   // for the access log
+	RequestID          string
 }
 
 type ctxKey int
@@ -35,7 +36,8 @@ func RequestInfoFrom(ctx context.Context) *RequestInfo {
 }
 
 // RequestInfoMiddleware determines the client address (03 §5) and stores RequestInfo.
-func RequestInfoMiddleware(trusted []netip.Prefix, header string, log *slog.Logger) func(http.Handler) http.Handler {
+// requestID returns the request ID set by an earlier middleware.
+func RequestInfoMiddleware(trusted []netip.Prefix, header string, requestID func(context.Context) string, log *slog.Logger) func(http.Handler) http.Handler {
 	var once sync.Once
 	warn := func() {
 		once.Do(func() {
@@ -47,6 +49,7 @@ func RequestInfoMiddleware(trusted []netip.Prefix, header string, log *slog.Logg
 			info := &RequestInfo{
 				ClientAddr: domain.ClientAddrKey(ClientIP(r, trusted, header, warn)),
 				UserAgent:  r.UserAgent(),
+				RequestID:  requestID(r.Context()),
 			}
 			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), requestInfoKey, info)))
 		})

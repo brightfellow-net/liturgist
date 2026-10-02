@@ -11,12 +11,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/brightfellow-net/liturgist/adapters/httpapi"
 	"github.com/danielgtaylor/huma/v2"
 )
 
+// register adds a platform operation (no tenant needed).
 func register(id, path string) Option {
 	return WithRoutes(func(api huma.API) {
-		huma.Register(api, huma.Operation{OperationID: id, Method: http.MethodGet, Path: path},
+		huma.Register(api, huma.Operation{OperationID: id, Method: http.MethodGet, Path: path,
+			Metadata: map[string]any{httpapi.TenancyKey: httpapi.TenancyPlatform}},
 			func(context.Context, *struct{}) (*struct{}, error) { return nil, nil })
 	})
 }

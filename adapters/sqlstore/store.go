@@ -5,6 +5,7 @@ package sqlstore
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/brightfellow-net/liturgist/app"
 	"github.com/brightfellow-net/liturgist/domain"
@@ -12,8 +13,9 @@ import (
 )
 
 type store struct {
-	tx *sqlx.Tx
-	d  Dialect
+	tx  *sqlx.Tx
+	d   Dialect
+	log *slog.Logger
 }
 
 func (s *store) LockInstall(ctx context.Context) error { return s.d.LockInstall(ctx, s.tx) }
@@ -39,3 +41,7 @@ func (c *churchStore) ChurchID() domain.ChurchID { return c.churchID }
 func (c *churchStore) LockChurch(ctx context.Context) error {
 	return c.d.LockChurch(ctx, c.tx, string(c.churchID))
 }
+
+func (c *churchStore) Church() app.ChurchSettingsRepo  { return churchSettingsRepo{c} }
+func (c *churchStore) Memberships() app.MembershipRepo { return membershipRepo{c} }
+func (c *churchStore) Roles() app.RoleRepo             { return roleRepo{c} }
