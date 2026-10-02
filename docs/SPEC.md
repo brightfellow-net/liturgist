@@ -178,6 +178,7 @@ Draft ──submit──▶ In Review ──approve──▶ Approved ──publ
   - singing parts (Semua, Pemandu, Jemaat, Pria, Wanita, Paduan Suara);
   - translation names only, no text (e.g. TB, TB2, BIS, CUV, KJV, WEB);
   - a starter template "Ibadah Minggu" with item titles only and no default texts (votum words are often Bible text, which can't be shipped); a Mandarin version if Mandarin is chosen. The order is to be aligned with GKY Citragarden's real order of service.
+- **Feedback link:** an optional "Kirim masukan" (send feedback) link in the menu, pointing to a URL set in settings (e.g. a WhatsApp group or a form); hidden when not set.
 - **Onboarding checklist** on the church admin's dashboard until done or dismissed: invite your team; import your songs; check your template; create next week's liturgies.
 - **Helpful empty screens:** every empty list explains what to do next with direct actions (e.g. an empty song library offers EasyWorship import, paste lyrics, add a song).
 - **Team member welcome:** after accepting an invite, team members land on "Tugas saya" (my assignments) with a short welcome and simple steps to add the app to the home screen on Android and iPhone.
@@ -211,7 +212,7 @@ Starting point, not final. Refine as needed.
 
 - **Church**: id, name, default_language, default_translation_id, time_zone (e.g. `Asia/Jakarta`), logo_file? (stored through `Storage`), settings (incl. key display format: "Do = G" or "G", print defaults, church licences such as a CCLI licence number, and whether credit lines are shown) *(slug is SaaS-only; see 8.1.1)*
 - **ChurchSlugRedirect**: old_slug, church_id *(SaaS-only, and only if slug renaming is allowed; see 8.1.1)*
-- **User**: id, name, email?, phone?, password_hash, preferences (text size, UI language) *(platform-wide, no church_id; at least one of email or phone; each is unique across the platform)*
+- **User**: id, name, email?, phone?, password_hash, preferences (text size, UI language), last_seen_at *(platform-wide, no church_id; at least one of email or phone; each is unique across the platform)*
 - **Membership**: id, user_id, church_id, roles *(roles apply per church; a user may belong to several churches)*
 - **RoleType**: id, church_id, name (e.g. "Pemandu Pujian", "Pemusik")
 - **Template**: id, church_id, name, language
@@ -279,6 +280,7 @@ e.g. https://liturgist.brightfellow.net/gky-citragarden/liturgies/2026-10-11
 
 - **UI language:** Indonesian first, with i18n from the start (English as second locale).
 - **Mobile-friendly:** team members will mostly open links on phones.
+- **Privacy:** no analytics or tracking scripts in any install. A short privacy notice page in the app explains what personal data is stored (names, phone numbers, emails), why, and who can see it; the church admin can add the church's contact details. It is linked from the login and invite pages. Applies to every install (Indonesia's UU PDP).
 - **Accessibility:** WCAG 2.2 AA as the target, checked automatically with axe in the Playwright tests (see 5.8).
 - **No bundled copyrighted content** (lyrics, Bible text).
 - Apache-2.0 license headers/notice per repository convention.
@@ -426,7 +428,7 @@ The person running a community install is usually a volunteer without IT trainin
 5. Published web view, "my assignments" view, PDF output.
 6. Self-host packaging per 8.3: release builds for Linux, Windows and Docker, automatic migrations with pre-upgrade copy, `liturgist backup` / `restore` and scheduled backups, built-in HTTPS, health checks, system page, install and off-site backup guides, README.
 
-Pilot with GKY Citragarden after step 5; gather feedback from the liturgist, administrator, and multimedia team before starting slides.
+Pilot with GKY Citragarden after step 5; gather feedback from the liturgist, administrator, and multimedia team before starting slides. The pilot plan (goal, success criteria, hosting, timeline, feedback, risk rules) is in [PILOT.md](PILOT.md).
 
 ## 11. Decisions log
 
@@ -502,3 +504,5 @@ Record resolved decisions here (date, decision, reason). Move items from section
 | 2026-10-02 | Print formats in the MVP: team version and musician sheet; A4 and F4 / Folio paper; options for lyrics (full or first lines), reading text, assignments, keys and notes, and text size, with church defaults; header with church name, optional logo (stored through `Storage`), service, date and time. Produced with print styling in the browser. Congregation version, "my part" and A5 booklets come later (booklets need server-side Typst plus a booklet step). The exact layout still waits for open decision 3 | F4 is common in Indonesian churches and easy to forget; the musician sheet costs almost nothing from the same data; booklets can't be produced reliably by browsers |
 | 2026-10-02 | Song copyright: `Song.author` is split into lyricist, composer and translator, and songs gain copyright holder, copyright line, CCLI song number and licence status (unknown, public domain, covered by church licence, permission obtained), keeping free-text notes; the library can filter by status. Church licences (e.g. CCLI number) live in settings, with an optional licence footer on prints. Credit lines appear under songs in the team version and published view, on by default. `PublishedVersion` stores the credits as published. A usage report CSV is in the MVP. Licence status never blocks publishing or printing | Licences usually require credit lines and usage reporting; translations of old hymns are separate copyrighted works; the app records and reports but doesn't police, because it can't know a church's agreements |
 | 2026-10-02 | Older volunteers and accessibility: the UI follows the phone's text size (works at 200%), plus an A · A+ · A++ control saved to the account (`User.preferences`). Reading mode in the MVP: large text in one column, high contrast, the viewer's own items highlighted with "Go to my part", a keep-screen-on toggle (Wake Lock), offline through the PWA. People who are only team members see just "Tugas saya" and "Liturgi". WCAG 2.2 AA as the target with automated axe checks; tap targets of at least 48 px, labelled buttons, plain Indonesian, dark mode following the phone | Many team members are older and read from phones at the lectern; these are cheap to build in from the start and expensive to retrofit |
+| 2026-10-02 | Pilot plan recorded in `docs/PILOT.md`: owner-hosted community edition during the pilot (then self-hosting or SaaS); one Indonesian service first, about 8 weeks with a 2-week parallel run; baseline and success criteria; feedback through a WhatsApp group, an in-app feedback link, weekly check-ins, end interviews, a survey and a test with older volunteers; no updates Friday to Sunday, a weekend contact, tested backups | A plan is project work rather than product specification, so it lives in its own file; the product requirements it needs are in this spec |
+| 2026-10-02 | Product requirements from the pilot plan, for every install: no analytics or tracking scripts; a privacy notice page (linked from login and invite pages); an optional "Kirim masukan" feedback link set in settings; `User.last_seen_at` for usage figures from the app's own database | Personal data of church members is covered by UU PDP; usage can be measured without tracking; feedback should be one tap away |
