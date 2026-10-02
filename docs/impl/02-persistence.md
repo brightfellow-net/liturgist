@@ -46,7 +46,20 @@ type ChurchStore interface {
     Memberships() MembershipRepo
     Roles() RoleRepo
     Invites() InviteRepo
+    Songs() SongRepo                // songs, sections, groups, search, reindex (06, step 2)
+    Readings() ReadingRepo          // (07, step 2)
+    Imports() ImportRepo            // batches and candidates (08, step 2)
     LockChurch(ctx context.Context) error // serialise check-then-write rules per church (§3)
+}
+
+// Liturgy-use checks for deleting songs, sections and readings (06 §6, 07 §6). Step 2 passes
+// app.NeverUsed, which answers "unused"; step 3 replaces it with a query over the liturgies.
+type SongUsage interface {
+    SongInUse(ctx context.Context, church domain.ChurchID, song domain.SongID) (bool, error)
+    SectionsInUse(ctx context.Context, church domain.ChurchID, song domain.SongID, sections []domain.SectionID) ([]domain.SectionID, error)
+}
+type ReadingUsage interface {
+    ReadingInUse(ctx context.Context, church domain.ChurchID, reading domain.ReadingID) (bool, error)
 }
 
 type Clock interface{ Now() time.Time }               // always UTC, truncated to microseconds (§4)
@@ -114,7 +127,7 @@ Both SQLite (3.35+) and PostgreSQL support `ON CONFLICT … DO UPDATE` and `RETU
 ## 5. Migrations
 
 - goose v3 as a library; migrations embedded with `//go:embed` from `migrations/sqlite` and `migrations/postgres`.
-- File names: `NNNNN_short_name.sql` (5 digits). **Both folders must contain the same version numbers**; a unit test (TC-P-007) checks this.
+- File names: `NNNNN_short_name.sql` (5 digits). **Both folders must contain the same version numbers**; a unit test (TC-P-007) checks this. Step 2 adds `00002_library.sql` (songs, readings, imports, [reference/schema.md](../reference/schema.md#step-2-tables)); the SQLite file also creates the FTS5 table `song_fts`, the PostgreSQL file the `fts` column and its GIN index.
 - **Forward-only [P-11]:** files contain only `-- +goose Up`. Rolling back means restoring a backup.
 - **Migration lock (SQLite):** `serve` (when migrating) and `liturgist migrate` hold an exclusive OS file lock on `<DataDir>/liturgist.lock` from the version check through the copy, the migrations and the copy cleanup. A second process waits up to 30 s, then exits 1 with "another Liturgist process is migrating this database". PostgreSQL uses the advisory lock below instead.
 - **On `serve` start** (when `AutoMigrate`) and on `liturgist migrate`:

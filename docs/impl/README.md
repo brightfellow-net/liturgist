@@ -16,6 +16,17 @@
 | [05-web-shell.md](05-web-shell.md) | React app shell for step 1: pages, routing, API client, i18n |
 | [../reference/schema.md](../reference/schema.md) | Database tables for step 1 (Reference) |
 
+## 1a. Documents for step 2
+
+[SPEC.md §10](../SPEC.md#10-suggested-build-order), step 2: song library (CRUD, sections, search) and readings store, plus importing songs. **Status: Proposed** (drafted 2026-10-02); coding starts after the owner approves P-44 to P-53, the Spec Gate re-score and the adversarial review ([§5](#5-process)).
+
+| Document | Covers |
+|---|---|
+| [06-song-library.md](06-song-library.md) | Songs, sections, default arrangements, language groups, copyright fields, search, library pages (slice 2A) |
+| [07-readings.md](07-readings.md) | Bible reference parser, readings store, `BibleTextProvider` lookup, readings pages (slice 2B) |
+| [08-import.md](08-import.md) | Paste and split, OpenLyrics, ChordPro, batches and candidate review, `Importer` (slice 2C) |
+| [../reference/schema.md](../reference/schema.md#step-2-tables) | Step 2 tables (Reference) |
+
 ## 2. How to use these documents
 
 - **Required reading before writing any step-1 code:** [SPEC.md](../SPEC.md) and **every** document in the table above. This index alone is not a specification.
@@ -79,6 +90,16 @@
 | P-41 | Optional strict upgrade mode `LITURGIST_REQUIRE_PREUPGRADE_COPY=true`; default stays "skip the copy with a warning" | [02 §5](02-persistence.md#5-migrations) | **Approved** 2026-10-02 |
 | P-42 | The setup link stays in the log and stderr: accepted risk, with reasons recorded | [03 §10](03-identity-auth.md#10-first-time-setup) | **Approved** 2026-10-02 (risk accepted by the owner) |
 | P-43 | Changing one's own email or phone is deferred beyond step 1 | [04 §6](04-tenancy-extensions.md#6-step-1-church-and-member-api) | **Approved** 2026-10-02 (deferred) |
+| P-44 | Step 2 is built in three slices: 2A songs, 2B readings, 2C import (paste and split, OpenLyrics, ChordPro). Usage history and report, singing parts and church licence settings wait for steps 3 and 5 | [06 §1](06-song-library.md#1-scope), [08 §1](08-import.md#1-scope) | **Proposed** (scope chosen by the owner 2026-10-02) |
+| P-45 | Every member views songs and readings; `library.edit` creates, changes, deletes and imports | [06 §3](06-song-library.md#3-api), [07 §4](07-readings.md#4-api) | **Proposed** (chosen by the owner 2026-10-02) |
+| P-46 | Sections are replaced as one ordered list with stable IDs; songs and readings carry a `version` checked on every change (409 `version_conflict`); removing a section removes it from the arrangement; a song group has at least two songs and one song per language | [06 §2](06-song-library.md#2-data-model) | **Proposed** |
+| P-47 | Songs and readings are deleted for good after a confirmation; `SongUsage` and `ReadingUsage` ports report liturgy use (always "unused" in step 2) | [06 §6](06-song-library.md#6-ports), [07 §6](07-readings.md#6-ports) | **Proposed** (chosen by the owner 2026-10-02) |
+| P-48 | Search: one folding function (no stemming), full-text prefix search on a normalised index for Indonesian and English, substring search for Chinese, hymnal-number lookup first, index updated in the same transaction, `liturgist search reindex` as repair | [06 §5](06-song-library.md#5-search) | **Proposed** (no stemming accepted by the owner 2026-10-02) |
+| P-49 | Reference parser: USFM book codes, Indonesian names and LAI abbreviations, structure checks only, one-chapter books, unsupported forms rejected with a reason; Indonesian book names shown in both UI languages for now | [07 §2](07-readings.md#2-references) | **Proposed** (book table and Indonesian-only names accepted by the owner 2026-10-02; aliases may be extended from the pilot church's documents) |
+| P-50 | Readings are unique per church + reference + translation; lookup order stored reading → providers → nothing; provider text with `may_store = false` is never saved; attribution suggested from the last reading in the translation | [07 §3](07-readings.md#3-the-readings-store) | **Proposed** |
+| P-51 | Import goes through batches and candidates; text is sent as JSON (6 MiB limit for `POST /imports` only); Apply runs one transaction per candidate through the song use cases; merge fills empty fields and replaces sections keeping matching IDs; batches expire after 7 days | [08 §2–§5](08-import.md#2-flow-p-51) | **Proposed** (merge rule accepted by the owner 2026-10-02) |
+| P-52 | Sections and arrangements are reordered with Move up / Move down buttons, not drag-and-drop alone | [06 §4](06-song-library.md#4-pages) | **Proposed** |
+| P-53 | Hymnal numbers are not unique; the form warns about duplicates | [06 §2.1](06-song-library.md#21-song) | **Proposed** |
 
 ## 5. Process
 

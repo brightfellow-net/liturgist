@@ -303,6 +303,7 @@ A goroutine started by `serve` runs one minute after start, then: **throttle row
 | Invites | Never deleted (history); expired ones simply stop counting |
 | Throttle rows | Window ended and lock (if any) ended |
 | Setup tokens | `expires_at < now` |
+| Import batches (step 2) | `updated_at < now - 7 days`, with their candidates ([08 §2](08-import.md#2-flow-p-51)) |
 
 ## 12. Anti-patterns (DO NOT)
 

@@ -134,7 +134,7 @@ All interfaces are defined in `app` in step 1 and are **provisional [P-27]**: si
 | `Exporter` | `Export(ctx, liturgy PublishedVersion, format string, w io.Writer) error` | none | Step 5 |
 | `Importer` | `Parse(ctx, r io.Reader, hint ImportHint) ([]ImportCandidate, error)` | none | Step 2 |
 
-Types these ports use that later steps design (`domain.Reference`, `BibleText`, `NotifyEvent`, `Message`, `PublishedVersion`, `ImportHint`, `ImportCandidate`) are empty placeholder structs in step 1.
+Types these ports use that later steps design (`domain.Reference`, `BibleText`, `NotifyEvent`, `Message`, `PublishedVersion`, `ImportHint`, `ImportCandidate`) are empty placeholder structs in step 1. Step 2 defines `domain.Reference` ([07 §2](07-readings.md#2-references)), `BibleText` ([07 §3.1](07-readings.md#31-lookup-order-p-50)), `ImportHint` and `ImportCandidate` ([08 §4](08-import.md#4-formats)); the importers for `paste`, `openlyrics` and `chordpro` are registered by `server`, and `server.WithImporter(format, Importer)` adds or replaces one.
 
 Community behaviour: `localfs` keys are at most 512 bytes and have no empty, `.` or `..` segments; a file is written to a temporary name and renamed when complete; `Open` of a missing key → `app.ErrNotFound`; `Delete` of a missing key succeeds. The `memory` EventBus gives each subscriber a 64-message buffer; when it is full, that subscriber misses messages instead of blocking the publisher, so listeners must be able to re-read the current state.
 

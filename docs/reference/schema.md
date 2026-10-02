@@ -8,7 +8,7 @@
 - Types below are logical; physical types per database follow [02 §4](../impl/02-persistence.md#4-type-mapping): `id` = ULID text (26 chars), `ts` = UTC timestamp at microsecond precision, `json` = JSON value, `bool`, `text`, `int`.
 - SQLite tables are `STRICT`. Every constraint and index name below is identical in both migrations.
 - **Enforcement marker:** a rule written as SQL is enforced by the database; the SQL is given per dialect where it differs. A rule marked **(app)** is enforced only by the application, through the `domain` constructors used by every write path, and covered by a repository test that attempts a non-conforming write. Case rules are app-only because Unicode case folding differs between Go, SQLite and PostgreSQL.
-- **Platform tables** have no `church_id`. **Church-owned tables** have `church_id`, composite foreign keys including `church_id` ([SPEC.md §8.1](../SPEC.md#81-tenancy) rule 1), and a **church-leading index**: an index, primary key or unique constraint whose first column is `church_id`. A table without one must list the exception and its reason here (none in step 1).
+- **Platform tables** have no `church_id`. **Church-owned tables** have `church_id`, composite foreign keys including `church_id` ([SPEC.md §8.1](../SPEC.md#81-tenancy) rule 1), and a **church-leading index**: an index, primary key or unique constraint whose first column is `church_id`. A table without one must list the exception and its reason here (none in step 1; `song_fts` in step 2).
 - No database defaults for IDs or timestamps.
 - **Token hashes** (`token_hash` columns) are 64 lower-case hex characters: SQLite `CHECK (length(token_hash) = 64 AND token_hash NOT GLOB '*[^0-9a-f]*')`; PostgreSQL `CHECK (token_hash ~ '^[0-9a-f]{64}$')`. Check names: `<table>_token_hash_check`.
 - **Time order:** where a table has both, `expires_at > created_at` (`<table>_expiry_check`). Fixed-width timestamp text makes this comparison correct in SQLite.
@@ -242,9 +242,161 @@ Platform table. **[P-24]** Exactly zero or one row, enforced by the database.
 
 Issuing a token is one upsert on `id = 1` (`INSERT … ON CONFLICT (id) DO UPDATE`), so concurrent issuers leave exactly one valid token: the last writer's.
 
+## Step 2 tables
+
+Added by migration `00002_library.sql` (both dialects, same version). Church-owned, with the church-leading indexes the conventions require.
+
+### song_groups
+
+Church-owned. Links the language versions of one hymn **[P-46]**.
+
+| Column | Type | Null | Constraint |
+|---|---|---|---|
+| `id` | id | no | PK `song_groups_pkey` |
+| `church_id` | id | no | FK → `churches(id)` ON DELETE CASCADE `song_groups_church_fkey` |
+| `created_at` | ts | no | |
+
+- UNIQUE `song_groups_church_id_key` (`church_id`, `id`) — target for composite foreign keys; church-leading.
+- A group with fewer than two songs is deleted by the application in the same transaction (the foreign key from `songs` is `ON DELETE RESTRICT`, so the application first clears `song_group_id`).
+
+### songs
+
+Church-owned. **[P-46] [P-53]**
+
+| Column | Type | Null | Constraint |
+|---|---|---|---|
+| `id` | id | no | PK `songs_pkey` |
+| `church_id` | id | no | FK → `churches(id)` ON DELETE CASCADE `songs_church_fkey` |
+| `song_group_id` | id | yes | FK (`church_id`, `song_group_id`) → `song_groups(church_id, id)` ON DELETE RESTRICT `songs_group_fkey` |
+| `language` | text | no | `CHECK (language IN ('id','en','zh-Hans','zh-Hant'))` `songs_language_check` |
+| `title` | text | no | 1–200 chars (app) |
+| `title_key` | text | no | `Fold(title)` (app); used for ordering and duplicate detection |
+| `alt_titles` | json | no | Array of 0–10 strings (app); `[]` when none |
+| `hymnal_source` | text | no | 0–40 chars (app); empty string when none |
+| `hymnal_number` | text | no | 0–10 chars (app); empty string when none |
+| `hymnal_key` | text | yes | `<SOURCE KEY>:<number lower-case>` (app); null iff `hymnal_number = ''` |
+| `lyricist`, `composer`, `translator` | text | no | 0–200 chars (app); empty string when none |
+| `default_key` | text | no | Empty or `^[A-G][#b]?m?$` (app) |
+| `copyright_holder` | text | no | 0–200 chars (app) |
+| `copyright_line` | text | no | 0–300 chars (app) |
+| `ccli_song_number` | text | no | Empty or 1–12 digits (app) |
+| `licence_status` | text | no | `CHECK (licence_status IN ('unknown','public_domain','church_licence','permission_obtained'))` `songs_licence_status_check` |
+| `licence_notes` | text | no | 0–2000 chars (app) |
+| `default_arrangement` | json | no | Array of 0–100 section IDs of this song (app); `[]` when none |
+| `version` | int | no | `CHECK (version >= 1)` `songs_version_check` |
+| `created_at` | ts | no | |
+| `updated_at` | ts | no | |
+
+- `CHECK ((hymnal_source = '') = (hymnal_number = '') AND (hymnal_key IS NULL) = (hymnal_number = ''))` `songs_hymnal_check`.
+- UNIQUE `songs_church_id_key` (`church_id`, `id`) — target for composite foreign keys; church-leading.
+- UNIQUE partial index `songs_group_language_key` (`church_id`, `song_group_id`, `language`) `WHERE song_group_id IS NOT NULL` — at most one song per language in a group.
+- Index `songs_church_title_idx` (`church_id`, `title_key`, `id`) — list order.
+- Partial index `songs_church_hymnal_idx` (`church_id`, `hymnal_key`) `WHERE hymnal_key IS NOT NULL` — duplicate detection and hymnal lookups. Not unique.
+- Index `songs_church_licence_idx` (`church_id`, `licence_status`).
+
+### song_sections
+
+Church-owned. Order is `position`; IDs are stable **[P-46]**.
+
+| Column | Type | Null | Constraint |
+|---|---|---|---|
+| `id` | id | no | PK `song_sections_pkey` |
+| `church_id` | id | no | |
+| `song_id` | id | no | FK (`church_id`, `song_id`) → `songs(church_id, id)` ON DELETE CASCADE `song_sections_song_fkey` |
+| `position` | int | no | `CHECK (position >= 0)` `song_sections_position_check`; dense 0..n-1 per song (app); not unique, so a reorder can be written row by row |
+| `kind` | text | no | `CHECK (kind IN ('verse','pre_chorus','chorus','bridge','tag','intro','ending','other'))` `song_sections_kind_check` |
+| `number` | int | yes | `CHECK ((kind = 'verse' AND number BETWEEN 1 AND 99) OR (kind <> 'verse' AND number IS NULL))` `song_sections_number_check` |
+| `label` | text | yes | 1–60 chars (app); null = derived from kind and number |
+| `text` | text | no | 1–5000 chars (app), normalised |
+
+- UNIQUE partial index `song_sections_verse_key` (`song_id`, `number`) `WHERE kind = 'verse'` — no two verses with one number.
+- Index `song_sections_church_song_idx` (`church_id`, `song_id`, `position`) — church-leading.
+
+### song_search
+
+Church-owned. Search index, written by the songs repository **in the same transaction** as every song change; rebuildable with `liturgist search reindex` **[P-48]**.
+
+| Column | Type | Null | Constraint |
+|---|---|---|---|
+| `church_id` | id | no | |
+| `song_id` | id | no | |
+| `language` | text | no | Copy of `songs.language` |
+| `title_fold` | text | no | Folded title and alternative titles |
+| `hymnal_fold` | text | no | Folded hymnal source and number |
+| `lyrics_fold` | text | no | Folded section texts, in order |
+| `fts` | tsvector | no | **PostgreSQL only**; `to_tsvector('simple', …)` of the three `_fold` columns, maintained by the application (no generated column, so both dialects share the write path) |
+
+- PK `song_search_pkey` (`church_id`, `song_id`) — church-leading.
+- FK `song_search_song_fkey` (`church_id`, `song_id`) → `songs(church_id, id)` ON DELETE CASCADE.
+- PostgreSQL: GIN index `song_search_fts_idx` on `fts`.
+- SQLite: the FTS5 virtual table `song_fts(title, hymnal, lyrics, church_id UNINDEXED, song_id UNINDEXED)`, tokenizer `unicode61`, `prefix='2 3'`. A virtual table has no keys or cascades, so the repository deletes its rows explicitly whenever it deletes a `song_search` row. **Exception to the church-leading-index rule**: `song_fts` has none, because every query filters on `church_id` through the join with `song_search`; the exception is listed here as the conventions require.
+
+### readings
+
+Church-owned. **[P-50]**
+
+| Column | Type | Null | Constraint |
+|---|---|---|---|
+| `id` | id | no | PK `readings_pkey` |
+| `church_id` | id | no | FK → `churches(id)` ON DELETE CASCADE `readings_church_fkey` |
+| `reference` | text | no | Standard form, e.g. `JHN 3:16-21` (app, `domain.ParseReference`) |
+| `reference_display` | text | no | As typed, 1–100 chars (app) |
+| `translation_id` | id | no | FK → `translations(id)` `readings_translation_fkey` |
+| `text` | text | no | 1–20000 chars (app), normalised |
+| `attribution` | text | no | 0–300 chars (app) |
+| `source_provider` | text | no | `manual` or a provider ID, 1–40 chars (app) |
+| `search_fold` | text | no | Folded `reference_display`, Indonesian book name and text (app); substring search |
+| `version` | int | no | `CHECK (version >= 1)` `readings_version_check` |
+| `created_at` | ts | no | |
+| `updated_at` | ts | no | |
+
+- UNIQUE `readings_church_ref_key` (`church_id`, `reference`, `translation_id`) — church-leading.
+
+### import_batches
+
+Church-owned. Working data, deleted after 7 days **[P-51]**.
+
+| Column | Type | Null | Constraint |
+|---|---|---|---|
+| `id` | id | no | PK `import_batches_pkey` |
+| `church_id` | id | no | FK → `churches(id)` ON DELETE CASCADE `import_batches_church_fkey` |
+| `source_format` | text | no | `CHECK (source_format IN ('paste','openlyrics','chordpro','easyworship','pptx'))` `import_batches_format_check` |
+| `status` | text | no | `CHECK (status IN ('open','closed'))` `import_batches_status_check` |
+| `created_by` | id | no | FK → `users(id)` `import_batches_user_fkey` |
+| `created_at` | ts | no | |
+| `updated_at` | ts | no | Set by every change; the cleanup job deletes batches whose `updated_at` is older than 7 days |
+
+- UNIQUE `import_batches_church_id_key` (`church_id`, `id`).
+- Index `import_batches_church_status_idx` (`church_id`, `status`, `updated_at`) — church-leading.
+
+### import_candidates
+
+Church-owned.
+
+| Column | Type | Null | Constraint |
+|---|---|---|---|
+| `id` | id | no | PK `import_candidates_pkey` |
+| `church_id` | id | no | |
+| `batch_id` | id | no | FK (`church_id`, `batch_id`) → `import_batches(church_id, id)` ON DELETE CASCADE `import_candidates_batch_fkey` |
+| `position` | int | no | `CHECK (position >= 0)`; order in the file(s) |
+| `kind` | text | no | `CHECK (kind IN ('song','reading'))` `import_candidates_kind_check`; step 2 creates only `song` |
+| `draft` | json | no | A `SongDraft` (app validates the shape on every write) |
+| `duplicate_of_id` | id | yes | The suspected duplicate when the batch was created; **not** a foreign key (the song may be deleted) |
+| `decision` | text | no | `CHECK (decision IN ('pending','accept','merge','skip'))` `import_candidates_decision_check` |
+| `merge_into` | id | yes | Song to merge into; not a foreign key; `CHECK ((decision = 'merge') = (merge_into IS NOT NULL))` `import_candidates_merge_check` |
+| `warnings` | json | no | Array of warning codes |
+| `applied_song_id` | id | yes | Set by Apply; not a foreign key |
+| `error_code` | text | yes | Set by Apply when a candidate failed |
+
+- Index `import_candidates_church_batch_idx` (`church_id`, `batch_id`, `position`) — church-leading.
+
+### Unique constraints added to the SQLite name mapping ([02 §8](../impl/02-persistence.md#8-error-mapping))
+
+`songs_group_language_key`, `song_sections_verse_key`, `readings_church_ref_key`.
+
 ## Later steps
 
-Tables for songs, readings, templates, services, liturgies, comments, edits, published versions and imports are added in the steps that build them, following [SPEC.md §7](../SPEC.md#7-data-model-sketch) and the conventions above.
+Tables for templates, services, liturgies, comments, edits and published versions are added in the steps that build them, following [SPEC.md §7](../SPEC.md#7-data-model-sketch) and the conventions above.
 
 ## References
 

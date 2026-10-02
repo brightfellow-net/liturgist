@@ -135,6 +135,7 @@ Commands in step 1 **[P-04]**:
 | `liturgist member grant-admin <identifier>` | Emergency recovery: give that member the ready-made Church admin role (recreated with its default scopes if it was deleted); log `grant_admin_cli` with the user ID | 0; 1 error; 5 no such user; 6 not a member |
 | `liturgist auth clear-throttle --identifier X \| --ip Y \| --all` | Delete login-throttle counters ([03 §5](03-identity-auth.md#5-login-and-throttling)) | 0; 1 error |
 | `liturgist openapi` | Print the OpenAPI 3.1 document as JSON to stdout, without opening a database | 0 |
+| `liturgist search reindex` | Rebuild the song search index from the songs ([06 §5.3](06-song-library.md#53-the-index)); added in step 2 | 0; 1 error |
 | `liturgist version` | Print version, commit, build date | 0 |
 
 ## 7. The `server` builder
@@ -208,7 +209,7 @@ func OpenOperator(ctx context.Context, cfg Config) (*Operator, error) // the CLI
 | `Referrer-Policy` | `same-origin` |
 | `Strict-Transport-Security` | `max-age=31536000` — only when `BaseURL` is `https` |
 
-- Request bodies on `/api` are limited to 1 MiB in step 1 (larger limits per operation come with imports).
+- Request bodies on `/api` are limited to 1 MiB, except `POST /api/v1/imports`, which allows 6 MiB ([08 §5](08-import.md#5-api)).
 - Middleware order: recover → request ID → allowed hosts → security headers → logging → session ([03 §4](03-identity-auth.md#4-sessions)) → CSRF ([03 §6](03-identity-auth.md#6-csrf-protection)) → tenant ([04 §2](04-tenancy-extensions.md#2-tenant-context)) → Huma.
 
 ## 9. Logging
@@ -247,6 +248,8 @@ RFC 9457 problem details (`application/problem+json`, Huma's default) extended w
 | `csrf_rejected` | 403 | CSRF check failed ([03 §6](03-identity-auth.md#6-csrf-protection)) |
 | `invite_identifier_mismatch` | 403 | The invite's identifier belongs to another account than the logged-in one |
 | `limit_reached` | 403 | Entitlement limit reached; `limit`: limit name, `used`, `max` |
+| `invalid_reference` | 422 | A Bible reference cannot be parsed; `reason`: `empty`, `unknown_book`, `missing_chapter`, `bad_number`, `bad_range`, `unsupported` ([07 §2](07-readings.md#2-references)) |
+| `import_unreadable` | 422 | An import file or text cannot be read; `reason`: `not_utf8`, `not_xml`, `no_song`, `too_many_sections` ([08 §4.4](08-import.md#44-errors)) |
 | `not_found` | 404 | Resource missing, or caller not a member of the church |
 | `invalid_token` | 400 | Invite/reset/setup token unusable; `reason`: `unknown`, `expired`, `used`, `cancelled` |
 | `already_set_up` | 409 | Setup attempted when a church exists |
@@ -256,6 +259,12 @@ RFC 9457 problem details (`application/problem+json`, Huma's default) extended w
 | `identifier_taken` | 409 | Email/phone belongs to another user |
 | `lockout_prevented` | 409 | Change would leave nobody holding both `roles.manage` and `members.manage` |
 | `role_name_taken` | 409 | Another role in the church has the same name |
+| `version_conflict` | 409 | The song or reading was changed since the client loaded it ([06 §2.4](06-song-library.md#24-editing-sections-and-concurrency-p-46)) |
+| `section_in_use` | 409 | A song section is used by an unpublished liturgy; `section_ids` |
+| `song_in_use` | 409 | The song is used by an unpublished liturgy |
+| `reading_in_use` | 409 | The reading is used by an unpublished liturgy |
+| `reading_exists` | 409 | The church already has this reference in this translation; `reading_id` |
+| `group_conflict` | 409 | Linking song versions failed; `reason`: `already_grouped`, `language_taken` |
 | `reset_not_allowed` | 409 | Admin reset for a user who belongs to another church |
 | `too_many_attempts` | 429 | Login throttled; `Retry-After` header in seconds |
 | `internal` | 500 | Unexpected error; details only in the log |
