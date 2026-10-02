@@ -15,7 +15,7 @@ The React single-page app for step 1: workspace layout, pages, routing, API clie
 |---|---|---|---|
 | `/setup#t=…` | Setup wizard: church, first admin, UI language, content language, translation, time zone, key display | Anyone with the setup link | `GET /setup/status`, `GET /translations`, `POST /setup` |
 | `/login` | "Email or phone number" + password; `?next=` return path; "Forgot password?" opens the text "Ask your church admin to send you a reset link." | Logged out | `POST /auth/login` |
-| `/invite#t=…` | Accept invite: new account (name, email and phone pre-filled from the invite and editable, password), or "log in to accept" / "join with my current account"; always ends with "You are joining {church} as {name}" | Invitee | `POST /invites/inspect`, `/invites/accept`, `/invites/accept-existing` |
+| `/invite#t=…` | Accept invite: new account (name, email and phone pre-filled from the invite and editable, password), or "log in to accept" (a login form on this page, since the token is already gone from the address bar) / "join with my current account" (with "Log out and use another account"); always ends with "You are joining {church} as {name}" | Invitee | `POST /invites/inspect`, `/invites/accept`, `/invites/accept-existing` |
 | `/reset#t=…` | Shows "This link was created by {name}", then set a new password | Holder of a reset link | `POST /auth/reset/inspect`, `POST /auth/reset` |
 | `/` | Home: welcome text; placeholder for "My assignments" (step 5) | Members | `GET /me` |
 | `/profile` | Name, text size, UI language, change password, "Log out on all other devices" (for a lost phone) | Logged in | `PATCH /me`, `POST /me/password`, `POST /me/sessions/end-others` |
@@ -60,7 +60,7 @@ packages/i18n/              @liturgist/i18n: en.json (source), id.json
 
 - React Router. Internal links use route constants from `src/routes/paths.ts`; no string-built paths elsewhere.
 - Links received from the API (invite and reset links) are shown and shared as received.
-- Tokens: `fragmentToken.ts` reads `t` from `location.hash`, then calls `history.replaceState` to remove the fragment, so the token doesn't stay in the address bar or history.
+- Tokens: `fragmentToken.ts` reads `t` from `location.hash`, then calls `history.replaceState` to remove the fragment, so the token doesn't stay in the address bar or history. If only the fragment changes while the page is open (another link opened on the same page), the page reloads so it starts over with the new token. After a link has been used, the page does not inspect it again.
 - If `/invite`, `/reset` or `/setup` opens without a `#t=` fragment (e.g. a mail scanner or a copy-paste dropped it), the page shows "This link is incomplete. Ask your church admin for a new link." (for `/setup`: "Open the setup link printed in the server log.") and makes no API call.
 - "Share to WhatsApp" for invite links uses `https://wa.me/?text=<encoded message with link>`; "Copy" uses the Clipboard API with a fallback text field.
 
