@@ -56,7 +56,7 @@ docs/                     SPEC, PILOT, impl/, reference/
 
 | Package | May import | Must not import |
 |---|---|---|
-| `domain` | stdlib | anything else in this module; third-party |
+| `domain` | stdlib, its own subpackages, and two pure-computation libraries: `github.com/nyaruka/phonenumbers` (identifiers) and `golang.org/x/text/unicode/norm` (password normalisation) | anything else in this module; any other third-party package |
 | `app` | `domain`, stdlib | `adapters/...`, `server`, `net/http`, `database/sql`, third-party |
 | `adapters/...` | `app`, `domain`, third-party | `server`, `cmd/...`, any other adapter package (adapters meet only through `app` ports, wired in `server`) |
 

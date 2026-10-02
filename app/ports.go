@@ -38,3 +38,16 @@ type Clock interface{ Now() time.Time }
 
 // IDGenerator returns new ULIDs.
 type IDGenerator interface{ NewID() string }
+
+// PasswordHasher hashes and verifies passwords. Implementations normalise with
+// domain.NormalizePassword, bound concurrency, and must never be called inside
+// a database transaction (03 §3).
+type PasswordHasher interface {
+	Hash(ctx context.Context, password string) (string, error)
+	// Verify reports whether password matches encoded, and whether encoded
+	// uses outdated parameters and should be replaced after a successful login.
+	Verify(ctx context.Context, encoded, password string) (ok, needsRehash bool, err error)
+	// VerifyDummy costs the same as Verify; used when no user exists, so
+	// timing doesn't reveal whether an account exists.
+	VerifyDummy(ctx context.Context, password string) error
+}

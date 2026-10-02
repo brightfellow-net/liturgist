@@ -11,7 +11,12 @@ linters:
       rules:
         domain:
           files: ["**/domain/**"]
-          allow: ["$gostd"]
+          # Standard library plus two pure-computation libraries (01 §3).
+          allow:
+            - "$gostd"
+            - "github.com/brightfellow-net/liturgist/domain"
+            - "github.com/nyaruka/phonenumbers"
+            - "golang.org/x/text/unicode/norm"
           deny:
             - pkg: "net/http"
               desc: "domain is pure; HTTP lives in adapters (01 §3)"

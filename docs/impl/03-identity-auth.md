@@ -15,7 +15,7 @@ A user has an email, a phone number, or both ([SPEC.md §7](../SPEC.md#7-data-mo
 |---|---|
 | Detect | Input (after trimming spaces) contains `@` → email; otherwise → phone |
 | Email | Lower-case the whole string; must parse with `net/mail.ParseAddress` as a bare address; exactly one `@`; domain part contains a `.`; ≤ 254 characters |
-| Phone | Remove spaces, `-`, `(`, `)`, `.`; parse with `github.com/nyaruka/phonenumbers`, default region `ID`; must be `IsValidNumber`; stored in E.164 (e.g. `+6281234567890`) |
+| Phone | Remove spaces, `-`, `(`, `)`, `.`; what remains must be digits with an optional leading `+` (the library would otherwise read letters as keypad digits); parse with `github.com/nyaruka/phonenumbers`, default region `ID`; must be `IsValidNumber`; stored in E.164 (e.g. `+6281234567890`) |
 | Failure | `invalid_identifier` (422) |
 
 - `domain.Identifier` is a value type `{Kind: Email|Phone, Value: string}` created only through `domain.ParseIdentifier`.
@@ -29,7 +29,7 @@ A user has an email, a phone number, or both ([SPEC.md §7](../SPEC.md#7-data-mo
 |---|---|
 | Normalisation | Unicode NFKC (`golang.org/x/text/unicode/norm`) before every check and before hashing; **no trimming** (spaces are part of the password) |
 | Length | 10 to 128 characters (Unicode code points, after normalisation) |
-| Common passwords | Rejected if, lower-cased, it appears in either embedded list: the 100,000 most common passwords (`internal/commonpw/common-100k.txt`, from SecLists, MIT licence) or the curated Indonesian and church list (`internal/commonpw/id-church.txt`, e.g. haleluya, tuhanyesus, bismillah, sayangku, rahasia123, indonesia, with common digit suffixes) |
+| Common passwords | Rejected if, lower-cased (with or without spaces), it appears in either embedded list in `domain/commonpw`: the NCSC top 100,000 (`ncsc-100k.txt`, SecLists' `100k-most-used-passwords-NCSC.txt`, MIT licence, notice in `LICENSE-SecLists`) or the curated Indonesian and church list (`id-church.txt`, e.g. haleluya, tuhanyesus, bismillah, sayangku, rahasia, indonesia), each word also with common suffixes (`1`, `12`, `123`, `2026`, `!`, …). Only entries of at least 10 characters are kept in memory (about 9,500), since shorter passwords fail the length rule anyway |
 | Own identity | Rejected if, lower-cased with spaces removed, it equals the user's email, the email's local part, the phone number with or without `+62`/`0` prefix, the user's name, or the church's name |
 | Composition rules | None |
 | Hash | argon2id, m = 19456 KiB, t = 2, p = 1, 16-byte salt, 32-byte key, PHC string format (`$argon2id$v=19$m=19456,t=2,p=1$<salt>$<hash>`) |

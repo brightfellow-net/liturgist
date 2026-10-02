@@ -1,0 +1,40 @@
+# Curated Indonesian and church words (03 §3). One word per line; commonpw
+# also adds common suffixes (1, 12, 123, 2026, !, ...). Lower-case.
+haleluya
+halleluya
+haleluyah
+hallelujah
+tuhanyesus
+yesuskristus
+yesustuhan
+jesus
+jesuschrist
+jesuslovesme
+jesusloveme
+imanuel
+immanuel
+shalom
+syalom
+pujituhan
+puji tuhan
+gereja
+kasihtuhan
+tuhanbaik
+tuhanberkati
+berkat
+alkitab
+injil
+kristus
+rohkudus
+bismillah
+sayangku
+sayang
+rahasia
+katasandi
+indonesia
+jakarta
+merdeka
+cintaku
+liturgi
+liturgist
+pujian
