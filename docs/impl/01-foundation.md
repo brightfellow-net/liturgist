@@ -1,7 +1,7 @@
 # 01 — Foundation (Implementation)
 
 > **Document type: Implementation.** Step 1 of [SPEC.md §10](../SPEC.md#10-suggested-build-order).
-> Status: **Draft**. Items marked **[P-xx]** are proposals awaiting approval ([index](README.md#3-proposed-decisions)).
+> Status: **Approved** 2026-10-02. Items marked **[P-xx]** are decisions listed in the [index](README.md#4-proposed-decisions).
 
 ## 1. Scope
 
@@ -73,6 +73,7 @@ docs/                     SPEC, PILOT, impl/, reference/
 | `make lint` | golangci-lint, license-header check, `pnpm -r lint` |
 | `make dev` | Go server on `:8080` and Vite dev server on `:5173` (Vite proxies `/api` to Go) |
 
+- **Generator versions are pinned:** `openapi-typescript` (and every other JS tool) is a dev dependency in `packages/api-client/package.json`, locked by `pnpm-lock.yaml`; Go-side generation uses only this module's code. `make gen` is the only supported way to regenerate, and CI runs exactly that with `pnpm install --frozen-lockfile`.
 - **Generated files are committed [P-07]:** `packages/api-client/openapi.json` and `packages/api-client/src/schema.d.ts`. CI runs `make gen` and fails if `git diff --exit-code` is non-empty.
 - **Embedding the frontend [P-08]:** `web/embed.go` (package `web`) has `//go:embed all:dist` exporting `web.Dist fs.FS`. `web/dist/.keep` is committed; everything else in `web/dist/` is git-ignored. If `index.html` is missing, the server answers SPA routes with a plain HTML page "Frontend not built — run `make web`" (status 503).
 - Version information is injected with `-ldflags "-X github.com/brightfellow-net/liturgist/server.Version=…"`; default `dev`.
@@ -84,7 +85,9 @@ Environment variables only in step 1 **[P-03]**. All are optional.
 | Variable | Default | Meaning | Validation |
 |---|---|---|---|
 | `LITURGIST_DATA_DIR` | `./data` | Folder for the SQLite file and later `files/`, `backups/` | Created if missing (mode 0700); must be writable |
-| `LITURGIST_LISTEN` | `:8080` | HTTP listen address | `host:port` |
+| `LITURGIST_LISTEN` | `127.0.0.1:8080` (the Docker image sets `:8080`) | HTTP listen address. Serving a LAN directly needs e.g. `:8080` | `host:port` |
+| `LITURGIST_EXTRA_HOSTS` | empty | Extra host names (without port) the server answers to besides the `BaseURL` host, e.g. `192.168.1.10,gereja.local` | Comma-separated host names or IPs |
+| `LITURGIST_REQUIRE_PREUPGRADE_COPY` | `false` | Abort migration if the SQLite pre-upgrade copy can't be made ([02 §5](02-persistence.md#5-migrations)) | `true`/`false` |
 | `LITURGIST_BASE_URL` | `http://localhost:8080` | Public base URL for links, cookie security and the `Origin` check | Absolute `http`/`https` URL without path, query or fragment |
 | `LITURGIST_DB_DRIVER` | `sqlite` | `sqlite` or `postgres` | One of the two |
 | `LITURGIST_DB_URL` | — | PostgreSQL connection URL | Required when driver is `postgres`; ignored for `sqlite` |
@@ -99,6 +102,20 @@ Environment variables only in step 1 **[P-03]**. All are optional.
 - Parsed once in `cmd/liturgist` (via `internal/envconfig`) into `server.Config`. The SaaS builds `server.Config` itself.
 - Invalid configuration: print every problem to stderr in one message, exit code 2.
 - `cmd/liturgist` imports `time/tzdata` so time zones work on Windows and minimal container images.
+- **Start-up checks (warnings, not errors):** logged once at warn level when
+  - the listener is not a loopback address **and** `BaseURL` is `http` **and** `LITURGIST_TRUSTED_PROXIES` is empty: "Liturgist is reachable on the network over plain HTTP. Passwords and session cookies can be read on the network; use HTTPS (see the install guide).";
+  - `BaseURL` is `https` while the listener is plain HTTP **and** no trusted proxy is configured (and built-in HTTPS, a step-6 feature, is off): "BASE_URL says https, but nothing here terminates TLS; configure the TLS proxy as a trusted proxy."
+
+### 5.1 Supported deployment setups
+
+| Setup | How | What the app trusts |
+|---|---|---|
+| **A. TLS proxy or tunnel** (recommended) | Caddy, nginx, Cloudflare Tunnel or Tailscale terminates HTTPS and forwards to Liturgist on `127.0.0.1:8080`; `BaseURL` = the public `https` URL; the proxy's address in `LITURGIST_TRUSTED_PROXIES` | Client IP from the proxy ([03 §5](03-identity-auth.md#5-login-and-throttling)) |
+| **B. Built-in HTTPS** (step 6) | Liturgist itself serves HTTPS with Let's Encrypt ([SPEC.md §8.3](../SPEC.md#83-self-host-operations)) | Nothing forwarded |
+| **C. Plain HTTP on a local network** | `LITURGIST_LISTEN=:8080`, `BaseURL` = `http://<LAN address>:8080`, warning on start and on the system page | Nothing forwarded |
+
+- The app **never** reads `X-Forwarded-Proto`, `X-Forwarded-Host`, `Forwarded` or similar: scheme and host always come from `BaseURL`. Secure cookies and the CSRF origin follow `BaseURL` only.
+- In setup A the proxy must be the only way to reach the app: Liturgist listens on `127.0.0.1` (the default), or the host firewall blocks direct access to the port. The install guide shows this for each proxy.
 
 ## 6. Command line
 
@@ -114,6 +131,7 @@ Commands in step 1 **[P-04]**:
 | `liturgist user reset-password <identifier>` | Print a reset link ([03 §9](03-identity-auth.md#9-password-reset)); warn on stderr if `LITURGIST_BASE_URL` is not set | 0; 1 error; 5 no such user |
 | `liturgist user list` | Print one line per user: name, email, phone, roles in the church | 0; 1 error |
 | `liturgist member grant-admin <identifier>` | Emergency recovery: give that member the ready-made Church admin role (recreated with its default scopes if it was deleted); log `grant_admin_cli` with the user ID | 0; 1 error; 5 no such user; 6 not a member |
+| `liturgist auth clear-throttle --identifier X \| --ip Y \| --all` | Delete login-throttle counters ([03 §5](03-identity-auth.md#5-login-and-throttling)) | 0; 1 error |
 | `liturgist openapi` | Print the OpenAPI 3.1 document as JSON to stdout, without opening a database | 0 |
 | `liturgist version` | Print version, commit, build date | 0 |
 
@@ -134,6 +152,8 @@ type Config struct {
     SessionTTL  time.Duration
     SessionMaxAge time.Duration
     TrustedProxies []netip.Prefix
+    ExtraHosts     []string
+    RequirePreUpgradeCopy bool
     ClientIPHeader string
     Logger      *slog.Logger
 }
@@ -167,7 +187,10 @@ func (s *Server) Close() error
 | `/assets/...` | Hashed static files from `web/dist/assets`, `Cache-Control: public, max-age=31536000, immutable` |
 | any other `GET`/`HEAD` | `web/dist/index.html` with `Cache-Control: no-cache` (SPA routing) |
 | other methods outside `/api` | 405 |
+| `OPTIONS` anywhere | 405, no CORS headers |
 
+- **Allowed hosts:** every request's `Host` (port removed) must be the `BaseURL` host or one of `LITURGIST_EXTRA_HOSTS`; when the `BaseURL` host is `localhost`, also `127.0.0.1` and `::1`. Otherwise respond 421 Misdirected Request with no body and log at debug level. This blocks DNS-rebinding attacks and makes the CSRF origin comparison ([03 §6](03-identity-auth.md#6-csrf-protection)) safe. `/healthz` and `/readyz` are exempt so container health checks work.
+- **No CORS:** the community edition never sends `Access-Control-*` headers. A frontend on another origin (e.g. the SaaS frontend) must either be served from the same origin as the API or get a deliberate, allow-listed CORS policy added in `liturgist-saas`; cookie-authenticated requests keep the CSRF rules either way.
 - **Secret tokens only in URL fragments [P-05]:** invite, reset and setup links have the form `{base}/invite#t=<token>`. Fragments are never sent to the server, so tokens never reach access logs or `Referer` headers. The SPA reads the fragment and sends the token in a JSON body.
 - **Security headers on every response [P-30]:**
 
@@ -179,14 +202,16 @@ func (s *Server) Close() error
 | `Strict-Transport-Security` | `max-age=31536000` — only when `BaseURL` is `https` |
 
 - Request bodies on `/api` are limited to 1 MiB in step 1 (larger limits per operation come with imports).
-- Middleware order: recover → request ID → security headers → logging → session ([03 §4](03-identity-auth.md#4-sessions)) → CSRF ([03 §6](03-identity-auth.md#6-csrf-protection)) → tenant ([04 §2](04-tenancy-extensions.md#2-tenant-context)) → Huma.
+- Middleware order: recover → request ID → allowed hosts → security headers → logging → session ([03 §4](03-identity-auth.md#4-sessions)) → CSRF ([03 §6](03-identity-auth.md#6-csrf-protection)) → tenant ([04 §2](04-tenancy-extensions.md#2-tenant-context)) → Huma.
 
 ## 9. Logging
 
 - `log/slog` to stdout; handler chosen by `LITURGIST_LOG_FORMAT`.
 - **Request ID:** accept an incoming `X-Request-ID` if it matches `^[A-Za-z0-9-]{8,64}$`, else generate a ULID; echo it in the response header; add `request_id` to every log line of that request.
 - **Access log line** (level info): `method`, `path` (no query string), `status`, `duration_ms`, `request_id`, `user_id` (if logged in). Never request or response bodies, headers, cookies, identifiers (emails/phones) or names.
-- The setup link is the only secret ever logged ([03 §10](03-identity-auth.md#10-first-time-setup)); it expires after 24 hours and is useless once setup is done.
+- **Redaction at the logger boundary:** a `slog` `ReplaceAttr` function replaces the value of any attribute whose key is `token`, `password`, `email`, `phone`, `identifier`, `cookie`, `authorization` or ends in `_token` with `[redacted]`, so a mistaken log call can't leak them.
+- The setup link is the only secret deliberately logged, through a dedicated call that bypasses redaction ([03 §10](03-identity-auth.md#10-first-time-setup), accepted risk); it expires after 24 hours and is useless once setup is done.
+- **Retention and access:** logs go to stdout/stderr; how long they are kept and who can read them is up to the operator (Docker, systemd). The install guide recommends limiting retention (e.g. 14 days) and notes that logs contain user IDs and short-lived request data.
 - Panics: log at error level with stack trace and request ID; respond 500 `internal`.
 
 ## 10. Error format and codes
@@ -263,6 +288,9 @@ One workflow on every push and pull request:
 | TC-F-003 | `envconfig` | `LITURGIST_BASE_URL=https://x.org/path` | Error: base URL must not have a path | Trailing slash allowed and removed |
 | TC-F-004 | Request ID middleware | Incoming `X-Request-ID: abc` (too short) | New ULID generated and echoed | Valid incoming ID is kept |
 | TC-F-005 | Security headers | Any request | All headers in §8; HSTS only for `https` base URL | — |
+| TC-F-009 | Allowed hosts | `Host: evil.example` | 421, no body | `BaseURL` host with port → allowed; `localhost` base → `127.0.0.1` allowed; `/healthz` with any host → 200 |
+| TC-F-010 | Log redaction | `slog.Info("x", "email", "a@b.c", "reset_token", "t")` | Both values `[redacted]` | Setup-link call is not redacted |
+| TC-F-011 | Start-up warnings | Listen `:8080`, base `http://…`, no proxies | Plain-HTTP warning logged | Listen `127.0.0.1:8080` → no warning |
 | TC-F-006 | Error mapper | `app.ErrConflict{Code:"already_member"}` | 409 problem JSON with `code` | Unknown error → 500 `internal`, no detail leaked |
 | TC-F-007 | Access log | Request to `/api/v1/auth/login?x=1` with body | Log line has path without query; no body | — |
 | TC-F-008 | `WithRoutes` | Register an operation with an existing operation ID | Panic at `New` | Same path, different method is allowed |
@@ -273,6 +301,7 @@ One workflow on every push and pull request:
 |---|---|---|---|---|
 | IT-F-001 | `serve` start-up | Empty temp data dir | `/healthz` 200; `/readyz` 200; database file created | Stop server |
 | IT-F-002 | SPA fallback | Built `dist` fixture | `GET /members` returns `index.html` with `no-cache`; `GET /assets/x.js` has immutable cache | — |
+| IT-F-006 | No CORS | `OPTIONS /api/v1/me` with `Origin: https://other.example` | 405; no `Access-Control-*` headers | — |
 | IT-F-003 | Frontend not built | Empty `dist` | `GET /` → 503 "Frontend not built" page; `/api/v1/setup/status` still works | — |
 | IT-F-004 | Graceful shutdown | Slow handler in flight, then SIGTERM | In-flight request completes; new connections refused | — |
 | IT-F-005 | `liturgist openapi` | No database | Valid OpenAPI 3.1 JSON; matches committed file | — |

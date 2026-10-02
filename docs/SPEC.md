@@ -2,7 +2,7 @@
 
 > **Document type: Strategic** (what to build and why). How to build each step is in the implementation documents under [`docs/impl/`](impl/README.md); see [section 12](#12-references).
 > Read this fully before writing code. Where this document says **Open decision**, ask the project owner before choosing.
-> Sections 1–10 are authoritative. The decisions log (section 11) records when and why each decision was made; where a log row and a section differ, the section wins.
+> Sections 1–10 are authoritative for **what** to build. Approved implementation documents (`docs/impl/`, `docs/reference/`) decide **how**, and win on implementation details. The decisions log (section 11) records when and why each decision was made; where a log row and a section differ, the section wins. If two current documents conflict, stop and ask the owner ([precedence rule](impl/README.md#2-how-to-use-these-documents)).
 
 ## 1. Context
 
@@ -282,7 +282,7 @@ Starting point, not final. Refine as needed.
 - **Tenant-ready:** all church-owned data scoped by `church_id`, behind a tenant context and church-scoped repositories (8.1). One church per community install; multi-church hosting is SaaS-only (8.1.1).
 - **UI language:** English first, Indonesian second, with i18n from the start. English is the source language for all UI text; every Indonesian message file must contain every key. Each church has a default UI language for its members (English unless changed); each user can choose their own, saved in `User.preferences`. This is separate from content language (5.2), which stays per church, liturgy and song.
 - **Mobile-friendly:** team members will mostly open links on phones.
-- **Privacy:** no analytics or tracking scripts in any install. A short privacy notice page in the app explains what personal data is stored (names, phone numbers, emails; IP addresses only briefly, to block password guessing, deleted within about an hour), why, and who can see it; the church admin can add the church's contact details. It is linked from the login and invite pages. Applies to every install (Indonesia's UU PDP).
+- **Privacy:** no analytics or tracking scripts in any install. A short privacy notice page in the app explains what personal data is stored (names, phone numbers, emails; IP addresses only briefly, to block password guessing, deleted within an hour), why, and who can see it; the church admin can add the church's contact details. It is linked from the login and invite pages. Applies to every install (Indonesia's UU PDP).
 - **Accessibility:** WCAG 2.2 AA as the target, checked automatically with axe in the Playwright tests (see 5.8).
 - **No bundled copyrighted content** (lyrics, Bible text).
 - Apache-2.0 license headers/notice per repository convention.
@@ -409,7 +409,7 @@ The person running a community install is usually a volunteer without IT trainin
 
 **Install and platforms**
 - Supported release builds: Linux (amd64, arm64), Windows (amd64, able to install itself as a Windows service), and a Docker image (`ghcr.io/brightfellow-net/liturgist`). macOS is not a packaged or tested platform, but developers can build and run on it.
-- Start with `liturgist serve` or `docker run -d -p 8080:8080 -v liturgist-data:/data ghcr.io/brightfellow-net/liturgist`. Nothing must be configured to start; options come from environment variables or an optional config file (base URL, database, email, HTTPS).
+- Start with `liturgist serve` or `docker run -d -p 8080:8080 -v liturgist-data:/data ghcr.io/brightfellow-net/liturgist`. The binary listens only on `127.0.0.1:8080` unless configured otherwise (a TLS proxy or tunnel in front is the recommended setup); the Docker image listens on all interfaces inside the container. Nothing must be configured to start; options come from environment variables or an optional config file (base URL, database, email, HTTPS).
 - One data folder holds everything: `liturgist.db`, `files/` (local `Storage`), `backups/`. Default `./data` (`/data` in Docker), or `LITURGIST_DATA_DIR`. An example systemd unit is provided.
 - Runs comfortably on a 512 MB VPS, a Raspberry Pi 4, or an old Windows office PC.
 
@@ -549,7 +549,9 @@ Record resolved decisions here (date, decision, reason). Move items from section
 | 2026-10-02 | The community install finds its church in the database (the only `churches` row, cached), not in configuration; it refuses to start if the database holds more than one church | The church is created at runtime by setup, and "nothing must be configured to start"; never silently picking one church protects against restored or imported databases |
 | 2026-10-02 | Response codes for access: 401 when not logged in; 404 when not a member or when the resource is not visible to the member, with bodies identical to "doesn't exist" and the reason only in the log; 403 when the member can see the resource but lacks the scope | Reveals nothing to outsiders (important for the SaaS) while giving members a clear "no permission" message |
 | 2026-10-02 | All extension-point interfaces are defined in build step 1 and marked provisional until the step that first uses them. Until v1.0 any port may change; port changes are listed under "Ports" in `CHANGELOG.md` | Owner's choice: the full set of extension points is visible from the start; the changelog keeps SaaS updates manageable |
-| 2026-10-02 | Step-1 implementation documents (`docs/impl/`, `docs/reference/schema.md`) approved: proposals P-01 to P-32 | Recorded in [docs/impl/README.md](impl/README.md#3-proposed-decisions) |
+| 2026-10-02 | Step-1 implementation documents (`docs/impl/`, `docs/reference/schema.md`) approved: proposals P-01 to P-32 | Recorded in [docs/impl/README.md](impl/README.md#4-proposed-decisions) |
+| 2026-10-02 | Adversarial review round 1 (index only) handled: P-33 (all unsafe API requests must be JSON), P-34 (per-church lock before role safeguards), P-35 (throttle-clearing command and proxy misconfiguration warning), P-36 (precedence between SPEC and implementation documents), plus clarifications | Recorded in the [review log](impl/README.md#6-review-log) |
+| 2026-10-02 | Adversarial review round 2 (implementation documents and schema) handled: atomic operations for all single-use tokens, counters and setup (P-37); binary listens on 127.0.0.1 by default (P-38); allowed-host check and supported deployment setups (P-39); live invite roles in a join table (P-40); optional strict upgrade mode (P-41); setup link in logs accepted as a risk (P-42); changing one's own email/phone deferred (P-43) | All CRITICAL findings fixed and every HIGH finding decided; see the [review log](impl/README.md#6-review-log) |
 | 2026-10-02 | Login throttling uses three counters (identifier + IP: 5 failures/15 min; identifier: 50/hour; IP: 100/15 min) and trusts client IPs only from configured reverse proxies, both in build step 1 | Most installs sit behind a proxy or tunnel; Indonesian mobile carriers and church Wi-Fi share IP addresses; counting per identifier + IP stops one person locking another out |
 
 ## 12. References

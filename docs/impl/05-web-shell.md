@@ -1,7 +1,7 @@
 # 05 — Web App Shell (Implementation)
 
 > **Document type: Implementation.** Step 1 of [SPEC.md §10](../SPEC.md#10-suggested-build-order).
-> Status: **Draft**. Items marked **[P-xx]** are proposals awaiting approval ([index](README.md#3-proposed-decisions)).
+> Status: **Approved** 2026-10-02. Items marked **[P-xx]** are decisions listed in the [index](README.md#4-proposed-decisions).
 
 ## 1. Scope
 
@@ -22,7 +22,7 @@ The React single-page app for step 1: workspace layout, pages, routing, API clie
 | `/settings/church` | Church settings | View: all members; edit: per `actions` (`church.settings`) | `GET/PATCH /church`, `GET /translations` |
 | `/settings/members` | Members (assign roles, remove, reset link) and invites (create with roles, copy/share link, regenerate, cancel), usage "9 of 12" when limited | Members with `members.view` (actions per `actions`) | `/members`, `/invites`, `/roles` |
 | `/settings/roles` | Role editor: list roles with member counts; create, rename, edit description, tick scopes (each with a plain-language description); delete with confirmation showing how many members hold it | Members with `roles.manage` | `/roles`, `/scopes` |
-| `/privacy` | Privacy notice: what is stored (names, phone numbers, emails; IP addresses only briefly, for blocking password guessing, deleted within about an hour), why, who can see it, plus the church's contact text | Anyone | `GET /church` when logged in; static text otherwise |
+| `/privacy` | Privacy notice: what is stored (names, phone numbers, emails; IP addresses only briefly, for blocking password guessing, deleted within an hour), why, who can see it, plus the church's contact text | Anyone | `GET /church` when logged in; static text otherwise |
 | `*` | Not found | Anyone | — |
 
 Navigation: people with no roles (team members) see **Home** and **Profile** (Liturgies arrive in step 5); members holding any of `church.settings`, `members.view`, `members.manage`, `roles.manage` also see **Settings**. The menu is driven by `membership.scopes` from `GET /me`.
@@ -51,7 +51,8 @@ packages/i18n/              en.json (source), id.json
 - On a 401 `unauthenticated` from any query: clear the cache and go to `/login?next=<current path>`.
 - On 409 `not_set_up`: go to `/setup`.
 - Forms: React Hook Form + Zod. Zod schemas mirror the server rules (lengths, required fields) for instant feedback only; the server's 422 `errors` are mapped onto fields and always win.
-- Buttons and menu items are shown or hidden from `actions` in API responses only.
+- Buttons and menu items are shown or hidden from `actions` in API responses only. `actions` are advisory: a 403 can still happen if permissions changed meanwhile, and is shown with the normal error message.
+- Every `POST`, `PUT`, `PATCH` and `DELETE` is sent with `Content-Type: application/json`, including bodyless ones (empty body `{}`) ([03 §6](03-identity-auth.md#6-csrf-protection)).
 
 ## 5. Links and routing
 

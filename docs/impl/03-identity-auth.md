@@ -1,7 +1,7 @@
 # 03 — Identity and Auth (Implementation)
 
 > **Document type: Implementation.** Step 1 of [SPEC.md §10](../SPEC.md#10-suggested-build-order).
-> Status: **Draft**. Items marked **[P-xx]** are proposals awaiting approval ([index](README.md#3-proposed-decisions)).
+> Status: **Approved** 2026-10-02. Items marked **[P-xx]** are decisions listed in the [index](README.md#4-proposed-decisions).
 
 ## 1. Scope
 
@@ -33,7 +33,7 @@ A user has an email, a phone number, or both ([SPEC.md §7](../SPEC.md#7-data-mo
 | Own identity | Rejected if, lower-cased with spaces removed, it equals the user's email, the email's local part, the phone number with or without `+62`/`0` prefix, the user's name, or the church's name |
 | Composition rules | None |
 | Hash | argon2id, m = 19456 KiB, t = 2, p = 1, 16-byte salt, 32-byte key, PHC string format (`$argon2id$v=19$m=19456,t=2,p=1$<salt>$<hash>`) |
-| Concurrency | A semaphore allows at most 2 hash computations at once (≈ 38 MiB); others wait up to 10 s, then `unavailable` |
+| Concurrency | One **process-wide** semaphore allows at most 2 hash computations at once (≈ 38 MiB per process; each SaaS instance has its own). At most **32 requests may wait**; a 33rd gets 503 `unavailable` immediately. A waiting request gives up when its context is cancelled (client gone) or after 10 s (`unavailable`). A computation that has started runs to completion (argon2 can't be interrupted). Hashing and verifying **never happen inside a database transaction** |
 | Re-hash | On successful login, if the stored parameters differ from the current ones, re-hash and save |
 
 Errors: `weak_password` (422) with `reason` = `too_short`, `too_long`, `common`, `matches_identity`.
@@ -46,50 +46,66 @@ Errors: `weak_password` (422) with `reason` = `too_short`, `too_long`, `common`,
 |---|---|
 | Token | 32 random bytes (`crypto/rand`), base64url without padding (43 chars) |
 | Stored | Only `SHA-256(token)` as hex in `sessions.token_hash` |
-| Cookie name | `__Host-liturgist_session` when `BaseURL` is `https`; `liturgist_session` otherwise |
+| Cookie name | `__Host-liturgist_session` when `BaseURL` is `https`; `liturgist_session` otherwise. If a request carries **both** names (e.g. after moving from HTTP to HTTPS), only the one for the current scheme is used, and every response that sets or clears the session cookie also clears the other name (`Max-Age=0`, same `Path=/`) |
 | Cookie attributes | `HttpOnly`, `SameSite=Lax`, `Path=/`, `Secure` when `https`, no `Domain`, `Max-Age` = remaining lifetime |
 | Lifetime | `SessionTTL` (default 90 days) from last use, but never more than `SessionMaxAge` (default 1 year) after `created_at`: `expires_at = min(last use + SessionTTL, created_at + SessionMaxAge)` |
-| Extension | On an authenticated request, if `last_seen_at` is more than 1 hour old: set `last_seen_at = now`, recompute `expires_at` with the formula above, `users.last_seen_at = now`, and re-send the cookie |
+| Extension | On an authenticated request, if `last_seen_at` is more than 1 hour old: one conditional update `UPDATE sessions SET last_seen_at = $now, expires_at = $new WHERE token_hash = $h AND expires_at > $now` ([02 §2.1](02-persistence.md#21-atomic-operations)) plus `users.last_seen_at = $now`. If 0 rows changed, the session was ended meanwhile: the request continues as anonymous (401 for protected operations). The cookie is re-sent only after the transaction commits. Deletion therefore always wins over extension |
 | New token on every login | Login, accepting an invite, setup and password reset always create a **new** session. If the request carried a session cookie, that session is deleted first (prevents session fixation) |
 | Ends | Logout deletes the current session. "Log out on all other devices" (`POST /api/v1/me/sessions/end-others`, 204) deletes all **other** sessions of that user. Changing one's password does the same. A password reset deletes **all** sessions of that user |
 | User agent | First 200 characters of `User-Agent`, for a future "your devices" page; no IP address is stored |
 
-Session middleware: read cookie → look up hash → if missing or expired, treat as anonymous (and clear the cookie) → else attach `app.Session{UserID, SessionID}` to the context.
+Only the session belonging to the cookie the browser sent is deleted at login; no other sessions of either account are touched.
+
+Session middleware: read cookie → look up hash → if missing or expired (`expires_at <= now`), treat as anonymous and clear both cookie names → else attach `app.Session{UserID, SessionID}` to the context. Set-Cookie headers are written only after the request's transactions have committed.
 
 ## 5. Login and throttling
 
 `POST /api/v1/auth/login` `{ "identifier": string, "password": string }`
 
-1. Parse the identifier. If invalid → still run step 3 with a dummy hash, then return `invalid_credentials` (same timing and message as a wrong password).
-2. Check throttling (below). If locked → 429 `too_many_attempts` with `Retry-After`.
-3. Load the user by identifier. If none → verify against a fixed dummy hash, record a failure, return `invalid_credentials`.
-4. Verify the password. Wrong → record a failure, return `invalid_credentials`.
-5. Success → clear the identifier's failure counter, create a session, set the cookie, respond `204`.
+1. **Client IP and IP counter first:** determine the client address key (below) and read the `ip` counter. Locked → 429 `too_many_attempts`. This happens before the identifier is even parsed, so malformed input can't bypass throttling.
+2. **Parse the identifier.** Unparseable input is not rejected early: its counters use the SHA-256 of the trimmed raw input as `H` ([schema](../reference/schema.md#auth_throttle)). Read the `idip` and `id` counters; any locked → 429.
+3. **Load the user** by identifier in a `Tx.Read` (none for unparseable or unknown identifiers).
+4. **Verify outside any transaction**, through the hash semaphore: against the user's hash, or against a fixed dummy hash when there is no user, so timing is the same.
+5. **Record the result in one `Tx.Write`:**
+   - failure → atomically increment all three counters ([02 §2.1](02-persistence.md#21-atomic-operations)) and return 401 `invalid_credentials` (same body whether or not the account exists);
+   - success → delete the `idip` counter, delete the session from the cookie the request carried (if any), create the new session, and update the hash if it needs re-hashing (computed in step 4); after commit set the cookie and respond `204`.
 
 **Throttling [P-18]** — table `auth_throttle`, one row per counter key:
 
 | Counter | Key | Limit | Window | Lock |
 |---|---|---|---|---|
-| Identifier + IP | `idip:<identifier>|<ip>` | 5 failures | 15 minutes from the first failure | 15 minutes |
-| Identifier | `id:<identifier>` | 50 failures | 1 hour from the first failure | 1 hour |
-| IP | `ip:<ip>` | 100 failures | 15 minutes from the first failure | 15 minutes |
+| Identifier + IP | `idip:<H>:<A>` | 5 failures | 15 minutes from the first failure | 15 minutes |
+| Identifier | `id:<H>` | 50 failures | 1 hour from the first failure | 1 hour |
+| IP | `ip:<A>` | 100 failures | 15 minutes from the first failure | 15 minutes |
+
+`H` and `A` and the exact encodings are defined in the [schema](../reference/schema.md#auth_throttle); identifiers are stored only as hashes.
+
+**Atomic update:** each failure is one `INSERT … ON CONFLICT (key) DO UPDATE` per counter that, in SQL: starts a new window (`failures = 1`, `window_started_at = $now`) if the old window has ended; otherwise adds 1; and sets `locked_until = $now + lock` when the new count reaches the limit. The statement returns the row, so the decision uses the committed values. Concurrent failures are therefore never lost.
 
 - A login attempt is refused (429) if **any** of its three counters is locked; `Retry-After` is the longest remaining lock.
 - Every failure increments all three counters. A successful login deletes the identifier+IP counter (the other two keep counting until their window ends).
 - Unknown identifiers are counted the same way (keyed by the normalised input), so the response never reveals whether an account exists.
-- **Client IP:** the TCP remote address, unless it falls inside `LITURGIST_TRUSTED_PROXIES` ([01 §5](01-foundation.md#5-configuration)). From a trusted proxy: if `LITURGIST_CLIENT_IP_HEADER` is set, use that header's value; otherwise use the right-most address in `X-Forwarded-For` that is not itself a trusted proxy. Unparseable values fall back to the remote address. IPv6 addresses are counted per /64 network.
-- **Privacy:** IP addresses exist only inside throttle keys and are deleted by the cleanup job as soon as window and lock have ended (at most about one hour). The privacy notice lists this ([05 §2](05-web-shell.md#2-pages-in-step-1)).
+- **Client IP algorithm:**
+  1. Start with the TCP remote address (port removed).
+  2. If it is **not** in `LITURGIST_TRUSTED_PROXIES` ([01 §5](01-foundation.md#5-configuration)), use it. Done.
+  3. If `LITURGIST_CLIENT_IP_HEADER` is set: the request must carry exactly one such header with one value that parses as an IP address (`netip.ParseAddr` after trimming spaces); use it. Otherwise fall back to the remote address.
+  4. Else use `X-Forwarded-For`: join all header lines with `,`, split on `,`, trim spaces. Walk from the **right**: skip addresses inside `LITURGIST_TRUSTED_PROXIES`; the first other address is the client. If any element on that walk fails to parse (ports, `unknown`, obfuscated values), or the walk ends without a client, fall back to the remote address.
+  5. Convert to the client address key `A` (IPv4 as is; IPv6 → /64 prefix).
+  Fallbacks are logged at debug level only.
+- **Privacy:** IP addresses exist only inside `idip` and `ip` keys. Those counters live at most 15 minutes of window plus 15 minutes of lock, and the throttle cleanup runs **every 10 minutes** ([§11](#11-cleanup-job)), so an IP address is deleted within about 40 minutes. The privacy notice says "within an hour" ([05 §2](05-web-shell.md#2-pages-in-step-1)). `id` counters hold only identifier hashes.
+- **Operator recovery:** `liturgist auth clear-throttle --identifier <identifier> | --ip <address> | --all` deletes the matching counters immediately ([01 §6](01-foundation.md#6-command-line)).
+- **Misconfiguration warning:** if requests arrive carrying `X-Forwarded-For` (or the configured client-IP header) while `LITURGIST_TRUSTED_PROXIES` is empty or doesn't include the sender, the server logs once per start at warn level: "Requests come through a proxy, but LITURGIST_TRUSTED_PROXIES is not set; all clients share one IP for login throttling."
 - The 429 message (web app): "Too many attempts. Try again in {minutes} minutes, or ask your church admin for a reset link."
 
 `POST /api/v1/auth/logout` → deletes the session, clears the cookie, `204`. Works without a session too (idempotent).
 
 ## 6. CSRF protection
 
-**[P-20]** Three layers, no CSRF tokens:
+**[P-20]** Three layers, no CSRF tokens, behind the host check of [01 §8](01-foundation.md#8-http-basics) (requests whose `Host` is not an allowed host are rejected before any of these):
 
 1. **Cookie:** `SameSite=Lax` ([§4](#4-sessions)) — browsers don't send it on cross-site `POST`s.
-2. **Cross-origin check:** Go's standard `http.CrossOriginProtection` (Go 1.25+) wraps all `/api/` routes. For `POST`, `PUT`, `PATCH`, `DELETE`: allowed if `Sec-Fetch-Site` is `same-origin` or `none`; if `Sec-Fetch-Site` is absent, allowed if `Origin` matches the request host or a trusted origin; requests with **neither** header are allowed (non-browser clients such as curl; browsers always send at least one). The origin of `BaseURL` is registered with `AddTrustedOrigin`, so a proxy that rewrites `Host` doesn't break the check. A `same-site` request (e.g. from another brightfellow.net subdomain) is rejected.
-3. **JSON only:** our own middleware rejects unsafe requests that have a body unless `Content-Type` is `application/json` (with optional parameters). HTML forms on other sites can't send JSON without a CORS preflight, and the API allows no CORS.
+2. **Cross-origin check:** Go's standard `http.CrossOriginProtection` (Go 1.25+) wraps all `/api/` routes. For `POST`, `PUT`, `PATCH`, `DELETE`: allowed if `Sec-Fetch-Site` is `same-origin` or `none`; if `Sec-Fetch-Site` is absent, allowed if `Origin` matches the request host (already restricted to allowed hosts) or a trusted origin; requests with **neither** header are allowed (non-browser clients such as curl; browsers always send at least one). The origin of `BaseURL` is registered with `AddTrustedOrigin`, so a proxy that rewrites `Host` doesn't break the check. A `same-site` request (e.g. from another brightfellow.net subdomain) is rejected.
+3. **JSON only:** our own middleware rejects **every** `POST`, `PUT`, `PATCH` and `DELETE` under `/api/` whose `Content-Type` media type is not `application/json` (parameters such as `charset` allowed), **whether or not it has a body**. Bodyless operations (logout, cancel invite, regenerate, …) are sent by the web client with `Content-Type: application/json` and an empty or `{}` body. HTML forms on other sites can't send `application/json` without a CORS preflight, and the API allows no CORS ([01 §8](01-foundation.md#8-http-basics)).
 
 Rejection by layer 2 or 3: 403 `csrf_rejected` (layer 2's deny handler is set to return our problem JSON). Requests authenticated by a bearer token (future mobile `AuthProvider`) skip layer 2; there are none in step 1.
 
@@ -101,20 +117,22 @@ Rejection by layer 2 or 3: 403 `csrf_rejected` (layer 2's deny handler is set to
 |---|---|
 | `name` | 1–120 characters, trimmed |
 | `email`, `phone` | At least one; each parsed as in [§2](#2-identifiers) |
-| `role_ids` | IDs of roles in this church; empty = team member. Rule 2 of [§8](#8-member-roles-and-permissions) applies |
+| `role_ids` | IDs of roles in this church, stored in `invite_roles`; empty = team member. Rule 2 of [§8](#8-member-roles-and-permissions) applies at creation and regeneration |
 | Token | 32 random bytes, base64url; only `SHA-256` stored |
 | Expiry | 7 days after creation or regeneration |
 | Link | `URLBuilder.AppURL("/invite") + "#t=" + token` ([01 §8](01-foundation.md#8-http-basics), [04 §4](04-tenancy-extensions.md#4-urlbuilder)) |
 
 A **pending** invite is one with `accepted_at`, `cancelled_at` both null and `expires_at` in the future.
 
-**Create** `POST /api/v1/invites` — inside `Tx.Write` with `LockForLimits`:
+**Create** `POST /api/v1/invites` — inside `Tx.Write`, with `LockChurch` as the first statement:
 
-1. Validate fields.
+1. Validate fields. The actor must be a member holding `members.manage` (recorded as `created_by`).
 2. If a member of this church already has the email or phone → 409 `already_member`.
-3. If a pending invite in this church has the same email or phone → 409 `invite_exists`. (Expired, unaccepted invites for the same identifier are marked cancelled first.)
+3. Mark expired, unaccepted, uncancelled invites for the same email or phone as cancelled. Then, if an open invite in this church has the same email or phone → 409 `invite_exists`. The partial unique indexes `invites_church_email_open_key` / `invites_church_phone_open_key` back this up; a unique violation on them also maps to `invite_exists`.
 4. `Entitlements.Limit(church, MaxTeamMembers)`; if not unlimited and `memberships + pending invites ≥ limit` → 403 `limit_reached`.
-5. Insert; respond `201` with the invite and its link. **The link is shown only in this response and in "regenerate".**
+5. Insert the invite and its `invite_roles` rows; respond `201` with the invite and its link. **The link is shown only in this response and in "regenerate".**
+
+**Live roles:** an invite refers to roles, not to a frozen list of scopes. If a role is edited before acceptance, the invitee receives the role as it is at acceptance, like every existing holder of that role. This is safe because whoever edits a role must hold every scope they add ([§8](#8-member-roles-and-permissions) rule 2). Deleted roles disappear from open invites automatically (foreign key cascade).
 
 **Regenerate** `POST /api/v1/invites/{id}/regenerate` — pending or expired (not accepted/cancelled) invites only: new token, new 7-day expiry (re-checking the limit if the invite had expired); respond with the new link. The old link stops working.
 
@@ -123,14 +141,15 @@ A **pending** invite is one with `accepted_at`, `cancelled_at` both null and `ex
 **Inspect** `POST /api/v1/invites/inspect` `{ token }` → `{ church_name, invitee_name, email, phone, status: "pending", owner_exists: bool }`, or 400 `invalid_token` with `reason`. `owner_exists` is true if the invite's email or phone belongs to an existing user (the **owner**). The invite's own email/phone are returned so the invitee can check them.
 
 **Accept as new user** `POST /api/v1/invites/accept` `{ token, name, email?, phone?, password }`:
-1. Token must be pending (`invalid_token` otherwise).
+0. Validate and **hash the password before** opening the transaction (outside any transaction, [§3](#3-passwords)).
+1. In one `Tx.Write`: **atomically claim** the invite ([02 §2.1](02-persistence.md#21-atomic-operations)); if no row was claimed, look up why and return `invalid_token` with `reason`.
 2. If the invite has an owner → 409 `identifier_taken` (the page switches to "log in to accept").
 3. `name`, `email`, `phone` are pre-filled from the invite in the web app and may be corrected by the invitee; at least one identifier; each parsed as in [§2](#2-identifiers). If a submitted identifier belongs to an existing user → 409 `identifier_taken`.
-4. Validate the password ([§3](#3-passwords)) against the submitted name and identifiers.
-5. Create the user with the submitted details, a membership with the invite's roles (role IDs that no longer exist are skipped), mark the invite accepted (recording `accepted_user_id`), create a session; `201`.
+4. The password check of step 0 includes the submitted name and identifiers.
+5. In the same transaction, create the user with the submitted details, a membership with the invite's roles (role IDs that no longer exist are skipped), mark the invite accepted (recording `accepted_user_id`), create a session; `201`.
 
 **Accept with the logged-in account** `POST /api/v1/invites/accept-existing` `{ token }` — requires a session:
-1. Token must be pending.
+1. In one `Tx.Write`: check rule 2 below, then **atomically claim** the invite; nothing claimed → `invalid_token` with `reason`.
 2. If the invite has an owner and it is **not** the logged-in user → 403 `invite_identifier_mismatch` ("This invite is for another account. Log out and log in as that person.").
 3. If the invite has no owner, any logged-in user may accept (the link is the credential, as for new accounts).
 4. If already a member of the church → mark the invite accepted, `200` (idempotent).
@@ -175,7 +194,7 @@ Names are created in the church's default UI language; churches can rename them.
 | Origin | Set only by setup and migrations; never changed through the API; kept when renamed |
 | Delete | Allowed for any role, including ready-made ones; removes it from all members (the web app asks for confirmation, showing how many members hold it) |
 
-**Safeguards** (checked inside the same `Tx.Write` as the change, after applying it, before commit):
+**Safeguards** (checked inside the same `Tx.Write` as the change: the use case calls `LockChurch` first, then applies the change, then checks, then commits — so two concurrent changes in the same church are evaluated one after the other on both databases):
 
 1. **No lock-out [P-16]:** after the change, at least one membership must hold `roles.manage` **and** `members.manage` (through any combination of roles). Otherwise → 409 `lockout_prevented`. Applies to: editing a role's scopes, deleting a role, changing a member's roles, removing a member.
 2. **No escalation:** the actor must hold every scope they put into a role (create/edit), every scope of every role they assign or remove from a member, and every scope of every role in an invite they create or regenerate. Otherwise → 403 `scope_not_held` with the missing `scopes`.
@@ -191,27 +210,27 @@ Names are created in the church's default UI language; churches can rename them.
 |---|---|
 | Token | 32 random bytes, base64url, only `SHA-256` stored |
 | Lifetime | 24 hours |
-| One at a time | Creating a new link marks every unused link of that user as used |
+| One at a time | Creating a new link takes `LockUser`, marks every unused link of that user as used (expired ones included), then inserts the new one, all in one `Tx.Write`; the partial unique index `password_resets_user_open_key` backs this up |
 | Link | `URLBuilder.AppURL("/reset") + "#t=" + token` |
 
 **Admin-created** `POST /api/v1/members/{membershipId}/password-reset` (`members.manage`, plus [§8](#8-member-roles-and-permissions) rule 2 for the member's roles):
 - If the user has a membership in any other church → 409 `reset_not_allowed` (prevents an admin of one church taking over an account used in another church on the SaaS).
 - Respond `201 { link, expires_at }`.
 - `GET /api/v1/members` includes, for viewers with `members.manage`, each member's latest reset link: `last_reset: { created_by_name, created_at, expires_at, used_at } | null` (never the link itself).
-- Log lines at info: `reset_link_created` (actor user ID, target user ID) and `reset_link_used` (user ID).
+- Log lines at info: `reset_link_created` (`actor` = user ID, or `cli` for the command line; target user ID) and `reset_link_used` (user ID).
 
-**CLI** `liturgist user reset-password <identifier>`: prints the user's name, the link and its expiry (in the church's time zone) to stdout. Never accepts a password argument. No church or scope check (the operator controls the server). The reset page shows "created by the server administrator". If `LITURGIST_BASE_URL` is not set in the environment, prints a warning that the link may point to `localhost`. Unknown identifier → exit 5. Works while the server is running (SQLite WAL), e.g. `docker exec <container> liturgist user reset-password …`.
+**CLI** `liturgist user reset-password <identifier>`: prints the user's name, the link and its expiry (in the church's time zone) to stdout. Never accepts a password argument. No church or scope check (the operator controls the server). The reset page shows "created by the server administrator". If `LITURGIST_BASE_URL` is not set in the environment, prints a warning that the link may point to `localhost`. The identifier is parsed with `domain.ParseIdentifier`; emails and phone numbers are unique across the platform, so it matches at most one user. Logged as `reset_link_created` with `actor=cli`. Unknown identifier → exit 5. Works while the server is running (SQLite WAL), e.g. `docker exec <container> liturgist user reset-password …`.
 
 **Recovery CLI** (operator only): `liturgist user list` prints names, identifiers and roles; `liturgist member grant-admin <identifier>` gives the member the ready-made Church admin role, recreating that role with its default scopes if it was deleted. For when no reachable member holds `roles.manage` and `members.manage` (e.g. the only admin left the church).
 
 **Inspect** `POST /api/v1/auth/reset/inspect` `{ token }` → `{ user_name, created_by_name | null, expires_at }` or 400 `invalid_token`; the reset page shows "This link was created by {created_by_name}" (or "by the server administrator" for CLI links).
 
 **Use** `POST /api/v1/auth/reset` `{ token, new_password }`:
-1. Token must be unused and unexpired (`invalid_token` otherwise).
-2. Validate the password ([§3](#3-passwords)).
-3. Save the new hash, mark the token used, delete all the user's sessions, clear identifier throttling, create a new session; `204`.
+1. Look up the token's user (`Tx.Read`) to validate the password against their identity, then validate and **hash** the new password outside any transaction.
+2. In one `Tx.Write`: **atomically claim** the token (`UPDATE password_resets SET used_at = $now WHERE token_hash = $h AND used_at IS NULL AND expires_at > $now`); 0 rows → `invalid_token` with `reason`. Then save the new hash, delete all the user's sessions, delete the user's `id` and `idip` throttle counters, and create a new session.
+3. After commit set the cookie; `204`. Of two simultaneous uses, exactly one succeeds.
 
-**Change own password** `POST /api/v1/me/password` `{ current_password, new_password }`: verify current (failure counts toward throttling as a login failure → `invalid_credentials`), validate new, save, delete all **other** sessions; `204`.
+**Change own password** `POST /api/v1/me/password` `{ current_password, new_password }`: verify the current password and hash the new one outside any transaction (a wrong current password counts toward throttling as a login failure → `invalid_credentials`); then in one `Tx.Write` save the hash and delete all **other** sessions; `204`.
 
 Email-based reset is not part of step 1 (no email support yet).
 
@@ -219,7 +238,7 @@ Email-based reset is not part of step 1 (no email support yet).
 
 **[P-24]**
 
-**Setup token:** stored only as `SHA-256` in the `setup_tokens` table ([schema](../reference/schema.md#setup_tokens)), valid **24 hours**. At most one row exists: creating a token deletes any other.
+**Setup token:** stored only as `SHA-256` in the singleton `setup_tokens` row ([schema](../reference/schema.md#setup_tokens)), valid **24 hours**. Issuing a token is one upsert on that row under `LockInstall`, so concurrent issuers (two instances starting, or a start plus `setup-link`) leave exactly one valid token, the last one written.
 
 - At `serve` start, if `Churches().Count() == 0`: create a new token and print the link as a framed block to stderr **and** log it once at warn level:
 
@@ -231,8 +250,10 @@ Email-based reset is not part of step 1 (no email support yet).
   ================================================================
   ```
 
+- Each new token replaces the previous one, so **the most recently printed link is the only valid one**. With several instances against one PostgreSQL database (not a community setup), use `liturgist setup-link` to get a link that is valid at that moment. After a restart or crash, use the link printed by the latest start, or run `liturgist setup-link`.
 - `liturgist setup-link` does the same on demand (e.g. `docker exec <container> liturgist setup-link`); exit 4 if already set up. It warns if `LITURGIST_BASE_URL` is unset, like the reset command.
 - There is no exception for requests from `localhost`: behind a reverse proxy every request looks local.
+- **Accepted risk (review round 2):** the setup link is a live credential in the server log and stderr until setup or expiry (24 h). Accepted by the owner because no church data exists before setup, people who can read container logs usually control the host, and the link stops working once used, replaced or expired. It is the only secret the logger's redaction allows through ([01 §9](01-foundation.md#9-logging)).
 - `GET /api/v1/setup/status` → `{ "set_up": bool }` (public). The web app's `/setup` page shows "Already set up — go to login" when `set_up` is true.
 
 **`POST /api/v1/setup`** (public, CSRF rules apply):
@@ -261,9 +282,9 @@ Email-based reset is not part of step 1 (no email support yet).
 | `time_zone` | Loadable by `time.LoadLocation`; the wizard offers `Asia/Jakarta` (WIB, pre-selected), `Asia/Makassar` (WITA), `Asia/Jayapura` (WIT) |
 | `key_display` | `do` ("Do = G") or `letter` ("G") |
 
-In one `Tx.Write`: verify the token against `setup_tokens` (unknown or expired → 400 `invalid_token`); if any church exists → 409 `already_set_up`; create the church, the three ready-made roles ([§8](#8-member-roles-and-permissions)), the user, and a membership holding the Church admin role; delete the setup token; create a session; respond `201`. The resolver cache is refreshed ([04 §3](04-tenancy-extensions.md#3-tenantresolver)).
+Validate fields and hash the admin password outside any transaction. Then in one `Tx.Write`: take `LockInstall`; **atomically claim** the token (`DELETE FROM setup_tokens WHERE id = 1 AND token_hash = $h AND expires_at > $now`, 1 row required, otherwise 400 `invalid_token`); if any church exists → 409 `already_set_up`; create the church, the three ready-made roles ([§8](#8-member-roles-and-permissions)), the user, and a membership holding the Church admin role; create a session; respond `201` after commit. The resolver cache is refreshed ([04 §3](04-tenancy-extensions.md#3-tenantresolver)).
 
-**CLI** `liturgist setup --church-name … --admin-name … --admin-identifier … [--ui-language en] [--language id] [--translation TB] [--time-zone Asia/Jakarta] [--key-display do]`. The password is read from the terminal without echo, or from stdin with `--password-stdin`. Calls the same use case (no token needed). Already set up → exit 4.
+**CLI** `liturgist setup --church-name … --admin-name … --admin-identifier … [--ui-language en] [--language id] [--translation TB] [--time-zone Asia/Jakarta] [--key-display do]`. The password is read from the terminal without echo, or from stdin with `--password-stdin`. Calls the same use case without a token, but under the same `LockInstall` and church-count check, so the CLI and the web wizard can never both create a church. Already set up → exit 4.
 
 The "regular services" wizard step ([SPEC.md §5.7](../SPEC.md#57-first-time-experience)) is added with services in step 3.
 
@@ -271,7 +292,9 @@ The "regular services" wizard step ([SPEC.md §5.7](../SPEC.md#57-first-time-exp
 
 ## 11. Cleanup job
 
-**[P-32]** A goroutine started by `serve` runs once a minute after start, then hourly, each run in its own `Tx.Write`:
+**[P-32]** Expiry is decided **at use time**: every token, session or throttle check compares `expires_at` / `locked_until` with `Clock.Now()` (UTC) inside the same transaction that uses it. The cleanup job is storage housekeeping only; a row it hasn't deleted yet is still treated as expired.
+
+A goroutine started by `serve` runs one minute after start, then: **throttle rows every 10 minutes**, everything else hourly; each run in its own `Tx.Write`:
 
 | Deletes | Condition |
 |---|---|
@@ -292,8 +315,10 @@ The "regular services" wizard step ([SPEC.md §5.7](../SPEC.md#57-first-time-exp
 | Let a church admin reset the password of a user who belongs to another church | `reset_not_allowed` | Account takeover across churches on the SaaS |
 | Normalise identifiers in more than one place | `domain.ParseIdentifier` only | Duplicate accounts from inconsistent normalisation |
 | Use form-encoded bodies, skip the cross-origin check, or write a custom origin check | JSON bodies + Go's `http.CrossOriginProtection` | CSRF; the standard library's check is maintained and reviewed |
-| Compute argon2 hashes without the semaphore | Go through the password hasher | Memory exhaustion on 512 MB servers |
-| Log identifiers, names or tokens (except the setup link) | Log user IDs only | UU PDP; secrets |
+| Compute argon2 hashes without the semaphore, or inside a transaction | Go through the password hasher, before or after the transaction | Memory exhaustion on 512 MB servers; long transactions block the database |
+| Check that a token is unused with `SELECT`, then mark it used later | Atomic claim ([02 §2.1](02-persistence.md#21-atomic-operations)) | Two simultaneous uses would both succeed on PostgreSQL |
+| Check throttling only after parsing the identifier | IP counter first ([§5](#5-login-and-throttling)) | Malformed input would bypass throttling and burn hash capacity |
+| Log identifiers, names or tokens (except the setup link) | Log user IDs only; the logger redacts known secret keys ([01 §9](01-foundation.md#9-logging)) | UU PDP; secrets |
 
 ## 13. Test case specifications
 
@@ -307,7 +332,7 @@ The "regular services" wizard step ([SPEC.md §5.7](../SPEC.md#57-first-time-exp
 | TC-A-004 | Hasher | Hash then verify | Verifies; wrong password fails | Old parameters → `NeedsRehash` true |
 | TC-A-005 | Throttle | 5 failures for one identifier from one IP within 15 min | 6th attempt from that IP → 429, `Retry-After` ≈ 15 min; same identifier from another IP → still allowed | 50 failures for the identifier across IPs within 1 h → locked everywhere for 1 h; 100 failures from one IP across identifiers → IP locked; failures 16 min apart don't lock |
 | TC-A-011 | Client IP | Remote `127.0.0.1` (trusted), `X-Forwarded-For: 203.0.113.5, 127.0.0.1` | `203.0.113.5` | Remote untrusted → header ignored; `LITURGIST_CLIENT_IP_HEADER=CF-Connecting-IP` from trusted remote → header value; IPv6 → /64 prefix |
-| TC-A-006 | CSRF check | `POST` with `Sec-Fetch-Site: cross-site` | 403 `csrf_rejected` | `same-site` → rejected; no `Sec-Fetch-Site` with matching `Origin` → allowed; `Origin` equal to `BaseURL` while `Host` differs (proxy) → allowed; neither header → allowed; `text/plain` body → rejected |
+| TC-A-006 | CSRF check | `POST` with `Sec-Fetch-Site: cross-site` | 403 `csrf_rejected` | `same-site` → rejected; no `Sec-Fetch-Site` with matching `Origin` → allowed; `Origin` equal to `BaseURL` while `Host` differs (proxy) → allowed; neither header → allowed; `text/plain` body → rejected; bodyless `POST` without `Content-Type` → rejected; bodyless `POST` with `application/json` → allowed |
 | TC-A-007 | Lock-out rule | Remove `roles.manage` from the only role holding it | `lockout_prevented` | Another member still holds both scopes through a custom role → allowed |
 | TC-A-009 | Escalation rule | Actor with `members.manage` but not `liturgy.approve` invites with the Liturgist role | 403 `scope_not_held` listing `liturgy.approve`, `liturgy.edit`, … | Actor holds all scopes → allowed |
 | TC-A-010 | Effective scopes | Member with Editor + custom role {`church.settings`} | Union of both scope sets | No roles → empty (baseline only) |
@@ -329,6 +354,10 @@ The "regular services" wizard step ([SPEC.md §5.7](../SPEC.md#57-first-time-exp
 | IT-A-012 | CLI recovery | Only admin unreachable; member M | `member grant-admin M` → M holds Church admin; with the role deleted beforehand → role recreated with default scopes; `user reset-password` without base URL → warning on stderr | — |
 | IT-A-009 | Change own password | Logged in on two sessions | Other session invalid afterwards; current remains | — |
 | IT-A-010 | CSRF over HTTP | Cross-site `POST /api/v1/auth/logout` | 403 `csrf_rejected` | — |
+| IT-A-013 | Races (both dialects, barrier after the first read) | One invite, one reset link, one setup token; two requests each | Exactly one acceptance / reset / setup succeeds; the other gets `invalid_token`; exactly one church and one membership exist | Two simultaneous reset-link creations → one open link; session extension racing with logout → session stays deleted, no cookie re-issued |
+| IT-A-014 | Throttle counters under concurrency | 10 parallel failures for one identifier+IP | `failures = 10`, lock set at the 5th; no lost increments (both dialects) | Malformed identifiers counted against the IP |
+| IT-A-015 | Hash queue | 2 hashes running, 32 waiting | 35th request → immediate 503; a waiting request whose client disconnects leaves the queue | — |
+| IT-A-016 | Cookie names | Request with both cookie names | Current-scheme cookie used; response clears the other | — |
 
 ## 14. Error handling matrix
 
@@ -336,7 +365,8 @@ The "regular services" wizard step ([SPEC.md §5.7](../SPEC.md#57-first-time-exp
 |---|---|---|---|---|
 | Wrong password / unknown identifier | Verify fails / no user | 401 `invalid_credentials` | — | info: `login_failed`, user ID if known |
 | Throttled | Any of the three counters locked | 429 `too_many_attempts` + `Retry-After` | Wait, or ask for a reset link | warn: counter type (`idip`/`id`/`ip`), not the value |
-| Hash semaphore timeout | 10 s wait | 503 `unavailable` | Retry | warn |
+| Hash semaphore timeout or full queue | 10 s wait, or 32 waiting | 503 `unavailable` | Retry | warn |
+| Token claimed by a concurrent request | Atomic claim changed 0 rows | 400 `invalid_token` (`used`) | — | info |
 | Token unknown/expired/used/cancelled | Lookup by hash | 400 `invalid_token` + `reason` | Ask admin for a new link | info |
 | Identifier already used | Unique violation `users_email_key`/`users_phone_key` | 409 `identifier_taken` | Log in instead | info |
 | Lock-out | Safeguard 1 | 409 `lockout_prevented` | Give someone else the scopes first | info |

@@ -1,7 +1,7 @@
 # 04 — Tenancy, Authorization and Extension Points (Implementation)
 
 > **Document type: Implementation.** Step 1 of [SPEC.md §10](../SPEC.md#10-suggested-build-order).
-> Status: **Draft**. Items marked **[P-xx]** are proposals awaiting approval ([index](README.md#3-proposed-decisions)).
+> Status: **Approved** 2026-10-02. Items marked **[P-xx]** are decisions listed in the [index](README.md#4-proposed-decisions).
 
 ## 1. Scope
 
@@ -10,11 +10,21 @@ The tenant context, the `TenantResolver` and `URLBuilder` ports, authorization (
 ## 2. Tenant context
 
 - `app.Tenant{ChurchID domain.ChurchID}` is stored in the request context by the tenant middleware ([01 §8](01-foundation.md#8-http-basics) middleware order).
-- The middleware calls `TenantResolver.Resolve(r)` for every `/api/v1/...` request except **platform operations**: `/api/v1/setup*`, `/api/v1/auth/*` (including `/auth/reset/inspect`), `/api/v1/me*`, `/api/v1/invites/inspect`, `/api/v1/invites/accept`, `/api/v1/invites/accept-existing`, and `/api/v1/translations`.
-- Invite operations take the church from the invite itself. If a tenant could also be resolved for the request and it differs from the invite's church, the operation returns 404 `not_found` (relevant for the SaaS, where the link carries the slug).
-- `GET /api/v1/me` tries to resolve the tenant; if there is none (not set up), `church` and `membership` are `null`.
-- Resolver result `ErrNotSetUp` → 409 `not_set_up`. Any other resolver error → 503 `unavailable`.
+- **Every operation declares its tenancy** when it is registered, as Huma operation metadata `tenancy`:
+
+| `tenancy` | Middleware behaviour | Step-1 operations |
+|---|---|---|
+| `church` (**default** when not declared) | Resolve the tenant; failure → 409 `not_set_up` or 503 `unavailable` | Everything not listed below |
+| `optional` | Try to resolve; continue without a tenant if there is none | `GET /api/v1/me`, the three invite operations below |
+| `platform` | Never resolve | `/api/v1/setup*`, `/api/v1/auth/*` (including `/auth/reset/inspect`), `PATCH /api/v1/me`, `/api/v1/me/password`, `/api/v1/me/sessions/end-others`, `/api/v1/translations` |
+
+- Operations added with `server.WithRoutes` follow the same rule: undeclared means `church`. Declaring `platform` or `optional` is a deliberate, reviewed choice. A unit test lists every registered operation with its declared tenancy and fails if the list changes without updating the test's expected table.
+- **Invite operations** (`/api/v1/invites/inspect`, `/accept`, `/accept-existing`) are `optional` and take the church from the invite:
+  - Community: the resolver always returns the install's only church, which is always the invite's church.
+  - SaaS: invite links carry the church slug (built by the SaaS `URLBuilder`). If a tenant is resolved and differs from the invite's church → 404 `not_found`. If the slug is unknown → 404 `not_found`.
+- `GET /api/v1/me` with no tenant (not set up) returns `church` and `membership` as `null`.
 - Use cases read the tenant with `app.TenantFrom(ctx)`; it returns an error if absent. Use cases pass `Tenant.ChurchID` to `Store.ForChurch` ([02 §2](02-persistence.md#2-ports-in-app)).
+- **Enforcing scoped access:** every `ChurchStore` repository method is covered by the two-church contract test IT-P-007 ([02 §10](02-persistence.md#10-test-case-specifications)), and composite foreign keys reject cross-church references. When `liturgist-saas` adds row-level-security policies, they must deny all rows when `liturgist.church_id` is unset (fail closed).
 
 ## 3. `TenantResolver`
 
@@ -75,7 +85,7 @@ type URLBuilder interface {
   "actions": { "edit_roles": true, "remove": true, "create_reset_link": true } }
 ```
 
-An action is `true` only if the scope check **and** the safeguards would pass (e.g. `remove` is `false` for the only member holding `roles.manage` and `members.manage`, or for a member whose roles hold scopes the viewer lacks). The UI never decides permissions itself.
+**Actions are advisory only:** they help the UI show the right buttons, but they never authorize anything. Every mutation re-loads the actor's membership, roles and scopes and re-checks the safeguards inside its own write transaction before changing data. An action is `true` only if the scope check **and** the safeguards would pass (e.g. `remove` is `false` for the only member holding `roles.manage` and `members.manage`, or for a member whose roles hold scopes the viewer lacks). The UI never decides permissions itself.
 
 ## 6. Step-1 church and member API
 
@@ -105,6 +115,8 @@ An action is `true` only if the scope check **and** the safeguards would pass (e
 Every mutating role and member operation also applies the safeguards in [03 §8](03-identity-auth.md#8-member-roles-and-permissions).
 
 - `usage.team_members.used` = memberships + pending invites; `max` is `null` when unlimited (community).
+- **PATCH semantics** (all `PATCH` operations): an **omitted** field is left unchanged. `null` is allowed only where stated and means "clear / use the default": `preferences.ui_language: null` (follow the church default), `feedback_url: null`, `privacy_contact: null`. Empty strings are rejected (`validation_failed`) except `feedback_url: ""` and `privacy_contact: ""`, which also clear. Unknown fields → 422.
+- **Changing one's own email or phone** is not possible in step 1 (deferred by the owner, review round 2). Mistakes are corrected when accepting the invite ([03 §7](03-identity-auth.md#7-invites)).
 - `feedback_url` must be an absolute `https` URL or empty; `privacy_contact` is free text ≤ 500 characters ([SPEC.md §8](../SPEC.md#8-non-functional-requirements) privacy).
 
 ## 7. Extension points
@@ -196,6 +208,7 @@ type Entitlements interface {
 | IT-T-003 | Not set up | Fresh install, logged out | `GET /api/v1/church` → 409 `not_set_up`; `GET /api/v1/setup/status` → 200 | — |
 | IT-T-004 | Removed member | Member M removed by admin | M's next request → 404; M's session still valid for `GET /me` | — |
 | IT-T-005 | Limit through entitlements | `WithEntitlements` stub with `max_team_members = 1`, 1 member | `GET /members` shows `used:1, max:1`; invite → 403 `limit_reached` with `limit`, `used`, `max` | — |
+| IT-T-008 | Tenancy declarations | All registered operations | Each has the expected `tenancy`; an operation added through `WithRoutes` without a declaration is treated as `church` | — |
 | IT-T-006 | SaaS-style resolver | Test resolver returning church B for path prefix `/b`, two churches | Member of A calling B's endpoints → 404 (community tests the foundation; slug routing is tested in the SaaS) | — |
 
 ## 11. Error handling matrix

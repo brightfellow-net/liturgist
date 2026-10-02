@@ -1,7 +1,7 @@
 # 02 — Persistence (Implementation)
 
 > **Document type: Implementation.** Step 1 of [SPEC.md §10](../SPEC.md#10-suggested-build-order).
-> Status: **Draft**. Items marked **[P-xx]** are proposals awaiting approval ([index](README.md#3-proposed-decisions)).
+> Status: **Approved** 2026-10-02. Items marked **[P-xx]** are decisions listed in the [index](README.md#4-proposed-decisions).
 
 ## 1. Scope
 
@@ -27,6 +27,11 @@ type Store interface {
     AuthThrottle() AuthThrottleRepo
     Churches() ChurchRepo           // create/load/count churches; used by setup and TenantResolver
     Translations() TranslationRepo
+    SetupTokens() SetupTokenRepo
+
+    // Serialising locks for platform-level "check, then write" rules (§2.1).
+    LockInstall(ctx context.Context) error                 // setup, setup-link issuing
+    LockUser(ctx context.Context, id domain.UserID) error  // creating reset links
 
     // ForChurch returns repositories scoped to one church. Every query they run
     // filters by churchID. On PostgreSQL it also sets the row-level-security
@@ -38,17 +43,33 @@ type ChurchStore interface {
     Church() ChurchSettingsRepo     // the scoped church row itself
     Memberships() MembershipRepo
     Invites() InviteRepo
-    LockForLimits(ctx context.Context) error // serialise limit checks (§3)
+    LockChurch(ctx context.Context) error // serialise check-then-write rules per church (§3)
 }
 
-type Clock interface{ Now() time.Time }               // always UTC
+type Clock interface{ Now() time.Time }               // always UTC, truncated to microseconds (§4)
 type IDGenerator interface{ New() domain.ID }         // ULID, monotonic within a process
 ```
 
 - Platform-level questions that cross churches go through `Users()`, never through `ForChurch`: `Users().MembershipChurchIDs(ctx, userID)` (used by `GET /me`, the admin-reset rule in [03 §9](03-identity-auth.md#9-password-reset), and accepting invites as an existing user).
 - Use cases never see `*sql.DB`, `*sql.Tx` or SQL.
 - Repository methods take and return `domain` types. Repository interfaces are defined in `app`, next to the use cases that need them.
-- `Tx.Write` retries the whole `fn` up to 3 times on a serialisation failure (PostgreSQL `40001`) or `SQLITE_BUSY` after the busy timeout; `fn` must therefore have no side effects outside the transaction.
+- **Retries (the only authoritative list):** `Tx.Write` re-runs the whole `fn` when the driver reports PostgreSQL `40001` (serialisation failure) or `40P01` (deadlock), or SQLite `SQLITE_BUSY` after the busy timeout. At most **3 attempts**, waiting 10 ms, 50 ms, then 250 ms (each ±50 % jitter) between them; waiting stops immediately if `ctx` is cancelled. After the last failed attempt the error becomes `app.ErrUnavailable` → 503 `unavailable`. `Tx.Read` retries the same errors the same way.
+- **Retry-safe use cases:** `fn` must have no side effects outside the transaction (no network calls, no sent messages, no cookies). IDs and timestamps may be generated inside `fn`; only values from the **committed** attempt are ever returned, logged or put in cookies, so values from failed attempts are never visible.
+- **Deadlines:** `Tx.Write` and `Tx.Read` derive a context with a **10-second** deadline from the caller's; when it expires or the request is cancelled, the transaction rolls back. PostgreSQL connections set `statement_timeout = 5s` and `idle_in_transaction_session_timeout = 15s`. Expensive work (password hashing) is never done inside a transaction ([03 §5](03-identity-auth.md#5-login-and-throttling)).
+
+### 2.1 Atomic operations
+
+Every "check, then write" rule must be safe when two transactions run at once. On SQLite, writes are already one at a time; on PostgreSQL (read committed) they are not. Each rule uses one of these patterns, identically on both databases:
+
+| Pattern | How | Used by |
+|---|---|---|
+| **Atomic claim** | One conditional statement, e.g. `UPDATE invites SET accepted_at = $now, accepted_user_id = $u WHERE id = $id AND accepted_at IS NULL AND cancelled_at IS NULL AND expires_at > $now`; or `DELETE … WHERE … RETURNING`. Continue only if **exactly 1 row** changed; otherwise the token is treated as already used/expired. The claim is the first write in the transaction, and everything else (users, memberships, sessions) happens in the same transaction | Invite acceptance, reset-link use, setup-token use |
+| **Atomic counter** | One `INSERT … ON CONFLICT (key) DO UPDATE SET …` that computes the new count, window start and lock in SQL and returns them (`RETURNING`) | Login throttling ([03 §5](03-identity-auth.md#5-login-and-throttling)) |
+| **Conditional update** | `UPDATE … WHERE <key> AND expires_at > $now`; 0 rows changed means the row was revoked or expired | Session extension ([03 §4](03-identity-auth.md#4-sessions)) |
+| **Serialising lock** | `LockChurch` (church row), `LockUser` (user row) or `LockInstall` (PostgreSQL `pg_advisory_xact_lock(7420116)`), taken as the first statement; then check; then write | Limits, role safeguards, invite creation (`LockChurch`); reset-link creation (`LockUser`); setup, setup-link issuing (`LockInstall`) |
+| **Database constraint** | Partial unique indexes and checks in the [schema](../reference/schema.md) back up the patterns above | One open reset link per user, one open invite per identifier, one setup token, invite state |
+
+Both SQLite (3.35+) and PostgreSQL support `ON CONFLICT … DO UPDATE` and `RETURNING`; the dialect layer only changes placeholders.
 
 ## 3. Connections and transactions
 
@@ -60,14 +81,14 @@ type IDGenerator interface{ New() domain.ID }         // ULID, monotonic within 
 | Readers | 4 | `_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_pragma=query_only(1)` | `Tx.Read` |
 
 - File: `<DataDir>/liturgist.db`.
-- Because the writer pool has one connection and uses `BEGIN IMMEDIATE`, writes are serialised; `LockForLimits` is a no-op on SQLite.
+- Because the writer pool has one connection and uses `BEGIN IMMEDIATE`, writes are serialised; `LockChurch`, `LockUser` and `LockInstall` are no-ops on SQLite.
 
 **PostgreSQL [P-09]**
 
 - One pool through `pgx/v5/stdlib`, `MaxOpenConns=10`, `MaxIdleConns=5`, `ConnMaxLifetime=30m`.
 - Pool sizes come from `server.Config` (`DBMaxConns`, default 10 for PostgreSQL; `DBMaxReaders`, default 4 for SQLite readers). They are not environment variables in step 1; the SaaS sets them in code.
 - `Tx.Read`: `BEGIN READ ONLY` (isolation read committed). `Tx.Write`: read committed.
-- `LockForLimits`: `SELECT id FROM churches WHERE id = $1 FOR UPDATE` — serialises count-then-insert limit checks per church.
+- `LockChurch`: `SELECT id FROM churches WHERE id = $1 FOR UPDATE` — serialises every "check, then write" rule per church: limit checks (invites, later liturgies) and the role safeguards ([03 §8](03-identity-auth.md#8-member-roles-and-permissions)). Must be the first statement after `ForChurch` in those use cases.
 
 ## 4. Type mapping
 
@@ -76,13 +97,13 @@ type IDGenerator interface{ New() domain.ID }         // ULID, monotonic within 
 | Go / domain | SQLite (STRICT tables) | PostgreSQL | Notes |
 |---|---|---|---|
 | `domain.ID` (ULID string) | `TEXT` with `CHECK (length(id) = 26)` | `text` with the same check | Generated by `IDGenerator`, never by the database |
-| `time.Time` (UTC) | `TEXT`, format `2006-01-02T15:04:05.000000Z` | `timestamptz` | Fixed width so SQLite text sorts correctly; adapter converts both ways |
+| `time.Time` (UTC) | `TEXT`, format `2006-01-02T15:04:05.000000Z` | `timestamptz` | Fixed width so SQLite text sorts correctly; adapter converts both ways. **Canonical precision is microseconds** (PostgreSQL's): `Clock.Now()` returns UTC truncated to µs, and every computed time (expiry = now + duration) is truncated to µs before use, so comparisons give the same result on both databases |
 | `*time.Time` | same, `NULL` allowed | same | |
 | `bool` | `INTEGER` with `CHECK (x IN (0,1))` | `boolean` | |
 | enum (`domain.MemberRole` etc.) | `TEXT` with `CHECK (x IN (...))` | `text` with the same check | Same check text in both migrations |
-| JSON object (settings, preferences) | `TEXT` with `CHECK (json_valid(x))` | `jsonb` | Adapter marshals Go structs; unknown keys are preserved |
+| JSON object (settings, preferences) | `TEXT` with `CHECK (json_valid(x))` | `jsonb` | Adapter marshals Go structs and validates the shape on every write; unknown keys are preserved; equality is semantic (PostgreSQL may reorder keys) |
 | short string | `TEXT` | `text` | Lengths are validated in `domain`, not by column types |
-| SHA-256 token hash | `TEXT` (64 hex chars) | `text` | |
+| SHA-256 token hash | `TEXT` with the token-hash check | `text` with the token-hash check | 64 lower-case hex chars, enforced by both databases ([schema conventions](../reference/schema.md#conventions)) |
 
 - Every `CREATE TABLE` in SQLite ends with `STRICT`.
 - No database defaults for IDs or timestamps; the app always supplies them (via `IDGenerator`, `Clock`).
@@ -92,15 +113,20 @@ type IDGenerator interface{ New() domain.ID }         // ULID, monotonic within 
 - goose v3 as a library; migrations embedded with `//go:embed` from `migrations/sqlite` and `migrations/postgres`.
 - File names: `NNNNN_short_name.sql` (5 digits). **Both folders must contain the same version numbers**; a unit test (TC-P-007) checks this.
 - **Forward-only [P-11]:** files contain only `-- +goose Up`. Rolling back means restoring a backup.
+- **Migration lock (SQLite):** `serve` (when migrating) and `liturgist migrate` hold an exclusive OS file lock on `<DataDir>/liturgist.lock` from the version check through the copy, the migrations and the copy cleanup. A second process waits up to 30 s, then exits 1 with "another Liturgist process is migrating this database". PostgreSQL uses the advisory lock below instead.
 - **On `serve` start** (when `AutoMigrate`) and on `liturgist migrate`:
   1. Read the current version. If it is **greater** than the newest embedded version → exit code 3 with "Database version N is newer than this program (max M). Install version ≥ X or restore a backup." — unless `--allow-newer-schema` is given (§5.1).
-  2. If migrations are pending and the driver is SQLite: write a **pre-upgrade copy** with `VACUUM INTO '<DataDir>/backups/pre-upgrade-v<current version>-<UTC timestamp>.db'`. Before copying, check free space ≥ 1.2 × database file size; if not, **skip the copy** and log a warning (as [SPEC.md §8.3](../SPEC.md#83-self-host-operations) requires), then continue. Keep the newest 3 pre-upgrade copies and delete older ones. PostgreSQL gets no automatic copy (documented `pg_dump` instead).
+  2. If migrations are pending and the driver is SQLite: write a **pre-upgrade copy** with `VACUUM INTO '<DataDir>/backups/pre-upgrade-v<current version>-<UTC timestamp>-<8 random hex>.db'`.
+     - Before copying, check free space ≥ 1.2 × (database file size + WAL file size). If there isn't enough, or the copy fails for any reason, **skip the copy**, delete any partial file, and log a warning with the needed and free bytes (as [SPEC.md §8.3](../SPEC.md#83-self-host-operations) requires), then continue.
+     - **Strict mode:** with `LITURGIST_REQUIRE_PREUPGRADE_COPY=true`, a skipped or failed copy aborts instead: exit 1 with "pre-upgrade copy could not be made; migration not started".
+     - After a successful copy, keep the newest 3 pre-upgrade copies (by file name) and delete older ones.
+     - PostgreSQL gets no automatic copy (documented `pg_dump` instead).
   3. Apply pending migrations in one goose run.
 
 ### 5.1 Expand/contract rule and newer schemas
 
 - **Expand/contract:** a release never removes or renames a column, table or constraint that the previous release still uses. First release: add the new structure and switch the code to it ("expand"). A later release: remove the old structure ("contract"). So the previous program version can always run against the current schema, which allows rolling back the program one version without restoring data, and lets old and new SaaS instances run side by side during a deploy.
-- **`--allow-newer-schema`** (flag for `serve` and `migrate status`, off by default): start even if the database version is newer than the program; log a warning naming both versions. For operators rolling back one version under the expand/contract rule. Documented in the operator guide, not in the volunteer install guide.
+- **`--allow-newer-schema`** (flag for `serve` and `migrate status`, off by default): start even if the database version is newer than the program; log a warning naming both versions at every start. It **only** skips the refusal to start. It never runs migrations (there are none to run: the database is ahead), never writes to goose's version table, never takes a pre-upgrade copy, and is not accepted by `liturgist migrate`. For operators rolling back one version under the expand/contract rule. Documented in the operator guide, not in the volunteer install guide.
 - PostgreSQL: goose runs while holding `pg_advisory_lock(7420115)` so parallel SaaS instances never migrate at the same time.
 - Seed data that every install needs (the `translations` rows, [schema](../reference/schema.md#translations)) is inserted by a migration with fixed IDs, so it is identical everywhere.
 
@@ -148,7 +174,8 @@ Constraint names are identical in both migrations (e.g. `users_email_key`) so ma
 | Write dialect `if` statements inside repositories | Put the difference in the `Dialect` interface | One place for database differences (decisions log) |
 | Use `:memory:` SQLite or mock repositories in use-case tests | Temp-file SQLite via `sqlstoretest` **[P-12]** | Tests must hit real SQL, pools and locks |
 | Add a migration to only one folder | Add both with the same version number | Test TC-P-007 fails otherwise; databases drift |
-| Hold a `Store` after `fn` returns, or do network calls inside `Tx.Write` | Finish all work inside `fn`; call outside services after commit | Retries rerun `fn`; long transactions block SQLite's single writer |
+| Hold a `Store` after `fn` returns, or do network calls or password hashing inside a transaction | Finish database work inside `fn`; hash and call outside services before or after | Retries rerun `fn`; long transactions block SQLite's single writer and PostgreSQL connections |
+| Check a token or count with `SELECT`, then write in a separate statement | Use an atomic pattern from §2.1 | PostgreSQL read committed lets two transactions pass the same check |
 | Edit an already released migration | Add a new migration | Installed databases have already run the old one |
 | Drop or rename a column in the same release that stops using it | Expand/contract over two releases (§5.1) | The previous version must keep working on the new schema |
 
@@ -161,10 +188,11 @@ Constraint names are identical in both migrations (e.g. `users_email_key`) so ma
 | TC-P-001 | Time conversion | `time.Date(2026,10,4,7,0,0,123456789,WIB)` | Stored `2026-10-04T00:00:00.123456Z` (SQLite); reads back equal to the UTC value truncated to µs | Zero time rejected |
 | TC-P-002 | `Dialect.Rebind` | `SELECT ? , ?` | SQLite unchanged; PostgreSQL `SELECT $1 , $2` | `?` inside a string literal is not supported — documented, not handled |
 | TC-P-003 | Error mapping | Insert duplicate email | `app.ErrUnique{Constraint:"users_email_key"}` on both dialects | Duplicate primary key |
-| TC-P-004 | `Tx.Write` retry | `fn` returns a busy error twice, then succeeds | `fn` called 3 times; result committed | 4th failure → `ErrUnavailable` |
+| TC-P-004 | `Tx.Write` retry | `fn` returns a busy error twice, then succeeds | `fn` called 3 times; result committed; values returned are from the 3rd attempt | 3rd failure → `ErrUnavailable`; `40P01` retried like `40001`; cancelled context stops waiting immediately |
+| TC-P-009 | Time precision | `Clock.Now()` with nanoseconds; expiry `now + 24h` | Both truncated to µs; a token expiring at exactly `now` is expired on both dialects | — |
 | TC-P-005 | Migrations | Fresh database | Version = newest embedded | Running twice is a no-op |
 | TC-P-006 | Downgrade protection | Database version set to newest+1 | `serve` exits with code 3 and the message in §5 | With `--allow-newer-schema`: starts and logs a warning |
-| TC-P-008 | Pre-upgrade copy | SQLite at version N with pending migrations | `backups/pre-upgrade-vN-*.db` exists, opens, and has version N; only the newest 3 copies kept | Not enough free space → copy skipped with warning, migrations still applied; no pending migrations → no copy |
+| TC-P-008 | Pre-upgrade copy | SQLite at version N with pending migrations | `backups/pre-upgrade-vN-*.db` exists, opens, and has version N; only the newest 3 copies kept | Not enough free space (database + WAL) → copy skipped with warning, migrations still applied; same with strict mode → exit 1, no migration; no pending migrations → no copy; a second process migrating at the same time waits for the lock file |
 | TC-P-007 | Migration sets | Embedded folder listings | Same version numbers in `sqlite/` and `postgres/` | Extra file in one folder fails |
 
 ### Integration (contract) tests — run against both dialects
@@ -177,6 +205,9 @@ Constraint names are identical in both migrations (e.g. `users_email_key`) so ma
 | IT-P-004 | Read-only pool | `Tx.Read` attempting an insert | Error; nothing written | — |
 | IT-P-005 | RLS hook (PostgreSQL only) | `ForChurch(A)` | `current_setting('liturgist.church_id', true)` = A inside the transaction, empty after commit | — |
 | IT-P-006 | Seeded translations | Fresh database | 6 rows with the fixed IDs and codes in the schema reference | — |
+| IT-P-007 | Scoped repository coverage | Two churches A and B with rows in every church-owned table | **Every** method of every `ChurchStore` repository, called through `ForChurch(A)`, reads and changes only A's rows. A table-driven harness lists all methods; adding a method without adding it to the harness fails a reflection check | — |
+| IT-P-008 | Race harness | Two transactions synchronised by a barrier after their first read | For each atomic pattern in §2.1, exactly one transaction succeeds and the other observes it; run on both dialects | — |
+| IT-P-009 | Database constraints | Direct inserts bypassing the app | Second open reset link per user, second open invite for the same email or phone, a second setup-token row, an accepted-and-cancelled invite, a malformed token hash and a malformed phone are all rejected on both dialects | — |
 
 ## 11. Error handling matrix
 
@@ -187,7 +218,10 @@ Constraint names are identical in both migrations (e.g. `users_email_key`) so ma
 | Migration fails half-way | goose error | Exit 1; SQLite migration runs in a transaction so nothing partial remains | Restore the pre-upgrade copy | error with version |
 | No space for pre-upgrade copy | Free-space check | Skip the copy, continue migrating | — | warn with needed and free bytes |
 | Database newer than binary | Version compare | Exit 3 | Install newer version | error |
-| Serialisation conflict persists | 3 retries exhausted | 503 `unavailable` | Client may retry | warn |
+| Serialisation conflict or deadlock persists | 3 attempts exhausted | 503 `unavailable` | Client may retry | warn |
+| Transaction deadline exceeded | 10 s context deadline / PostgreSQL `statement_timeout` | Roll back; 503 `unavailable` | Client may retry | warn with operation name |
+| Another process is migrating | Lock file held > 30 s | Exit 1 | Retry after the other process finishes | error |
+| Pre-upgrade copy impossible in strict mode | Free-space check or copy error | Exit 1, no migration | Free disk space | error |
 
 ## 12. References
 

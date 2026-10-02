@@ -16,11 +16,23 @@
 | [05-web-shell.md](05-web-shell.md) | React app shell for step 1: pages, routing, API client, i18n |
 | [../reference/schema.md](../reference/schema.md) | Database tables for step 1 (Reference) |
 
-## 2. Status
+## 2. How to use these documents
 
-**All proposals approved (2026-10-02).** Every decision these documents add on top of SPEC.md is marked **[P-xx]** and listed below; the markers stay as cross-references. New decisions found later are added here as Proposed until the owner approves them.
+- **Required reading before writing any step-1 code:** [SPEC.md](../SPEC.md) and **every** document in the table above. This index alone is not a specification.
+- **Precedence [P-36]:**
+  1. SPEC.md sections 1–10 decide **what** to build (product behaviour).
+  2. Approved documents in `docs/impl/` and `docs/reference/` decide **how** (implementation details) and win over SPEC.md on those details.
+  3. The SPEC.md decisions log (section 11) is history only.
+  4. If two current documents still conflict, treat it as a bug: stop and ask the owner. Don't pick one.
 
-## 3. Proposed decisions
+## 3. Status
+
+**All proposals approved on 2026-10-02 by the project owner (Hutomo Widjaja), in review sessions recorded through commit `d7cded9` (P-01 to P-32), the commit adding P-33 to P-36, and the commit adding P-37 to P-43.** Every decision these documents add on top of SPEC.md is marked **[P-xx]** and listed below; the markers stay as cross-references.
+
+- New decisions found later are added here as **Proposed** until the owner approves them.
+- If the **substance** of an approved proposal changes, its status returns to Proposed until re-approved. Wording fixes and clarifications that don't change behaviour don't need re-approval.
+
+## 4. Proposed decisions
 
 | ID | Proposal | Where | Status |
 |---|---|---|---|
@@ -56,10 +68,29 @@
 | P-30 | Security headers on every response (CSP, `nosniff`, `frame-ancestors 'none'`, `Referrer-Policy`) | [01 §8](01-foundation.md#8-http-basics) | **Approved** 2026-10-02 |
 | P-31 | Translations are a global table seeded by migration (TB, TB2, BIS, CUV, KJV, WEB), created in step 1 because the setup wizard asks for a default translation | [reference/schema.md](../reference/schema.md#translations) | **Approved** 2026-10-02 |
 | P-32 | Expired sessions, invites, reset links and throttle rows are deleted by an hourly cleanup job | [03 §11](03-identity-auth.md#11-cleanup-job) | **Approved** 2026-10-02 |
+| P-33 | CSRF: every `POST`, `PUT`, `PATCH`, `DELETE` under `/api/` must have `Content-Type: application/json`, with or without a body (adversarial review #6) | [03 §6](03-identity-auth.md#6-csrf-protection) | **Approved** 2026-10-02 |
+| P-34 | Role and member changes take the per-church lock (`LockChurch`) before checking the safeguards, so concurrent changes can't lock everyone out on PostgreSQL (review #10) | [03 §8](03-identity-auth.md#8-member-roles-and-permissions), [02 §3](02-persistence.md#3-connections-and-transactions) | **Approved** 2026-10-02 |
+| P-35 | `liturgist auth clear-throttle` command, and a once-per-start warning when proxy headers arrive but `LITURGIST_TRUSTED_PROXIES` is not set (review #12) | [03 §5](03-identity-auth.md#5-login-and-throttling) | **Approved** 2026-10-02 |
+| P-36 | Precedence between SPEC.md and these documents (§2) (review #2) | [§2](#2-how-to-use-these-documents) | **Approved** 2026-10-02 |
+| P-37 | Atomic operations for every "check, then write" rule (atomic claim, atomic counters, conditional session update, `LockChurch`/`LockUser`/`LockInstall`), backed by partial unique indexes and checks; one retry list with backoff; 10 s transaction deadlines; microsecond time precision; race tests on both databases (review round 2) | [02 §2.1](02-persistence.md#21-atomic-operations), [schema](../reference/schema.md) | **Approved** 2026-10-02 |
+| P-38 | The binary listens on `127.0.0.1:8080` by default (the Docker image sets `:8080`); start-up warnings for plain HTTP on the network and for `https` without TLS | [01 §5](01-foundation.md#5-configuration) | **Approved** 2026-10-02 |
+| P-39 | Allowed-host check (`BaseURL` host plus `LITURGIST_EXTRA_HOSTS`), three supported deployment setups, no forwarded scheme/host headers trusted, no CORS | [01 §5.1](01-foundation.md#51-supported-deployment-setups), [01 §8](01-foundation.md#8-http-basics) | **Approved** 2026-10-02 |
+| P-40 | Invite roles in an `invite_roles` table; invites refer to live roles (edits before acceptance apply, as for existing holders) | [03 §7](03-identity-auth.md#7-invites), [schema](../reference/schema.md#invite_roles) | **Approved** 2026-10-02 |
+| P-41 | Optional strict upgrade mode `LITURGIST_REQUIRE_PREUPGRADE_COPY=true`; default stays "skip the copy with a warning" | [02 §5](02-persistence.md#5-migrations) | **Approved** 2026-10-02 |
+| P-42 | The setup link stays in the log and stderr: accepted risk, with reasons recorded | [03 §10](03-identity-auth.md#10-first-time-setup) | **Approved** 2026-10-02 (risk accepted by the owner) |
+| P-43 | Changing one's own email or phone is deferred beyond step 1 | [04 §6](04-tenancy-extensions.md#6-step-1-church-and-member-api) | **Approved** 2026-10-02 (deferred) |
 
-## 4. Process
+## 5. Process
 
 1. Owner approves, changes or rejects each P-xx.
 2. Spec Gate re-score (target 9/10 or above).
-3. Adversarial review by a different AI model or a human reviewer, using the prompt in the stream-coding skill. Fix every CRITICAL finding; record a fix/accept/defer decision for each HIGH finding.
+3. Adversarial review by a different AI model or a human reviewer, using the prompt in the stream-coding skill. Fix every CRITICAL finding; record a fix/accept/defer decision for each HIGH finding. **The owner decides** every accept/defer; each needs a written reason and, for a deferral, the step in which it will be handled.
+   - **Exit condition:** coding may start when no CRITICAL finding is open and every HIGH finding has a recorded decision.
 4. Code for step 1, following these documents. Any change found necessary while coding is made in these documents first.
+
+## 6. Review log
+
+| Round | Date | Scope reviewed | Result |
+|---|---|---|---|
+| 1 | 2026-10-02 | This index only ([adversarial-review.md](adversarial-review.md)); the linked documents were not reviewed | 2 CRITICAL, 7 HIGH, 7 MEDIUM. Fixed: #1, #2, #3, #4, #6, #8, #10, #12, #13, #14, #16 (P-33 to P-36 plus clarifications). Clarified, already covered: #5, #7, #11. No change, already covered elsewhere: #9 (SPEC §8.1, 04 §3), #15 (SPEC §8, §5.2). No open CRITICAL or HIGH |
+| 2 | 2026-10-02 | 01–05 ([implementation-adversarial-review.md](implementation-adversarial-review.md)) and the schema reference ([schema-adversarial-review.md](../reference/schema-adversarial-review.md)) | Implementation: 3 CRITICAL, 13 HIGH, 14 MEDIUM. Schema: 2 CRITICAL, 8 HIGH, 8 MEDIUM. All CRITICAL fixed (atomic claims for invites, resets and setup; setup token singleton; throttle key encodings). HIGH: all fixed (P-37 to P-40 and clarifications) except the setup-link-in-logs finding, **accepted** as P-42 with reasons. MEDIUM: all fixed or clarified; changing one's own email/phone **deferred** (P-43). No open CRITICAL; every HIGH has a decision |
