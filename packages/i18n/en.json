@@ -8,7 +8,8 @@
     "label": "Main menu",
     "home": "Home",
     "privacy": "Privacy",
-    "log_out": "Log out"
+    "log_out": "Log out",
+    "profile": "Profile"
   },
   "common": {
     "language": "Language",
@@ -18,7 +19,10 @@
     "go_to_login": "Go to login",
     "field_invalid": "Check this field.",
     "required": "This field is required.",
-    "too_long": "At most {{max}} characters."
+    "too_long": "At most {{max}} characters.",
+    "link_incomplete": "This link is incomplete. Ask your church admin for a new link.",
+    "back": "Back",
+    "password_hint": "At least 10 characters. A few words together are easy to remember."
   },
   "language": {
     "en": "English",
@@ -48,7 +52,6 @@
     "admin_name": "Your name",
     "admin_identifier": "Your email or phone number",
     "admin_password": "Password",
-    "password_hint": "At least 10 characters. A few words together are easy to remember.",
     "submit": "Create church",
     "already": "Liturgist is already set up.",
     "incomplete": "This link is incomplete. Open the setup link printed in the server log.",
@@ -64,10 +67,63 @@
       "Asia/Jayapura": "WIT (Jayapura)"
     }
   },
+  "invite": {
+    "title": "Join your church team",
+    "invited": "{{church}} has invited {{name}} to join the church team.",
+    "logged_in_as": "You are logged in as {{name}}.",
+    "join_with_account": "Join with this account",
+    "use_other_account": "Log out and use another account",
+    "has_account": "You already have an account. Log in to accept the invite.",
+    "already_have_account": "I already have an account",
+    "new_account": "Create your account",
+    "name": "Your name",
+    "email": "Email",
+    "phone": "Phone number",
+    "contact_hint": "Fill in at least one. You will log in with it.",
+    "need_identifier": "Enter an email address or a phone number.",
+    "password": "Choose a password",
+    "continue": "Continue",
+    "log_in": "Log in",
+    "confirm": "You are joining {{church}} as {{name}}.",
+    "join": "Join",
+    "identifier_taken": "This email or phone number already has an account. Log in to accept the invite."
+  },
+  "reset": {
+    "title": "Set a new password",
+    "for": "New password for {{name}}.",
+    "created_by": "This link was created by {{name}}.",
+    "created_by_server": "This link was created by the server administrator.",
+    "new_password": "New password",
+    "submit": "Save password and log in"
+  },
   "home": {
     "title": "Welcome, {{name}}",
     "church": "You are a member of {{church}}.",
     "assignments": "Your assignments will appear here."
+  },
+  "profile": {
+    "title": "Profile",
+    "details": "Your details",
+    "name": "Name",
+    "text_size": "Text size",
+    "text_sizes": {
+      "normal": "Normal",
+      "large": "Large",
+      "larger": "Larger"
+    },
+    "ui_language": "Language of the app",
+    "church_default": "Church default ({{language}})",
+    "save": "Save",
+    "saved": "Saved.",
+    "password_title": "Change password",
+    "current_password": "Current password",
+    "new_password": "New password",
+    "change_password": "Change password",
+    "password_changed": "Your password has been changed. You have been logged out on your other devices.",
+    "devices_title": "Other devices",
+    "devices_text": "Lost your phone? Log out everywhere except on this device.",
+    "end_others": "Log out on all other devices",
+    "others_ended": "You have been logged out on all other devices."
   },
   "membership": {
     "not_member": "You are no longer a member of this church."

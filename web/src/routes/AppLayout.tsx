@@ -70,6 +70,7 @@ export function AppLayout() {
           <p className="mr-4 font-semibold">{me.data.church?.name ?? t("app.name")}</p>
           <nav aria-label={t("nav.label")} className="flex flex-1 flex-wrap gap-1">
             <NavLink to={paths.home} end className={link}>{t("nav.home")}</NavLink>
+            <NavLink to={paths.profile} className={link}>{t("nav.profile")}</NavLink>
           </nav>
           <Button variant="ghost" onClick={() => void logOut()}>{t("nav.log_out")}</Button>
         </div>

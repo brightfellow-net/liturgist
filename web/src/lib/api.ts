@@ -17,7 +17,12 @@ export const jsonBody: Middleware = {
   },
 };
 
-export const api = createClient<paths>({ baseUrl: "/api/v1", credentials: "same-origin" });
+// fetch is looked up on each call, so tests can replace globalThis.fetch.
+export const api = createClient<paths>({
+  baseUrl: "/api/v1",
+  credentials: "same-origin",
+  fetch: (request) => globalThis.fetch(request),
+});
 api.use(jsonBody);
 
 type Result<T> = { data?: T; error?: unknown; response: Response };

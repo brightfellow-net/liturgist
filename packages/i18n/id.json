@@ -8,7 +8,8 @@
     "label": "Menu utama",
     "home": "Beranda",
     "privacy": "Privasi",
-    "log_out": "Keluar"
+    "log_out": "Keluar",
+    "profile": "Profil"
   },
   "common": {
     "language": "Bahasa",
@@ -18,7 +19,10 @@
     "go_to_login": "Ke halaman masuk",
     "field_invalid": "Periksa isian ini.",
     "required": "Isian ini wajib diisi.",
-    "too_long": "Paling banyak {{max}} karakter."
+    "too_long": "Paling banyak {{max}} karakter.",
+    "link_incomplete": "Tautan ini tidak lengkap. Minta tautan baru kepada admin gereja Anda.",
+    "back": "Kembali",
+    "password_hint": "Minimal 10 karakter. Beberapa kata yang digabung mudah diingat."
   },
   "language": {
     "en": "English",
@@ -48,7 +52,6 @@
     "admin_name": "Nama Anda",
     "admin_identifier": "Email atau nomor HP Anda",
     "admin_password": "Kata sandi",
-    "password_hint": "Minimal 10 karakter. Beberapa kata yang digabung mudah diingat.",
     "submit": "Buat gereja",
     "already": "Liturgist sudah disiapkan.",
     "incomplete": "Tautan ini tidak lengkap. Buka tautan penyiapan yang tercetak di log server.",
@@ -64,10 +67,63 @@
       "Asia/Jayapura": "WIT (Jayapura)"
     }
   },
+  "invite": {
+    "title": "Bergabung dengan tim gereja",
+    "invited": "{{church}} mengundang {{name}} untuk bergabung dengan tim gereja.",
+    "logged_in_as": "Anda masuk sebagai {{name}}.",
+    "join_with_account": "Bergabung dengan akun ini",
+    "use_other_account": "Keluar dan gunakan akun lain",
+    "has_account": "Anda sudah punya akun. Masuk untuk menerima undangan.",
+    "already_have_account": "Saya sudah punya akun",
+    "new_account": "Buat akun Anda",
+    "name": "Nama Anda",
+    "email": "Email",
+    "phone": "Nomor HP",
+    "contact_hint": "Isi minimal satu. Anda akan masuk dengan ini.",
+    "need_identifier": "Isi alamat email atau nomor HP.",
+    "password": "Buat kata sandi",
+    "continue": "Lanjut",
+    "log_in": "Masuk",
+    "confirm": "Anda bergabung dengan {{church}} sebagai {{name}}.",
+    "join": "Bergabung",
+    "identifier_taken": "Email atau nomor HP ini sudah punya akun. Masuk untuk menerima undangan."
+  },
+  "reset": {
+    "title": "Atur kata sandi baru",
+    "for": "Kata sandi baru untuk {{name}}.",
+    "created_by": "Tautan ini dibuat oleh {{name}}.",
+    "created_by_server": "Tautan ini dibuat oleh administrator server.",
+    "new_password": "Kata sandi baru",
+    "submit": "Simpan kata sandi dan masuk"
+  },
   "home": {
     "title": "Selamat datang, {{name}}",
     "church": "Anda anggota {{church}}.",
     "assignments": "Tugas Anda akan tampil di sini."
+  },
+  "profile": {
+    "title": "Profil",
+    "details": "Data Anda",
+    "name": "Nama",
+    "text_size": "Ukuran huruf",
+    "text_sizes": {
+      "normal": "Biasa",
+      "large": "Besar",
+      "larger": "Lebih besar"
+    },
+    "ui_language": "Bahasa aplikasi",
+    "church_default": "Bawaan gereja ({{language}})",
+    "save": "Simpan",
+    "saved": "Tersimpan.",
+    "password_title": "Ganti kata sandi",
+    "current_password": "Kata sandi sekarang",
+    "new_password": "Kata sandi baru",
+    "change_password": "Ganti kata sandi",
+    "password_changed": "Kata sandi Anda sudah diganti. Anda sudah dikeluarkan dari perangkat lain.",
+    "devices_title": "Perangkat lain",
+    "devices_text": "HP Anda hilang? Keluar dari semua perangkat kecuali perangkat ini.",
+    "end_others": "Keluar dari semua perangkat lain",
+    "others_ended": "Anda sudah dikeluarkan dari semua perangkat lain."
   },
   "membership": {
     "not_member": "Anda sudah bukan anggota gereja ini."

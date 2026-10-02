@@ -1,6 +1,5 @@
 // Copyright 2026 Brightfellow contributors
 // SPDX-License-Identifier: Apache-2.0
-import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -16,7 +15,7 @@ import { PasswordInput } from "@/components/PasswordInput";
 import { api, call } from "@/lib/api";
 import { fieldErrors } from "@/lib/errors";
 import { languages } from "@/lib/i18n";
-import { readFragmentToken } from "@/lib/fragmentToken";
+import { useFragmentToken } from "@/lib/fragmentToken";
 import { setupStatusQuery, translationsQuery } from "@/lib/queries";
 import { PublicLayout } from "./PublicLayout";
 import { paths } from "./paths";
@@ -47,7 +46,7 @@ export function SetupPage() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [token] = useState(readFragmentToken);
+  const token = useFragmentToken();
   const status = useQuery({ ...setupStatusQuery, enabled: token !== null });
   const translations = useQuery({ ...translationsQuery, enabled: token !== null });
   const form = useForm<Values>({
@@ -135,7 +134,7 @@ export function SetupPage() {
           <Field label={t("setup.admin_identifier")} error={msg(e.admin?.identifier?.message)}>
             <Input autoComplete="username" {...form.register("admin.identifier")} />
           </Field>
-          <Field label={t("setup.admin_password")} hint={t("setup.password_hint")} error={msg(e.admin?.password?.message)}>
+          <Field label={t("setup.admin_password")} hint={t("common.password_hint")} error={msg(e.admin?.password?.message)}>
             <PasswordInput autoComplete="new-password" {...form.register("admin.password")} />
           </Field>
         </fieldset>
