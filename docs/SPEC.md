@@ -266,6 +266,45 @@ Limit names are constants defined in one place, next to feature names. Self-host
 
 **Tests:** counting across all states and multiple services per date; blocked creation via every creation path (template, scratch, duplicate) for each limit separately; archive only allowed for Published and only by permitted roles; delete only allowed for unpublished liturgies and only by permitted roles; archived liturgies viewable and exportable on the free plan; unarchive blocked at the limit; existing liturgies fully usable at and over the limit; downgrade behavior; blocked member invites; team-member count includes every role and pending invites but not free-text assignees; accepting a reserved invite never fails; expired, cancelled or removed entries free a slot.
 
+### 8.3 Self-host operations
+
+The person running a community install is usually a volunteer without IT training: every routine task should be one command or one button.
+
+**Install and platforms**
+- Supported release builds: Linux (amd64, arm64), Windows (amd64, able to install itself as a Windows service), and a Docker image (`ghcr.io/brightfellow-net/liturgist`). macOS is not a packaged or tested platform, but developers can build and run on it.
+- Start with `liturgist serve` or `docker run -d -p 8080:8080 -v liturgist-data:/data ghcr.io/brightfellow-net/liturgist`. Nothing must be configured to start; options come from environment variables or an optional config file (base URL, database, email, HTTPS).
+- One data folder holds everything: `liturgist.db`, `files/` (local `Storage`), `backups/`. Default `./data` (`/data` in Docker), or `LITURGIST_DATA_DIR`. An example systemd unit is provided.
+- Runs comfortably on a 512 MB VPS, a Raspberry Pi 4, or an old Windows office PC.
+
+**Upgrades**
+- Replace the binary (or pull the new image) and restart. Migrations run automatically on startup, after writing a pre-upgrade copy of the database (`backups/pre-upgrade-<old version>.db` for SQLite).
+- Downgrade protection: if the database is newer than the binary, the app refuses to start and says which version is needed.
+- `--no-auto-migrate` and `liturgist migrate` give manual control (also used by the SaaS, which migrates as a separate deploy step under a PostgreSQL lock).
+
+**Backups and restore**
+- `liturgist backup [file]` writes one archive: a consistent snapshot of the database, taken safely while the app runs, plus `files/`.
+- Built-in automatic backups: daily at 02:00, keeping 7 daily and 4 weekly copies in `backups/`; configurable and can be turned off.
+- A **"Download backup"** button on the church admin's system page, so a non-technical admin can keep a copy elsewhere (laptop, Google Drive).
+- A "last backup" warning when no backup has been made or downloaded recently, because automatic backups on the same disk do not survive a disk failure.
+- Off-site copies are documented (e.g. rclone, Litestream), not built in.
+- `liturgist restore <file>`, with the server stopped: checks the file's integrity first and keeps the current database as `pre-restore-….db`.
+- PostgreSQL self-hosters: documented `pg_dump` steps.
+
+**HTTPS and access**
+- Built-in automatic HTTPS (Let's Encrypt via `certmagic`) when a domain is set (e.g. `LITURGIST_DOMAIN`).
+- Documented guides for a reverse proxy (Caddy, nginx) and for Cloudflare Tunnel or Tailscale (an office PC with no public IP address).
+- Plain HTTP on the local network is allowed, with a warning on the system page that phones outside the network, secure cookies and the PWA won't work properly.
+
+**Health, logs and disk space**
+- `/healthz` (process alive) and `/readyz` (database reachable, migrations applied); the Docker image includes a health check.
+- Logs via `slog` to standard output (text by default, JSON optional), with a request ID. **No personal data in logs** (no emails, phone numbers or lyrics).
+- Disk space: a warning banner for church admins below a threshold (e.g. 1 GB or 5% free). Backups and pre-upgrade copies check for space first and skip with a clear message instead of filling the disk. A failed write shows users a clear "server storage is full" message.
+
+**System page and releases**
+- A system page for church admins: version, database size, free disk space, last backup, email configured or not, HTTPS status, update available (if enabled).
+- Update check: **off by default**; a church admin can turn it on, after which the server asks GitHub for newer releases.
+- Releases: semantic version tags (`v0.x` until stable), release notes, signed checksums, builds for every supported platform.
+
 ## 9. Open decisions (ask the owner)
 
 1. ~~**Tech stack** (language, web framework, frontend approach).~~ *Resolved 2026-10-02; see section 11.*
@@ -284,7 +323,7 @@ Limit names are constants defined in one place, next to feature names. Self-host
 3. Templates and weekly liturgy editor (items, reorder, songs, readings, assignments).
 4. Review workflow with item-level comments and state history.
 5. Published web view, "my assignments" view, PDF output.
-6. Self-host packaging (single binary / Docker), backup instructions, README.
+6. Self-host packaging per 8.3: release builds for Linux, Windows and Docker, automatic migrations with pre-upgrade copy, `liturgist backup` / `restore` and scheduled backups, built-in HTTPS, health checks, system page, install and off-site backup guides, README.
 
 Pilot with GKY Citragarden after step 5; gather feedback from the liturgist, administrator, and multimedia team before starting slides.
 
@@ -347,3 +386,9 @@ Record resolved decisions here (date, decision, reason). Move items from section
 | 2026-10-02 | In Review is read-only apart from comments; only Draft and Needs Revision are editable. To change a liturgy under review, the reviewer requests changes | Clear handoff between author and reviewer, and far fewer simultaneous edits |
 | 2026-10-02 | Content language: BCP 47 language codes on `Liturgy` (the service's main language), `Template`, `Song` and `Church` (`default_language`). Readings refer to a `Translation` record (code, name, language, e.g. `TB` → `id`, `CUV` → `zh-Hans`). The same song in another language is a separate `Song`, linked through a `SongGroup`. Content stays in one language per record for now; parallel text later adds secondary-language text alongside it. Bilingual singing meanwhile uses a medley of the linked versions. Mandarin uses simplified characters (`zh-Hans`). Pinyin comes later | The pilot church needs more than one language. Language versions of a hymn differ in hymnal number, copyright and verse count, so separate linked songs fit better than per-section translations; the model leaves room for parallel text without a rewrite |
 | 2026-10-02 | Lyric search uses substring matching for Chinese text and full-text search for Indonesian and English, both behind the search interface | Chinese has no spaces between words, so full-text search (and 3-character trigram search) misses typical 1–2-character queries; libraries are small enough for substring matching |
+| 2026-10-02 | Self-host platforms: release builds for Linux (amd64, arm64) and Windows (amd64, can run as a Windows service), plus the Docker image. macOS is not a packaged or tested platform | Many Indonesian churches have a Windows office PC; pure Go makes cross-platform builds cheap |
+| 2026-10-02 | Upgrades: migrations run automatically on startup after writing a pre-upgrade copy of the database; the app refuses to start on a database newer than the binary; `--no-auto-migrate` and `liturgist migrate` give manual control | Upgrading becomes "replace and restart", with a way back if something goes wrong |
+| 2026-10-02 | Backups: `liturgist backup` writes one archive (database snapshot plus `files/`); built-in daily backups keep 7 daily and 4 weekly copies; a "Download backup" button on the system page; a "last backup" warning; `liturgist restore` checks integrity and keeps a pre-restore copy. Off-site copies are documented, not built in | Protects against mistakes automatically, and lets a non-technical admin keep a copy off the server; managed off-site backups remain a SaaS service |
+| 2026-10-02 | HTTPS: built-in automatic HTTPS (Let's Encrypt via `certmagic`) when a domain is set; documented guides for a reverse proxy and for Cloudflare Tunnel/Tailscale; plain HTTP on the local network allowed with a warning | Phones outside church need HTTPS for secure cookies and the PWA; office PCs often have no public IP address |
+| 2026-10-02 | Update check is off by default; a church admin can turn it on | The server should not contact outside services without the church's consent |
+| 2026-10-02 | Operations basics: `/healthz` and `/readyz`; `slog` logs with request IDs and no personal data; disk-space warnings, with backups checking for space first; a system page for church admins; releases with semantic versions, release notes and signed checksums | Gives volunteers visibility without command-line skills; keeps logs safe under UU PDP |
