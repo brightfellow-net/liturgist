@@ -126,13 +126,17 @@ All interfaces are defined in `app` in step 1 and are **provisional [P-27]**: si
 | Interface | Step-1 signature | Community implementation in step 1 | First real use |
 |---|---|---|---|
 | `Entitlements` | see §8 | `adapters/entitlements/unlimited` | Step 1 (invites) |
-| `AuthProvider` | `Authenticate(ctx, identifier, password string) (domain.UserID, error)` | `adapters/authpassword` ([03 §5](03-identity-auth.md#5-login-and-throttling)) | Step 1 |
+| `AuthProvider` | `Authenticate(ctx, identifier, password string) (domain.UserID, error)` | none: password login stays in `app.Auth` ([03 §5](03-identity-auth.md#5-login-and-throttling)) until a second provider needs the port | SSO, passkeys (later) |
 | `Storage` | `Put(ctx, key string, r io.Reader) error`, `Open(ctx, key string) (io.ReadCloser, error)`, `Delete(ctx, key string) error` | `adapters/storage/localfs` under `<DataDir>/files`; keys are `[a-z0-9/_.-]` only, no `..` | Logo upload (later step) |
 | `EventBus` | `Publish(ctx, topic string, payload []byte) error`, `Subscribe(ctx, topic string) (<-chan []byte, func())` | `adapters/eventbus/memory` | Liturgy editor (step 3) |
 | `Notifier` | `Compose(ctx, event NotifyEvent) ([]Message, error)` | `adapters/notify/copyshare` returning an empty list | Publishing (step 5) |
 | `BibleTextProvider` | `Lookup(ctx, ref domain.Reference, translation string) (BibleText, error)` | none registered; returns `ErrNotAvailable` | Readings (step 2) |
 | `Exporter` | `Export(ctx, liturgy PublishedVersion, format string, w io.Writer) error` | none | Step 5 |
 | `Importer` | `Parse(ctx, r io.Reader, hint ImportHint) ([]ImportCandidate, error)` | none | Step 2 |
+
+Types these ports use that later steps design (`domain.Reference`, `BibleText`, `NotifyEvent`, `Message`, `PublishedVersion`, `ImportHint`, `ImportCandidate`) are empty placeholder structs in step 1.
+
+Community behaviour: `localfs` keys are at most 512 bytes and have no empty, `.` or `..` segments; a file is written to a temporary name and renamed when complete; `Open` of a missing key → `app.ErrNotFound`; `Delete` of a missing key succeeds. The `memory` EventBus gives each subscriber a 64-message buffer; when it is full, that subscriber misses messages instead of blocking the publisher, so listeners must be able to re-read the current state.
 
 Rules ([SPEC.md §8.2](../SPEC.md#82-extensibility-and-editions)): use cases depend only on these interfaces; implementations are chosen in `server`; each `server.With…` option replaces the community default.
 

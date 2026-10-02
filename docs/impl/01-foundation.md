@@ -37,7 +37,6 @@ adapters/
   sqlstore/               shared SQL adapter + dialects (02)
   httpapi/                Huma operations, middleware, TenantResolver interface (04)
   tenancy/                community TenantResolver + URLBuilder (04)
-  authpassword/           password AuthProvider (03)
   entitlements/unlimited/ community Entitlements stub (04)
   eventbus/memory/        in-memory EventBus (04)
   storage/localfs/        local-folder Storage (04)

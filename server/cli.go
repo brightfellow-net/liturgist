@@ -28,9 +28,10 @@ type Operator struct {
 
 // CLI error classes, for exit codes (01 §6).
 var (
-	ErrAlreadySetUp = app.ErrAlreadySetUp // exit 4
-	ErrNoSuchUser   = errors.New("no such user")
-	ErrNotMember    = app.ErrNotMember // exit 6
+	ErrAlreadySetUp    = app.ErrAlreadySetUp        // exit 4
+	ErrNoSuchUser      = errors.New("no such user") // exit 5
+	ErrNotMember       = app.ErrNotMember           // exit 6
+	ErrTooManyChurches = app.ErrTooManyChurches     // exit 7
 )
 
 // OpenOperator opens the database for a CLI command.

@@ -5,8 +5,20 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
+
+	"github.com/brightfellow-net/liturgist/internal/envconfig"
+	"github.com/brightfellow-net/liturgist/server"
 )
 
 func cli(stdin string, args ...string) (code int, stdout, stderr string) {
@@ -87,5 +99,94 @@ func TestOperatorCommands(t *testing.T) {
 	t.Setenv("LITURGIST_BASE_URL", "")
 	if _, _, errOut := cli("", "user", "reset-password", "admin@example.org"); !strings.Contains(errOut, "LITURGIST_BASE_URL is not set") {
 		t.Errorf("missing base URL warning: %q", errOut)
+	}
+}
+
+// Exit codes for each error class (01 §6), including wrapped errors.
+func TestExitCodes(t *testing.T) {
+	for err, want := range map[error]int{
+		errors.New("boom"):                                    exitError,
+		server.ErrAlreadySetUp:                                exitAlreadySetUp,
+		fmt.Errorf("op: %w", server.ErrNoSuchUser):            exitNoSuchUser,
+		fmt.Errorf("op: %w", server.ErrNotMember):             exitNotMember,
+		fmt.Errorf("resolver: %w", server.ErrTooManyChurches): exitTooManyChurches,
+	} {
+		if got := exitFor(err, io.Discard); got != want {
+			t.Errorf("%v: exit %d, want %d", err, got, want)
+		}
+	}
+}
+
+// Test passwords.
+const (
+	adminPassword  = "kopi susu pagi hari" //nolint:gosec // test password
+	memberPassword = "es jeruk sore hari"  //nolint:gosec // test password
+)
+
+// Exit 6: grant-admin for someone who has an account but left the church.
+func TestGrantAdminNotMember(t *testing.T) {
+	t.Setenv("LITURGIST_DATA_DIR", t.TempDir())
+	t.Setenv("LITURGIST_BASE_URL", "https://liturgi.example.org")
+	if code, _, errOut := cli("", "migrate"); code != exitOK {
+		t.Fatalf("migrate: %d %s", code, errOut)
+	}
+	if code, _, errOut := cli(adminPassword+"\n", "setup", "--church-name", "GKY Citragarden", "--admin-name", "Admin",
+		"--admin-identifier", "admin@example.org", "--password-stdin"); code != exitOK {
+		t.Fatalf("setup: %d %s", code, errOut)
+	}
+
+	cfg, _, err := envconfig.Load(os.Getenv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Logger = slog.New(slog.DiscardHandler)
+	srv, err := server.New(context.Background(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = srv.Close() })
+	api := func(method, path string, body any, cookie *http.Cookie) *httptest.ResponseRecorder {
+		t.Helper()
+		b, _ := json.Marshal(body)
+		r := httptest.NewRequest(method, "/api/v1"+path, bytes.NewReader(b))
+		r.Host = "liturgi.example.org"
+		r.Header.Set("Content-Type", "application/json")
+		if cookie != nil {
+			r.AddCookie(cookie)
+		}
+		rec := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(rec, r)
+		if rec.Code >= 300 {
+			t.Fatalf("%s %s: %d %s", method, path, rec.Code, rec.Body.String())
+		}
+		return rec
+	}
+	cookie := func(rec *httptest.ResponseRecorder) *http.Cookie {
+		for _, c := range rec.Result().Cookies() {
+			if strings.HasSuffix(c.Name, "liturgist_session") && c.Value != "" {
+				return c
+			}
+		}
+		t.Fatal("no session cookie")
+		return nil
+	}
+
+	admin := cookie(api("POST", "/auth/login", map[string]string{"identifier": "admin@example.org", "password": adminPassword}, nil))
+	var invite struct{ Link string }
+	_ = json.Unmarshal(api("POST", "/invites", map[string]string{"name": "Sari", "email": "sari@example.org"}, admin).Body.Bytes(), &invite)
+	api("POST", "/invites/accept", map[string]string{"token": invite.Link[strings.Index(invite.Link, "#t=")+3:],
+		"name": "Sari", "email": "sari@example.org", "password": memberPassword}, nil)
+	var members struct {
+		Members []struct{ ID, Email string }
+	}
+	_ = json.Unmarshal(api("GET", "/members", nil, admin).Body.Bytes(), &members)
+	for _, m := range members.Members {
+		if m.Email == "sari@example.org" {
+			api("DELETE", "/members/"+m.ID, nil, admin)
+		}
+	}
+
+	if code, _, errOut := cli("", "member", "grant-admin", "sari@example.org"); code != exitNotMember {
+		t.Errorf("grant-admin for a former member: %d %s", code, errOut)
 	}
 }

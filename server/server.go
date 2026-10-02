@@ -10,12 +10,16 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"github.com/brightfellow-net/liturgist/adapters/argon2pw"
 	"github.com/brightfellow-net/liturgist/adapters/entitlements/unlimited"
+	"github.com/brightfellow-net/liturgist/adapters/eventbus/memory"
 	"github.com/brightfellow-net/liturgist/adapters/httpapi"
+	"github.com/brightfellow-net/liturgist/adapters/notify/copyshare"
 	"github.com/brightfellow-net/liturgist/adapters/sqlstore"
+	"github.com/brightfellow-net/liturgist/adapters/storage/localfs"
 	"github.com/brightfellow-net/liturgist/adapters/sysclock"
 	"github.com/brightfellow-net/liturgist/adapters/tenancy"
 	"github.com/brightfellow-net/liturgist/adapters/ulidgen"
@@ -33,7 +37,10 @@ type options struct {
 	resolver     httpapi.TenantResolver
 	entitlements app.Entitlements
 	urls         app.URLBuilder
-	clock        app.Clock // tests only
+	storage      app.Storage  // unused until logo upload; wired so later steps only read it
+	events       app.EventBus // unused until the liturgy editor (step 3)
+	notifier     app.Notifier // unused until publishing (step 5)
+	clock        app.Clock    // tests only
 }
 
 // WithRoutes lets the SaaS add operations. It may only add: registering an
@@ -53,6 +60,15 @@ func WithEntitlements(e app.Entitlements) Option { return func(o *options) { o.e
 
 // WithURLBuilder replaces the community no-prefix URL builder (04 §4).
 func WithURLBuilder(b app.URLBuilder) Option { return func(o *options) { o.urls = b } }
+
+// WithStorage replaces the community local-folder storage (<DataDir>/files).
+func WithStorage(s app.Storage) Option { return func(o *options) { o.storage = s } }
+
+// WithEventBus replaces the community in-process event bus.
+func WithEventBus(b app.EventBus) Option { return func(o *options) { o.events = b } }
+
+// WithNotifier replaces the community copy-and-share notifier.
+func WithNotifier(n app.Notifier) Option { return func(o *options) { o.notifier = n } }
 
 // Server is a configured Liturgist HTTP server.
 type Server struct {
@@ -89,6 +105,15 @@ func wire(cfg Config, db app.Tx, o *options, refresh func()) useCases {
 	}
 	if o.urls == nil {
 		o.urls = tenancy.NoPrefix{BaseURL: cfg.BaseURL}
+	}
+	if o.storage == nil {
+		o.storage = localfs.Storage{Dir: filepath.Join(cfg.DataDir, "files")}
+	}
+	if o.events == nil {
+		o.events = &memory.Bus{}
+	}
+	if o.notifier == nil {
+		o.notifier = copyshare.Notifier{}
 	}
 	ids := ulidgen.New()
 	hasher := argon2pw.New(argon2pw.Default)
