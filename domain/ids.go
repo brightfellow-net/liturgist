@@ -14,6 +14,8 @@ type (
 	MembershipID string
 	// RoleID identifies a church's role.
 	RoleID string
+	// InviteID identifies an invite.
+	InviteID string
 	// TranslationID identifies a Bible translation.
 	TranslationID string
 )

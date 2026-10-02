@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TC-A-010
@@ -114,5 +115,33 @@ func TestValidateChurch(t *testing.T) {
 		if err := ValidateChurch(&c, "church."); !errors.As(err, &e) || e.Field != "church."+field {
 			t.Errorf("%s: %v", field, err)
 		}
+	}
+}
+
+// TC-A-008
+func TestInviteStatus(t *testing.T) {
+	now := time.Date(2026, 10, 2, 9, 0, 0, 0, time.UTC)
+	cases := []struct {
+		inv    Invite
+		status InviteStatus
+		reason TokenReason
+	}{
+		{Invite{ExpiresAt: now.Add(time.Hour)}, InvitePending, TokenUnknown},
+		{Invite{ExpiresAt: now}, InviteExpired, TokenExpired},
+		{Invite{ExpiresAt: now.Add(time.Hour), CancelledAt: now}, InviteCancelled, TokenCancelled},
+		{Invite{ExpiresAt: now.Add(-time.Hour), AcceptedAt: now}, InviteAccepted, TokenUsed},
+	}
+	for _, c := range cases {
+		if st := c.inv.Status(now); st != c.status || (st != InvitePending && st.Reason() != c.reason) {
+			t.Errorf("%+v: %s %s", c.inv, st, st.Reason())
+		}
+	}
+	r := PasswordReset{ExpiresAt: now.Add(time.Hour)}
+	if r.Reason(now) != "" || r.Reason(now.Add(time.Hour)) != TokenExpired {
+		t.Error("reset expiry")
+	}
+	r.UsedAt = now
+	if r.Reason(now) != TokenUsed {
+		t.Error("reset used")
 	}
 }

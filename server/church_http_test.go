@@ -16,11 +16,12 @@ import (
 	"time"
 
 	"github.com/brightfellow-net/liturgist/adapters/httpapi"
-	"github.com/brightfellow-net/liturgist/adapters/ulidgen"
 	"github.com/brightfellow-net/liturgist/app"
 	"github.com/brightfellow-net/liturgist/domain"
 	"github.com/danielgtaylor/huma/v2"
 )
+
+const newPassword = "es jeruk sore hari" //nolint:gosec // test password
 
 func harnessWith(t *testing.T, opts ...Option) harness {
 	t.Helper()
@@ -68,36 +69,25 @@ func (h harness) setupChurch() *http.Cookie {
 	return sessionCookie(h.t, rec)
 }
 
-// member adds a user with a membership holding roleIDs and logs them in
-// (invites arrive in slice 4c); returns the user's cookie.
-func (h harness) member(email string, roleIDs ...string) *http.Cookie {
+// invite creates an invite as admin and accepts it as a new user; returns the new user's cookie.
+func (h harness) invite(admin *http.Cookie, email string, roleIDs ...string) *http.Cookie {
 	h.t.Helper()
-	ids := ulidgen.New()
-	h.user(ids.NewID(), email, "")
-	ctx := context.Background()
-	church, err := h.srv.single.ChurchID(ctx)
-	if err != nil {
-		h.t.Fatal(err)
+	if roleIDs == nil {
+		roleIDs = []string{}
 	}
-	err = h.srv.db.Write(ctx, func(s app.Store) error {
-		u, err := s.Users().ByIdentifier(ctx, domain.Identifier{Kind: domain.Email, Value: email})
-		if err != nil {
-			return err
-		}
-		cs, err := s.ForChurch(ctx, church)
-		if err != nil {
-			return err
-		}
-		m := domain.Membership{ID: domain.MembershipID(ids.NewID()), UserID: u.ID, CreatedAt: time.Now().UTC().Truncate(time.Microsecond)}
-		for _, r := range roleIDs {
-			m.RoleIDs = append(m.RoleIDs, domain.RoleID(r))
-		}
-		return cs.Memberships().Create(ctx, m)
-	})
-	if err != nil {
-		h.t.Fatal(err)
+	rec := h.do(req{method: "POST", path: "/api/v1/invites", cookies: []*http.Cookie{admin},
+		body: map[string]any{"name": "Member", "email": email, "role_ids": roleIDs}})
+	if rec.Code != http.StatusCreated {
+		h.t.Fatalf("invite: %d %s", rec.Code, rec.Body.String())
 	}
-	return sessionCookie(h.t, h.login(email, testPassword))
+	link := decode(h.t, rec)["link"].(string)
+	token := link[strings.Index(link, "#t=")+3:]
+	rec = h.do(req{method: "POST", path: "/api/v1/invites/accept",
+		body: map[string]any{"token": token, "name": "Member", "email": email, "password": testPassword}})
+	if rec.Code != http.StatusCreated {
+		h.t.Fatalf("accept: %d %s", rec.Code, rec.Body.String())
+	}
+	return sessionCookie(h.t, rec)
 }
 
 func (h harness) get(path string, c *http.Cookie) *httptest.ResponseRecorder {
@@ -160,11 +150,16 @@ func TestNotMemberHTTP(t *testing.T) {
 		{method: "GET", path: "/api/v1/members"},
 		{method: "PATCH", path: "/api/v1/members/01JNOSUCHMEMBER00000000000", body: map[string]any{"role_ids": []string{}}},
 		{method: "DELETE", path: "/api/v1/members/01JNOSUCHMEMBER00000000000"},
+		{method: "POST", path: "/api/v1/members/01JNOSUCHMEMBER00000000000/password-reset"},
 		{method: "GET", path: "/api/v1/roles"},
 		{method: "POST", path: "/api/v1/roles", body: map[string]any{"name": "R", "scopes": []string{}}},
 		{method: "PATCH", path: "/api/v1/roles/01JNOSUCHROLE0000000000000", body: map[string]any{}},
 		{method: "DELETE", path: "/api/v1/roles/01JNOSUCHROLE0000000000000"},
 		{method: "GET", path: "/api/v1/scopes"},
+		{method: "GET", path: "/api/v1/invites"},
+		{method: "POST", path: "/api/v1/invites", body: map[string]any{"name": "A", "email": "a@example.org"}},
+		{method: "POST", path: "/api/v1/invites/01JNOSUCHINVITE00000000000/regenerate"},
+		{method: "DELETE", path: "/api/v1/invites/01JNOSUCHINVITE00000000000"},
 	} {
 		r.cookies = []*http.Cookie{out}
 		rec := h.do(r)
@@ -185,11 +180,12 @@ func TestNotMemberHTTP(t *testing.T) {
 func TestScopesHTTP(t *testing.T) {
 	h := harnessWith(t)
 	admin := h.setupChurch()
-	team := h.member("team@example.org")
+	team := h.invite(admin, "team@example.org")
 
 	for _, r := range []req{
 		{method: "PATCH", path: "/api/v1/church", body: map[string]any{"name": "X"}},
 		{method: "GET", path: "/api/v1/members"},
+		{method: "POST", path: "/api/v1/invites", body: map[string]any{"name": "A", "email": "a@example.org"}},
 		{method: "POST", path: "/api/v1/roles", body: map[string]any{"name": "R", "scopes": []string{}}},
 	} {
 		r.cookies = []*http.Cookie{team}
@@ -208,9 +204,13 @@ func TestScopesHTTP(t *testing.T) {
 		t.Fatalf("create role: %d %s", rec.Code, rec.Body.String())
 	}
 	viewerRole := decode(t, rec)["id"].(string)
-	viewer := h.member("viewer@example.org", viewerRole)
+	viewer := h.invite(admin, "viewer@example.org", viewerRole)
 	if rec := h.get("/api/v1/members", viewer); rec.Code != 200 {
 		t.Errorf("viewer lists members: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := h.do(req{method: "POST", path: "/api/v1/invites", cookies: []*http.Cookie{viewer},
+		body: map[string]any{"name": "A", "email": "a@example.org"}}); rec.Code != http.StatusForbidden {
+		t.Errorf("viewer invites: %d", rec.Code)
 	}
 	// Escalation is 403 scope_not_held with the scopes.
 	rec = h.do(req{method: "POST", path: "/api/v1/roles", cookies: []*http.Cookie{admin},
@@ -250,6 +250,48 @@ func TestScopesHTTP(t *testing.T) {
 	}
 }
 
+// IT-A-008 over HTTP: reset link created by the admin, inspected and used.
+func TestResetHTTP(t *testing.T) {
+	h := harnessWith(t)
+	admin := h.setupChurch()
+	member := h.invite(admin, "m@example.org")
+	me := decode(t, h.get("/api/v1/me", member))
+	mid := me["membership"].(map[string]any)["id"].(string)
+
+	rec := h.do(req{method: "POST", path: "/api/v1/members/" + mid + "/password-reset", cookies: []*http.Cookie{admin}})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create: %d %s", rec.Code, rec.Body.String())
+	}
+	link := decode(t, rec)["link"].(string)
+	token := link[strings.Index(link, "#t=")+3:]
+	if rec := h.do(req{method: "POST", path: "/api/v1/auth/reset/inspect", body: map[string]any{"token": token}}); rec.Code != 200 ||
+		decode(t, rec)["created_by_name"] != "Admin" {
+		t.Errorf("inspect: %d %s", rec.Code, rec.Body.String())
+	}
+	rec = h.do(req{method: "POST", path: "/api/v1/auth/reset", body: map[string]any{"token": token, "new_password": newPassword}})
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("use: %d %s", rec.Code, rec.Body.String())
+	}
+	fresh := sessionCookie(t, rec)
+	if h.get("/api/v1/me", member).Code != http.StatusUnauthorized || h.get("/api/v1/me", fresh).Code != 200 {
+		t.Error("a reset ends all sessions and starts a new one")
+	}
+	rec = h.do(req{method: "POST", path: "/api/v1/auth/reset", body: map[string]any{"token": token, "new_password": newPassword}})
+	if p := problemCode(t, rec); rec.Code != http.StatusBadRequest || p["code"] != "invalid_token" || p["reason"] != "used" {
+		t.Errorf("reuse: %d %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(h.log.String(), "reset_link_created") || !strings.Contains(h.log.String(), "reset_link_used") {
+		t.Error("reset events must be logged")
+	}
+	members := decode(t, h.get("/api/v1/members", admin))["members"].([]any)
+	for _, m := range members {
+		mm := m.(map[string]any)
+		if mm["id"] == mid && (mm["last_reset"] == nil || mm["last_reset"].(map[string]any)["used_at"] == nil) {
+			t.Errorf("last_reset: %v", mm)
+		}
+	}
+}
+
 // IT-T-005: the team-member limit comes from Entitlements.
 func TestLimitHTTP(t *testing.T) {
 	h := harnessWith(t, WithEntitlements(limitOne{}))
@@ -257,6 +299,11 @@ func TestLimitHTTP(t *testing.T) {
 	usage := decode(t, h.get("/api/v1/members", admin))["usage"].(map[string]any)["team_members"].(map[string]any)
 	if usage["used"] != 1.0 || usage["max"] != 1.0 {
 		t.Errorf("usage: %v", usage)
+	}
+	rec := h.do(req{method: "POST", path: "/api/v1/invites", cookies: []*http.Cookie{admin}, body: map[string]any{"name": "A", "email": "a@example.org"}})
+	if p := problemCode(t, rec); rec.Code != http.StatusForbidden || p["code"] != "limit_reached" || p["limit"] != "max_team_members" ||
+		p["used"] != 1.0 || p["max"] != 1.0 {
+		t.Errorf("limit: %d %s", rec.Code, rec.Body.String())
 	}
 }
 
@@ -272,9 +319,12 @@ func TestTenancyDeclarations(t *testing.T) {
 	want := map[string]string{
 		"login": "platform", "logout": "platform", "getMe": "optional", "updateMe": "platform", "changePassword": "platform",
 		"endOtherSessions": "platform", "getSetupStatus": "platform", "setup": "platform", "listTranslations": "platform",
+		"inspectReset": "platform", "resetPassword": "platform",
+		"inspectInvite": "optional", "acceptInvite": "optional", "acceptInviteExisting": "optional",
 		"getChurch": "church", "updateChurch": "church", "listMembers": "church", "setMemberRoles": "church",
-		"removeMember": "church", "listRoles": "church", "createRole": "church",
-		"updateRole": "church", "deleteRole": "church", "listScopes": "church",
+		"removeMember": "church", "createResetLink": "church", "listRoles": "church", "createRole": "church",
+		"updateRole": "church", "deleteRole": "church", "listScopes": "church", "listInvites": "church",
+		"createInvite": "church", "regenerateInvite": "church", "cancelInvite": "church",
 		"saasExtra": "church", // added through WithRoutes without a declaration
 	}
 	extra := WithRoutes(func(api huma.API) {
@@ -355,8 +405,8 @@ func TestOtherTenantHTTP(t *testing.T) {
 	}
 }
 
-// Role editing and church settings over HTTP.
-func TestRolesAndChurchHTTP(t *testing.T) {
+// Invite inspection, existing-account acceptance and role editing over HTTP.
+func TestInvitesAndRolesHTTP(t *testing.T) {
 	h := harnessWith(t)
 	admin := h.setupChurch()
 	list := h.get("/api/v1/roles", admin)
@@ -385,6 +435,26 @@ func TestRolesAndChurchHTTP(t *testing.T) {
 		t.Errorf("rename keeps origin: %d %s", rec.Code, rec.Body.String())
 	}
 
+	h.user("01JEXISTING000000000000000", "", "+6285700000001")
+	existing := sessionCookie(t, h.login("0857-0000-0001", testPassword))
+	rec = h.do(req{method: "POST", path: "/api/v1/invites", cookies: []*http.Cookie{admin}, body: map[string]any{"name": "Udin", "phone": "0857-0000-0001"}})
+	link := decode(t, rec)["link"].(string)
+	token := link[strings.Index(link, "#t=")+3:]
+	if rec := h.do(req{method: "POST", path: "/api/v1/invites/inspect", body: map[string]any{"token": token}}); rec.Code != 200 ||
+		decode(t, rec)["owner_exists"] != true {
+		t.Errorf("inspect: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := h.do(req{method: "POST", path: "/api/v1/invites/accept-existing", cookies: []*http.Cookie{admin}, body: map[string]any{"token": token}}); rec.Code != http.StatusForbidden ||
+		problemCode(t, rec)["code"] != "invite_identifier_mismatch" {
+		t.Errorf("wrong account: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := h.do(req{method: "POST", path: "/api/v1/invites/accept-existing", cookies: []*http.Cookie{existing}, body: map[string]any{"token": token}}); rec.Code != http.StatusCreated {
+		t.Errorf("owner accepts: %d %s", rec.Code, rec.Body.String())
+	}
+	invites := h.get("/api/v1/invites", admin)
+	if invites.Code != 200 || invites.Body.String() != "[]\n" && invites.Body.String() != "[]" {
+		t.Errorf("open invites: %d %q", invites.Code, invites.Body.String())
+	}
 	if rec := h.do(req{method: "PATCH", path: "/api/v1/church", cookies: []*http.Cookie{admin},
 		body: map[string]any{"feedback_url": nil, "unknown": 1}}); rec.Code != http.StatusUnprocessableEntity {
 		t.Errorf("unknown field: %d %s", rec.Code, rec.Body.String())

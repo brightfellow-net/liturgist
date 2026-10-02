@@ -73,6 +73,12 @@ func TestScopedRepositories(t *testing.T) {
 		}
 		return fmt.Errorf("want ErrNotFound for church B's row, got %w", err)
 	}
+	unchanged := func(ok bool, err error) error {
+		if err != nil || ok {
+			return fmt.Errorf("church B's row changed through church A (ok=%v, err=%w)", ok, err)
+		}
+		return nil
+	}
 	harness := map[string]call{
 		"Church.Get": func(cs app.ChurchStore, _ time.Time) error {
 			c, err := cs.Church().Get(ctx)
@@ -163,6 +169,41 @@ func TestScopedRepositories(t *testing.T) {
 			}
 			return err
 		},
+		"Invites.List": func(cs app.ChurchStore, _ time.Time) error {
+			all, err := cs.Invites().List(ctx)
+			if err == nil && (len(all) != 1 || all[0].ID != domain.InviteID(id("I1"))) {
+				err = fmt.Errorf("got %+v", all)
+			}
+			return err
+		},
+		"Invites.ByID": func(cs app.ChurchStore, _ time.Time) error {
+			_, err := cs.Invites().ByID(ctx, domain.InviteID(id("IB")))
+			return notFound(err)
+		},
+		"Invites.Create": func(cs app.ChurchStore, now time.Time) error {
+			err := cs.Invites().Create(ctx, domain.Invite{ID: domain.InviteID(id("IX")), TokenHash: hash("9"), Name: "X",
+				Email: "x@example.org", RoleIDs: []domain.RoleID{domain.RoleID(id("RB"))}, CreatedAt: now, ExpiresAt: now.Add(time.Hour)})
+			if !errors.Is(err, app.ErrReferenced) {
+				return fmt.Errorf("inviting with church B's role through A: %w", err)
+			}
+			return errRollback
+		},
+		"Invites.CancelExpired": func(cs app.ChurchStore, now time.Time) error {
+			return cs.Invites().CancelExpired(ctx, "invb@example.org", "", now.Add(48*time.Hour))
+		},
+		"Invites.CountPending": func(cs app.ChurchStore, now time.Time) error {
+			n, err := cs.Invites().CountPending(ctx, now)
+			if err == nil && n != 1 {
+				err = fmt.Errorf("count %d", n)
+			}
+			return err
+		},
+		"Invites.Renew": func(cs app.ChurchStore, now time.Time) error {
+			return unchanged(cs.Invites().Renew(ctx, domain.InviteID(id("IB")), hash("8"), now.Add(time.Hour)))
+		},
+		"Invites.Cancel": func(cs app.ChurchStore, now time.Time) error {
+			return unchanged(cs.Invites().Cancel(ctx, domain.InviteID(id("IB")), now))
+		},
 	}
 
 	// Reflection check: the harness covers every method of every repository.
@@ -196,6 +237,10 @@ func TestScopedRepositories(t *testing.T) {
 		f.must(`INSERT INTO memberships (id, church_id, user_id, created_at) VALUES (?, ?, ?, ?)`, id("MB"), id("CHB"), id("U2"), f.ts(0))
 		f.must(`INSERT INTO membership_roles (church_id, membership_id, role_id) VALUES (?, ?, ?)`, id("CHB"), id("MB"), id("RB"))
 		f.must(`INSERT INTO role_scopes (church_id, role_id, scope) VALUES (?, ?, 'roles.manage')`, id("CHB"), id("RB"))
+		if err := f.invite(id("IB"), id("CHB"), hash("5"), "invb@example.org", ""); err != nil {
+			t.Fatal(err)
+		}
+		f.must(`INSERT INTO invite_roles (church_id, invite_id, role_id) VALUES (?, ?, ?)`, id("CHB"), id("IB"), id("RB"))
 
 		// Each call runs in its own transaction, rolled back afterwards, so
 		// every call sees the same rows; changes to B would show up inside.
@@ -249,6 +294,10 @@ func TestPlatformRepos(t *testing.T) {
 			if _, err := s.Translations().ByID(ctx, "01M3XY2HBEKN8PETK6KXXXXXXX"); !errors.Is(err, app.ErrNotFound) {
 				t.Errorf("unknown translation: %v", err)
 			}
+			users, err := s.Users().List(ctx)
+			if err != nil || len(users) != 1 {
+				t.Errorf("users: %+v %v", users, err)
+			}
 			return nil
 		})
 
@@ -284,5 +333,68 @@ func TestPlatformRepos(t *testing.T) {
 		if !slices.Equal(claimed, []bool{true, false}) {
 			t.Errorf("setup claim: %v", claimed)
 		}
+
+		// Invite tokens: claim once, then set the user.
+		mustWrite(t, db, func(s app.Store) error {
+			inv, err := s.InviteTokens().ByTokenHash(ctx, hash("1"))
+			if err != nil || inv.ID != domain.InviteID(id("I1")) {
+				return fmt.Errorf("by token: %+v %w", inv, err)
+			}
+			inv, ok, err := s.InviteTokens().Claim(ctx, hash("1"), "", now)
+			if err != nil || !ok || inv.AcceptedAt.IsZero() || inv.ChurchID != domain.ChurchID(id("CHA")) {
+				return fmt.Errorf("claim: %+v %v %w", inv, ok, err)
+			}
+			if _, ok, err := s.InviteTokens().Claim(ctx, hash("1"), "", now); ok || err != nil {
+				return fmt.Errorf("second claim: %v %w", ok, err)
+			}
+			return s.InviteTokens().SetAcceptedUser(ctx, inv.ID, domain.UserID(id("U1")))
+		})
+
+		// Reset links: close open ones, claim once, latest per user, cleanup.
+		mustWrite(t, db, func(s app.Store) error {
+			if err := s.PasswordResets().CloseOpen(ctx, domain.UserID(id("U1")), now); err != nil {
+				return err
+			}
+			if err := s.PasswordResets().Create(ctx, domain.PasswordReset{ID: id("P2"), UserID: domain.UserID(id("U1")),
+				TokenHash: hash("7"), CreatedBy: domain.UserID(id("U1")), CreatedAt: now.Add(time.Second), ExpiresAt: now.Add(time.Hour)}); err != nil {
+				return err
+			}
+			p, ok, err := s.PasswordResets().Claim(ctx, hash("7"), now)
+			if err != nil || !ok || p.UsedAt.IsZero() {
+				return fmt.Errorf("claim: %+v %v %w", p, ok, err)
+			}
+			if _, ok, err := s.PasswordResets().Claim(ctx, hash("2"), now); ok || err != nil {
+				return fmt.Errorf("closed link claimed: %v %w", ok, err)
+			}
+			latest, err := s.PasswordResets().Latest(ctx, []domain.UserID{domain.UserID(id("U1"))})
+			if err != nil || latest[domain.UserID(id("U1"))].ID != id("P2") {
+				return fmt.Errorf("latest: %+v %w", latest, err)
+			}
+			return s.PasswordResets().DeleteOld(ctx, now.Add(2*time.Hour))
+		})
+
+		// Throttle deletions by identifier and address.
+		mustWrite(t, db, func(s app.Store) error {
+			keys := domain.ThrottleKeys("u1@example.org", "203.0.113.5")
+			for kind, key := range keys {
+				if err := s.AuthThrottle().RecordFailure(ctx, key, domain.ThrottleRules[kind], now); err != nil {
+					return err
+				}
+			}
+			if err := s.AuthThrottle().DeleteForIdentifier(ctx, "u1@example.org"); err != nil {
+				return err
+			}
+			return s.AuthThrottle().DeleteForAddr(ctx, "203.0.113.5")
+		})
+		mustRead(t, db, func(s app.Store) error {
+			var n int
+			if err := sqlstore.RawTx(s).QueryRowContext(ctx, "SELECT count(*) FROM auth_throttle").Scan(&n); err != nil || n != 0 {
+				t.Errorf("throttle rows left: %d %v", n, err)
+			}
+			if err := sqlstore.RawTx(s).QueryRowContext(ctx, "SELECT count(*) FROM password_resets").Scan(&n); err != nil || n != 0 {
+				t.Errorf("reset rows left: %d %v", n, err)
+			}
+			return nil
+		})
 	})
 }

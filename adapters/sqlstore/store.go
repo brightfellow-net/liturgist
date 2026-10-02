@@ -6,6 +6,7 @@ package sqlstore
 import (
 	"context"
 	"log/slog"
+	"strings"
 
 	"github.com/brightfellow-net/liturgist/app"
 	"github.com/brightfellow-net/liturgist/domain"
@@ -45,3 +46,17 @@ func (c *churchStore) LockChurch(ctx context.Context) error {
 func (c *churchStore) Church() app.ChurchSettingsRepo  { return churchSettingsRepo{c} }
 func (c *churchStore) Memberships() app.MembershipRepo { return membershipRepo{c} }
 func (c *churchStore) Roles() app.RoleRepo             { return roleRepo{c} }
+func (c *churchStore) Invites() app.InviteRepo         { return inviteRepo{c} }
+
+// in builds "col IN (?, ?, …)" with its arguments; n must be > 0.
+func in(col string, n int) string {
+	return col + " IN (?" + strings.Repeat(", ?", n-1) + ")"
+}
+
+func anys[T any](xs []T) []any {
+	out := make([]any, len(xs))
+	for i, x := range xs {
+		out[i] = x
+	}
+	return out
+}

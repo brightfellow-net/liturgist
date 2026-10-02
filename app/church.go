@@ -170,7 +170,10 @@ func (a *Account) MeView(ctx context.Context, sess *domain.Session) (MeResult, e
 		}
 		for _, m := range members {
 			if m.ID == sc.actor.MembershipID {
-				v := sc.memberView(m, members)
+				v, err := sc.memberView(ctx, s, m, members, false)
+				if err != nil {
+					return err
+				}
 				res.Church, res.Membership = &ch, &v
 			}
 		}

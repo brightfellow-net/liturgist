@@ -40,8 +40,7 @@ var ThrottleRules = map[ThrottleKind]ThrottleRule{
 // auth_throttle key encodings). identifier is the normalised identifier, or the
 // trimmed raw input when it couldn't be parsed.
 func ThrottleKeys(identifier, addrKey string) map[ThrottleKind]string {
-	sum := sha256.Sum256([]byte(identifier))
-	h := hex.EncodeToString(sum[:])
+	h := ThrottleIdentifierHash(identifier)
 	return map[ThrottleKind]string{
 		ThrottleIdentifierIP: "idip:" + h + ":" + addrKey,
 		ThrottleIdentifier:   "id:" + h,
@@ -65,4 +64,10 @@ func ThrottleIdentifierInput(raw string, parsed Identifier, err error) string {
 		return strings.TrimSpace(raw)
 	}
 	return parsed.Value
+}
+
+// ThrottleIdentifierHash is the hex SHA-256 used in identifier counter keys.
+func ThrottleIdentifierHash(identifier string) string {
+	sum := sha256.Sum256([]byte(identifier))
+	return hex.EncodeToString(sum[:])
 }

@@ -65,3 +65,28 @@ func (r throttleRepo) Delete(ctx context.Context, keys ...string) error {
 	_, err := r.tx.ExecContext(ctx, r.d.Rebind(q), args...)
 	return r.d.MapError(err)
 }
+
+func (r throttleRepo) DeleteAll(ctx context.Context) error {
+	_, err := r.tx.ExecContext(ctx, "DELETE FROM auth_throttle")
+	return r.d.MapError(err)
+}
+
+// Keys contain only hex digits, IP text and ':' '.' '/', never LIKE wildcards.
+func (r throttleRepo) DeleteForIdentifier(ctx context.Context, identifier string) error {
+	h := domain.ThrottleIdentifierHash(identifier)
+	_, err := r.tx.ExecContext(ctx, r.d.Rebind("DELETE FROM auth_throttle WHERE key = ? OR key LIKE ?"),
+		"id:"+h, "idip:"+h+":%")
+	return r.d.MapError(err)
+}
+
+func (r throttleRepo) DeleteForAddr(ctx context.Context, addrKey string) error {
+	_, err := r.tx.ExecContext(ctx, r.d.Rebind("DELETE FROM auth_throttle WHERE key = ? OR key LIKE ?"),
+		"ip:"+addrKey, "idip:%:"+addrKey)
+	return r.d.MapError(err)
+}
+
+func (r throttleRepo) DeleteEnded(ctx context.Context, kind domain.ThrottleKind, windowStart, now time.Time) error {
+	_, err := r.tx.ExecContext(ctx, r.d.Rebind(`DELETE FROM auth_throttle WHERE kind = ? AND window_started_at < ?
+		AND (locked_until IS NULL OR locked_until <= ?)`), string(kind), r.d.TimeArg(windowStart), r.d.TimeArg(now))
+	return r.d.MapError(err)
+}

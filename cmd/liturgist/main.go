@@ -31,6 +31,8 @@ const (
 	exitConfig          = 2
 	exitSchemaNewer     = 3
 	exitAlreadySetUp    = 4
+	exitNoSuchUser      = 5
+	exitNotMember       = 6
 	exitTooManyChurches = 7
 )
 
@@ -44,6 +46,11 @@ commands:
         [--ui-language en] [--language id] [--translation TB] [--time-zone Asia/Jakarta] [--key-display do]
                                          create the church and its first admin
   setup-link                             print a new 24-hour setup link
+  user reset-password <email-or-phone>   print a password-reset link
+  user list                              list users and their roles
+  member grant-admin <email-or-phone>    give a member the Church admin role (recovery)
+  auth clear-throttle --identifier X | --ip Y | --all
+                                         delete login-throttle counters
   openapi                                print the OpenAPI document
   version                                print version information`
 
@@ -65,6 +72,14 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return setup(args[1:], stdin, stdout, stderr)
 	case args[0] == "setup-link":
 		return withOperator("setup-link", args[1:], stdout, stderr, setupLink)
+	case len(args) > 1 && args[0] == "user" && args[1] == "reset-password":
+		return withOperator("user reset-password", args[2:], stdout, stderr, resetPassword)
+	case len(args) > 1 && args[0] == "user" && args[1] == "list":
+		return withOperator("user list", args[2:], stdout, stderr, listUsers)
+	case len(args) > 1 && args[0] == "member" && args[1] == "grant-admin":
+		return withOperator("member grant-admin", args[2:], stdout, stderr, grantAdmin)
+	case len(args) > 1 && args[0] == "auth" && args[1] == "clear-throttle":
+		return withOperator("auth clear-throttle", args[2:], stdout, stderr, clearThrottle)
 	case args[0] == "openapi":
 		doc, err := server.OpenAPI()
 		if err != nil {
@@ -109,6 +124,10 @@ func exitFor(err error, stderr io.Writer) int {
 		return exitSchemaNewer
 	case errors.Is(err, server.ErrAlreadySetUp):
 		return exitAlreadySetUp
+	case errors.Is(err, server.ErrNoSuchUser):
+		return exitNoSuchUser
+	case errors.Is(err, server.ErrNotMember):
+		return exitNotMember
 	case server.IsTooManyChurches(err):
 		return exitTooManyChurches
 	}
@@ -210,6 +229,83 @@ func setupLink(ctx context.Context, op *server.Operator, args []string, stdout, 
 		return err
 	}
 	fmt.Fprint(stdout, server.SetupLinkBlock("Setup link (any earlier link no longer works).", link))
+	return nil
+}
+
+func resetPassword(ctx context.Context, op *server.Operator, args []string, stdout, stderr io.Writer) error {
+	if len(args) != 1 {
+		return errUsage
+	}
+	warnBaseURL(stderr)
+	res, err := op.ResetPassword(ctx, args[0])
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "Password-reset link for %s (valid until %s):\n%s\n", res.UserName, res.ExpiresAt.Format("2006-01-02 15:04 MST"), res.Link)
+	return nil
+}
+
+func listUsers(ctx context.Context, op *server.Operator, args []string, stdout, _ io.Writer) error {
+	if len(args) != 0 {
+		return errUsage
+	}
+	users, err := op.ListUsers(ctx)
+	if err != nil {
+		return err
+	}
+	for _, u := range users {
+		roles := "(not a member)"
+		if u.Roles != nil {
+			roles = "roles: " + strings.Join(u.Roles, ", ")
+			if len(u.Roles) == 0 {
+				roles = "team member"
+			}
+		}
+		fmt.Fprintf(stdout, "%s\t%s\t%s\t%s\n", u.Name, orDash(u.Email), orDash(u.Phone), roles)
+	}
+	return nil
+}
+
+func orDash(s string) string {
+	if s == "" {
+		return "-"
+	}
+	return s
+}
+
+func grantAdmin(ctx context.Context, op *server.Operator, args []string, stdout, _ io.Writer) error {
+	if len(args) != 1 {
+		return errUsage
+	}
+	if err := op.GrantAdmin(ctx, args[0]); err != nil {
+		return err
+	}
+	fmt.Fprintln(stdout, "The member now holds the Church admin role.")
+	return nil
+}
+
+func clearThrottle(ctx context.Context, op *server.Operator, args []string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("auth clear-throttle", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	identifier := fs.String("identifier", "", "email or phone number")
+	ip := fs.String("ip", "", "client IP address")
+	all := fs.Bool("all", false, "delete every counter")
+	if err := fs.Parse(args); err != nil || fs.NArg() != 0 {
+		return errUsage
+	}
+	n := 0
+	for _, set := range []bool{*identifier != "", *ip != "", *all} {
+		if set {
+			n++
+		}
+	}
+	if n != 1 {
+		return errUsage
+	}
+	if err := op.ClearThrottle(ctx, *identifier, *ip, *all); err != nil {
+		return err
+	}
+	fmt.Fprintln(stdout, "Login-throttle counters deleted.")
 	return nil
 }
 

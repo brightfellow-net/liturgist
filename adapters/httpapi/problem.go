@@ -28,6 +28,9 @@ type Problem struct {
 	Detail string              `json:"detail,omitempty"`
 	Reason string              `json:"reason,omitempty"`
 	Scopes []string            `json:"scopes,omitempty"` // scope_not_held
+	Limit  string              `json:"limit,omitempty"`  // limit_reached
+	Used   *int                `json:"used,omitempty"`
+	Max    *int                `json:"max,omitempty"`
 	Errors []*huma.ErrorDetail `json:"errors,omitempty"`
 }
 
@@ -92,6 +95,7 @@ func MapError(ctx context.Context, err error, log *slog.Logger) error {
 		many     *app.TooManyAttemptsError
 		notHeld  *app.ScopeNotHeldError
 		badToken *app.InvalidTokenError
+		limit    *app.LimitReachedError
 		nf       *app.NotFoundError
 	)
 	info := RequestInfoFrom(ctx)
@@ -126,6 +130,10 @@ func MapError(ctx context.Context, err error, log *slog.Logger) error {
 		p.Reason = string(badToken.Reason)
 		log.Info("invalid_token", "reason", p.Reason, "request_id", info.RequestID)
 		return p
+	case errors.As(err, &limit):
+		p := problem(http.StatusForbidden, "limit_reached", "The plan's limit has been reached.")
+		p.Limit, p.Used, p.Max = string(limit.Limit), &limit.Used, &limit.Max
+		return p
 	case errors.Is(err, app.ErrForbidden):
 		log.Info("forbidden", "user_id", string(info.UserID), "request_id", info.RequestID)
 		return problem(http.StatusForbidden, "forbidden", "You don't have permission to do this.")
@@ -154,7 +162,12 @@ var conflicts = map[error]*Problem{
 	app.ErrAlreadySetUp:    problem(http.StatusConflict, "already_set_up", "Liturgist is already set up."),
 	app.ErrLockout:         problem(http.StatusConflict, "lockout_prevented", "Someone must keep the permissions to manage roles and members."),
 	app.ErrRoleNameTaken:   problem(http.StatusConflict, "role_name_taken", "Another role already has this name."),
+	app.ErrAlreadyMember:   problem(http.StatusConflict, "already_member", "This person is already a member of the church."),
+	app.ErrInviteExists:    problem(http.StatusConflict, "invite_exists", "This person already has an open invite."),
 	app.ErrIdentifierTaken: problem(http.StatusConflict, "identifier_taken", "This email or phone number belongs to another account."),
+	app.ErrResetNotAllowed: problem(http.StatusConflict, "reset_not_allowed", "This person also belongs to another church."),
+	app.ErrInviteMismatch: problem(http.StatusForbidden, "invite_identifier_mismatch",
+		"This invite is for another account. Log out and log in as that person."),
 }
 
 // errorKey returns the sentinel in conflicts that err wraps, if any.

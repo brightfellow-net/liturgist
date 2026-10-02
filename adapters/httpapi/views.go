@@ -10,7 +10,7 @@ import (
 	"github.com/brightfellow-net/liturgist/domain"
 )
 
-// JSON shapes of the church, member and role resources (04 §6).
+// JSON shapes of the church, member, role and invite resources (04 §6).
 
 // ChurchView is the church.
 type ChurchView struct {
@@ -48,22 +48,34 @@ func roleRefs(roles []domain.Role) []RoleRef {
 	return out
 }
 
+// ResetView is a member's latest reset link (never the link).
+type ResetView struct {
+	CreatedByName *string    `json:"created_by_name" doc:"null: created on the server's command line"`
+	CreatedAt     time.Time  `json:"created_at"`
+	ExpiresAt     time.Time  `json:"expires_at"`
+	UsedAt        *time.Time `json:"used_at"`
+}
+
 // MemberView is one member.
 type MemberView struct {
-	ID       string            `json:"id"`
-	UserID   string            `json:"user_id"`
-	Name     string            `json:"name"`
-	Email    *string           `json:"email"`
-	Phone    *string           `json:"phone"`
-	Roles    []RoleRef         `json:"roles"`
-	JoinedAt time.Time         `json:"joined_at"`
-	Actions  app.MemberActions `json:"actions"`
+	ID        string            `json:"id"`
+	UserID    string            `json:"user_id"`
+	Name      string            `json:"name"`
+	Email     *string           `json:"email"`
+	Phone     *string           `json:"phone"`
+	Roles     []RoleRef         `json:"roles"`
+	JoinedAt  time.Time         `json:"joined_at"`
+	LastReset *ResetView        `json:"last_reset,omitempty" doc:"Only for viewers with members.manage"`
+	Actions   app.MemberActions `json:"actions"`
 }
 
 func memberView(v app.MemberView) MemberView {
 	u := v.Member.User
 	out := MemberView{ID: string(v.Member.ID), UserID: string(u.ID), Name: u.Name, Email: optional(u.Email),
 		Phone: optional(u.Phone), Roles: roleRefs(v.Roles), JoinedAt: v.Member.CreatedAt, Actions: v.Actions}
+	if r := v.LastReset; r != nil {
+		out.LastReset = &ResetView{CreatedByName: r.CreatedByName, CreatedAt: r.CreatedAt, ExpiresAt: r.ExpiresAt, UsedAt: r.UsedAt}
+	}
 	return out
 }
 
@@ -98,6 +110,33 @@ func scopeStrings(s domain.ScopeSet) []string {
 		out = append(out, string(sc))
 	}
 	return out
+}
+
+// InviteView is one invite (never the link).
+type InviteView struct {
+	ID            string            `json:"id"`
+	Name          string            `json:"name"`
+	Email         *string           `json:"email"`
+	Phone         *string           `json:"phone"`
+	Roles         []RoleRef         `json:"roles"`
+	Status        string            `json:"status" enum:"pending,expired"`
+	CreatedByName *string           `json:"created_by_name"`
+	CreatedAt     time.Time         `json:"created_at"`
+	ExpiresAt     time.Time         `json:"expires_at"`
+	Actions       app.InviteActions `json:"actions"`
+}
+
+func inviteView(v app.InviteView) InviteView {
+	i := v.Invite
+	return InviteView{ID: string(i.ID), Name: i.Name, Email: optional(i.Email), Phone: optional(i.Phone),
+		Roles: roleRefs(v.Roles), Status: string(v.Status), CreatedByName: v.CreatedByName,
+		CreatedAt: i.CreatedAt, ExpiresAt: i.ExpiresAt, Actions: v.Actions}
+}
+
+// LinkView is a one-time link.
+type LinkView struct {
+	Link      string    `json:"link"`
+	ExpiresAt time.Time `json:"expires_at"`
 }
 
 func optional(s string) *string {

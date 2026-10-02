@@ -236,3 +236,22 @@ func copyFile(src, dst string) error {
 	}
 	return out.Close()
 }
+
+// Count runs a "SELECT count(*) …" query on a SQLite test database through a
+// separate read-only connection (use-case tests have no access to the Tx).
+func Count(t testing.TB, db *sqlstore.DB, query string, args ...any) int {
+	t.Helper()
+	if db.Path() == "" {
+		t.Fatal("sqlstoretest.Count supports SQLite only")
+	}
+	conn, err := sql.Open("sqlite", "file:"+db.Path()+"?mode=ro")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close() }()
+	var n int
+	if err := conn.QueryRowContext(context.Background(), query, args...).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	return n
+}

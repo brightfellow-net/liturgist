@@ -8,6 +8,7 @@ import (
 	"errors"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/brightfellow-net/liturgist/domain"
 )
@@ -21,16 +22,26 @@ type Members struct {
 
 // MemberActions are the advisory actions on a member (04 §5).
 type MemberActions struct {
-	EditRoles bool `json:"edit_roles"`
-	Remove    bool `json:"remove"`
+	EditRoles       bool `json:"edit_roles"`
+	Remove          bool `json:"remove"`
+	CreateResetLink bool `json:"create_reset_link"`
+}
+
+// ResetSummary is a member's latest reset link, never the link itself (03 §9).
+type ResetSummary struct {
+	CreatedByName *string
+	CreatedAt     time.Time
+	ExpiresAt     time.Time
+	UsedAt        *time.Time
 }
 
 // MemberView is a member as the API shows it.
 type MemberView struct {
-	Member  domain.Member
-	Roles   []domain.Role // the member's roles, by name
-	Scopes  domain.ScopeSet
-	Actions MemberActions
+	Member    domain.Member
+	Roles     []domain.Role // the member's roles, by name
+	Scopes    domain.ScopeSet
+	LastReset *ResetSummary // only for viewers with members.manage
+	Actions   MemberActions
 }
 
 // MemberList is GET /members.
@@ -42,7 +53,7 @@ type MemberList struct {
 
 // memberView computes a member's roles and actions as seen by the actor.
 // Actions are true only if the scope check and the safeguards would pass.
-func (c churchScope) memberView(m domain.Member, all []domain.Member) MemberView {
+func (c churchScope) memberView(ctx context.Context, s Store, m domain.Member, all []domain.Member, withReset bool) (MemberView, error) {
 	v := MemberView{Member: m, Scopes: c.scopesOf(m.RoleIDs)}
 	for _, id := range m.RoleIDs {
 		if r, ok := c.roles[id]; ok {
@@ -55,8 +66,44 @@ func (c churchScope) memberView(m domain.Member, all []domain.Member) MemberView
 	v.Actions.EditRoles = a.Has(domain.ScopeRolesManage) && holds
 	if a.Has(domain.ScopeMembersManage) && holds {
 		v.Actions.Remove = domain.SomeoneCanAdminister(membershipsWithout(all, m.ID), c.roles)
+		elsewhere, err := memberElsewhere(ctx, s, m.UserID, c.actor.ChurchID)
+		if err != nil {
+			return MemberView{}, err
+		}
+		v.Actions.CreateResetLink = !elsewhere
 	}
-	return v
+	if withReset && a.Has(domain.ScopeMembersManage) {
+		latest, err := s.PasswordResets().Latest(ctx, []domain.UserID{m.UserID})
+		if err != nil {
+			return MemberView{}, err
+		}
+		if r, ok := latest[m.UserID]; ok {
+			sum, err := resetSummary(ctx, s, r)
+			if err != nil {
+				return MemberView{}, err
+			}
+			v.LastReset = &sum
+		}
+	}
+	return v, nil
+}
+
+func resetSummary(ctx context.Context, s Store, r domain.PasswordReset) (ResetSummary, error) {
+	sum := ResetSummary{CreatedAt: r.CreatedAt, ExpiresAt: r.ExpiresAt}
+	if !r.UsedAt.IsZero() {
+		used := r.UsedAt
+		sum.UsedAt = &used
+	}
+	if r.CreatedBy != "" {
+		u, err := s.Users().ByID(ctx, r.CreatedBy)
+		if err != nil && !errors.Is(err, ErrNotFound) {
+			return ResetSummary{}, err
+		}
+		if err == nil {
+			sum.CreatedByName = &u.Name
+		}
+	}
+	return sum, nil
 }
 
 func memberships(all []domain.Member) []domain.Membership {
@@ -77,9 +124,28 @@ func membershipsWithout(all []domain.Member, id domain.MembershipID) []domain.Me
 	return out
 }
 
-// teamUsage returns the number of memberships (invites join in a later slice).
-func teamUsage(ctx context.Context, cs ChurchStore) (int, error) {
-	return cs.Memberships().Count(ctx)
+// memberElsewhere reports whether the user belongs to a church other than this one.
+func memberElsewhere(ctx context.Context, s Store, user domain.UserID, church domain.ChurchID) (bool, error) {
+	ids, err := s.Users().MembershipChurchIDs(ctx, user)
+	if err != nil {
+		return false, err
+	}
+	for _, id := range ids {
+		if id != church {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// teamUsage returns memberships + pending invites and the team-member limit.
+func teamUsage(ctx context.Context, cs ChurchStore, now time.Time) (int, error) {
+	members, err := cs.Memberships().Count(ctx)
+	if err != nil {
+		return 0, err
+	}
+	pending, err := cs.Invites().CountPending(ctx, now)
+	return members + pending, err
 }
 
 // teamLimit asks Entitlements before the transaction (no outside calls inside
@@ -120,9 +186,13 @@ func (u *Members) List(ctx context.Context, sess *domain.Session) (MemberList, e
 		}
 		res = MemberList{}
 		for _, m := range all {
-			res.Members = append(res.Members, sc.memberView(m, all))
+			v, err := sc.memberView(ctx, s, m, all, true)
+			if err != nil {
+				return err
+			}
+			res.Members = append(res.Members, v)
 		}
-		res.Used, err = teamUsage(ctx, sc.cs)
+		res.Used, err = teamUsage(ctx, sc.cs, u.Clock.Now())
 		return err
 	})
 	if err == nil && !limit.Unlimited {
@@ -172,8 +242,8 @@ func (u *Members) SetRoles(ctx context.Context, sess *domain.Session, id domain.
 		}
 		for _, mm := range all {
 			if mm.ID == id {
-				res = sc.memberView(mm, all)
-				return nil
+				res, err = sc.memberView(ctx, s, mm, all, true)
+				return err
 			}
 		}
 		return ErrNotFound

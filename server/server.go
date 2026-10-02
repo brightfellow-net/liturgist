@@ -72,6 +72,10 @@ type useCases struct {
 	churches *app.Churches
 	members  *app.Members
 	roles    *app.Roles
+	invites  *app.Invites
+	resets   *app.Resets
+	operator *app.Operator
+	cleanup  *app.Cleanup
 }
 
 // wire builds the use cases on db with the options' adapters.
@@ -96,6 +100,11 @@ func wire(cfg Config, db app.Tx, o *options, refresh func()) useCases {
 		churches: &app.Churches{Tx: db, Clock: clock},
 		members:  &app.Members{Tx: db, Clock: clock, Entitlements: o.entitlements},
 		roles:    &app.Roles{Tx: db, Clock: clock, IDs: ids},
+		invites: &app.Invites{Tx: db, Hasher: hasher, Clock: clock, IDs: ids, URLs: o.urls,
+			Entitlements: o.entitlements, Auth: auth},
+		resets:   &app.Resets{Tx: db, Hasher: hasher, Clock: clock, IDs: ids, URLs: o.urls, Auth: auth},
+		operator: &app.Operator{Tx: db, Clock: clock, IDs: ids},
+		cleanup:  &app.Cleanup{Tx: db, Clock: clock},
 	}
 }
 
@@ -136,7 +145,7 @@ func New(ctx context.Context, cfg Config, opts ...Option) (*Server, error) {
 	d := deps{
 		auth: httpapi.AuthDeps{Auth: s.uc.auth, Account: s.uc.account, Cookies: cookies, Clock: s.uc.auth.Clock, Log: cfg.Logger},
 		church: httpapi.ChurchDeps{Setup: s.uc.setup, Churches: s.uc.churches, Members: s.uc.members, Roles: s.uc.roles,
-			Cookies: cookies, Clock: s.uc.auth.Clock, Log: cfg.Logger},
+			Invites: s.uc.invites, Resets: s.uc.resets, Cookies: cookies, Clock: s.uc.auth.Clock, Log: cfg.Logger},
 		session:  httpapi.SessionMiddleware(s.uc.auth, cookies, s.uc.auth.Clock, cfg.Logger),
 		resolver: o.resolver,
 	}
@@ -154,8 +163,9 @@ func IsTooManyChurches(err error) bool { return errors.Is(err, app.ErrTooManyChu
 // Handler returns the server's root HTTP handler.
 func (s *Server) Handler() http.Handler { return s.handler }
 
-// Run prints the setup link if the church isn't set up yet, and serves
-// until ctx is cancelled, then shuts down gracefully within 15 s.
+// Run prints the setup link if the church isn't set up yet, starts the
+// cleanup job, and serves until ctx is cancelled, then shuts down gracefully
+// within 15 s.
 func (s *Server) Run(ctx context.Context) error {
 	for _, w := range StartupWarnings(s.cfg) {
 		s.cfg.Logger.Warn(w)
@@ -165,6 +175,7 @@ func (s *Server) Run(ctx context.Context) error {
 			return err
 		}
 	}
+	go s.cleanupLoop(ctx)
 
 	srv := &http.Server{
 		Addr:              s.cfg.Listen,
@@ -218,6 +229,41 @@ func (s *Server) setupLink(ctx context.Context, token string) string {
 func SetupLinkBlock(headline, link string) string {
 	const rule = "================================================================\n"
 	return rule + "  " + headline + "\n  Open this link to create your church (valid 24 hours):\n  " + link + "\n" + rule
+}
+
+// cleanupLoop runs the cleanup job one minute after start, then throttle
+// rows every 10 minutes and everything else hourly (03 §11).
+func (s *Server) cleanupLoop(ctx context.Context) {
+	timer := time.NewTimer(time.Minute)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return
+	case <-timer.C:
+	}
+	s.runCleanup(ctx, true)
+	tick := time.NewTicker(10 * time.Minute)
+	defer tick.Stop()
+	for n := 1; ; n++ {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+			s.runCleanup(ctx, n%6 == 0)
+		}
+	}
+}
+
+func (s *Server) runCleanup(ctx context.Context, hourly bool) {
+	if err := s.uc.cleanup.Throttle(ctx); err != nil && ctx.Err() == nil {
+		s.cfg.Logger.Warn("cleanup of throttle counters failed", "error", err)
+	}
+	if !hourly {
+		return
+	}
+	if err := s.uc.cleanup.Hourly(ctx); err != nil && ctx.Err() == nil {
+		s.cfg.Logger.Warn("cleanup failed", "error", err)
+	}
 }
 
 // Close closes the database.

@@ -38,6 +38,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set a new password with a reset link */
+        post: operations["resetPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/reset/inspect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Describe a reset link */
+        post: operations["inspectReset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/church": {
         parameters: {
             query?: never;
@@ -54,6 +88,109 @@ export interface paths {
         head?: never;
         /** Change church settings */
         patch: operations["updateChurch"];
+        trace?: never;
+    };
+    "/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pending and expired invites */
+        get: operations["listInvites"];
+        put?: never;
+        /** Invite a person */
+        post: operations["createInvite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invites/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept an invite as a new user */
+        post: operations["acceptInvite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invites/accept-existing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept an invite with the logged-in account */
+        post: operations["acceptInviteExisting"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invites/inspect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Describe an invite link */
+        post: operations["inspectInvite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invites/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Cancel an invite */
+        delete: operations["cancelInvite"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invites/{id}/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** New link for an invite */
+        post: operations["regenerateInvite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/me": {
@@ -141,6 +278,23 @@ export interface paths {
         head?: never;
         /** Assign roles to a member */
         patch: operations["setMemberRoles"];
+        trace?: never;
+    };
+    "/members/{membershipId}/password-reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a password-reset link for a member */
+        post: operations["createResetLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/roles": {
@@ -251,6 +405,19 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AcceptInviteRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/AcceptInviteRequest.json
+             */
+            readonly $schema?: string;
+            email?: string;
+            name: string;
+            password: string;
+            phone?: string;
+            token: string;
+        };
         AdminStruct: {
             identifier: string;
             name: string;
@@ -298,6 +465,18 @@ export interface components {
             privacy_contact: string | null;
             time_zone: string;
         };
+        CreateInviteRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/CreateInviteRequest.json
+             */
+            readonly $schema?: string;
+            email?: string;
+            name: string;
+            phone?: string;
+            role_ids?: string[] | null;
+        };
         CreateRoleRequest: {
             /**
              * Format: uri
@@ -309,6 +488,19 @@ export interface components {
             name: string;
             scopes: string[] | null;
         };
+        CreatedInviteOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/CreatedInviteOutputBody.json
+             */
+            readonly $schema?: string;
+            /** Format: date-time */
+            expires_at: string;
+            invite: components["schemas"]["InviteView"];
+            /** @description Shown only now and after regenerating */
+            link: string;
+        };
         ErrorDetail: {
             /** @description Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id' */
             location?: string;
@@ -316,6 +508,41 @@ export interface components {
             message?: string;
             /** @description The value at the given location */
             value?: unknown;
+        };
+        InviteActions: {
+            cancel: boolean;
+            regenerate: boolean;
+        };
+        InviteInfoOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/InviteInfoOutputBody.json
+             */
+            readonly $schema?: string;
+            church_name: string;
+            email: string | null;
+            invitee_name: string;
+            /** @description The invite's email or phone belongs to an existing account */
+            owner_exists: boolean;
+            phone: string | null;
+            /** @enum {string} */
+            status: "pending";
+        };
+        InviteView: {
+            actions: components["schemas"]["InviteActions"];
+            /** Format: date-time */
+            created_at: string;
+            created_by_name: string | null;
+            email: string | null;
+            /** Format: date-time */
+            expires_at: string;
+            id: string;
+            name: string;
+            phone: string | null;
+            roles: components["schemas"]["RoleRef"][] | null;
+            /** @enum {string} */
+            status: "pending" | "expired";
         };
         Item: {
             code: string;
@@ -325,6 +552,17 @@ export interface components {
         Item1: {
             description: string;
             scope: string;
+        };
+        LinkView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/LinkView.json
+             */
+            readonly $schema?: string;
+            /** Format: date-time */
+            expires_at: string;
+            link: string;
         };
         LoginRequest: {
             /**
@@ -351,6 +589,7 @@ export interface components {
             user: components["schemas"]["UserView"];
         };
         MemberActions: {
+            create_reset_link: boolean;
             edit_roles: boolean;
             remove: boolean;
         };
@@ -366,6 +605,8 @@ export interface components {
             id: string;
             /** Format: date-time */
             joined_at: string;
+            /** @description Only for viewers with members.manage */
+            last_reset?: components["schemas"]["ResetView"];
             name: string;
             phone: string | null;
             roles: components["schemas"]["RoleRef"][] | null;
@@ -405,11 +646,49 @@ export interface components {
             code: string;
             detail?: string;
             errors?: components["schemas"]["ErrorDetail"][] | null;
+            limit?: string;
+            /** Format: int64 */
+            max?: number;
             reason?: string;
             scopes?: string[] | null;
             /** Format: int64 */
             status: number;
             title: string;
+            /** Format: int64 */
+            used?: number;
+        };
+        ResetInfoOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/ResetInfoOutputBody.json
+             */
+            readonly $schema?: string;
+            /** @description null: created by the server administrator */
+            created_by_name: string | null;
+            /** Format: date-time */
+            expires_at: string;
+            user_name: string;
+        };
+        ResetPasswordRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/ResetPasswordRequest.json
+             */
+            readonly $schema?: string;
+            new_password: string;
+            token: string;
+        };
+        ResetView: {
+            /** Format: date-time */
+            created_at: string;
+            /** @description null: created on the server's command line */
+            created_by_name: string | null;
+            /** Format: date-time */
+            expires_at: string;
+            /** Format: date-time */
+            used_at: string | null;
         };
         RoleActions: {
             delete: boolean;
@@ -473,6 +752,15 @@ export interface components {
             max: number | null;
             /** Format: int64 */
             used: number;
+        };
+        TokenBodyBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/TokenBodyBody.json
+             */
+            readonly $schema?: string;
+            token: string;
         };
         UpdateChurchRequest: {
             /**
@@ -598,6 +886,71 @@ export interface operations {
             };
         };
     };
+    resetPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    inspectReset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenBodyBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResetInfoOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     getChurch: {
         parameters: {
             query?: never;
@@ -647,6 +1000,224 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChurchView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listInvites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteView"][] | null;
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    createInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateInviteRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedInviteOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    acceptInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptInviteRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    acceptInviteExisting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenBodyBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    inspectInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenBodyBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteInfoOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    cancelInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    regenerateInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkView"];
                 };
             };
             /** @description Error */
@@ -860,6 +1431,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MemberView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    createResetLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                membershipId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkView"];
                 };
             };
             /** @description Error */

@@ -87,6 +87,23 @@ func (r userRepo) MembershipChurchIDs(ctx context.Context, id domain.UserID) ([]
 	return ids, r.d.MapError(err)
 }
 
+func (r userRepo) List(ctx context.Context) ([]domain.User, error) {
+	rows, err := r.tx.QueryContext(ctx, "SELECT "+userColumns+" FROM users ORDER BY lower(name), id")
+	if err != nil {
+		return nil, r.d.MapError(err)
+	}
+	defer func() { _ = rows.Close() }()
+	var out []domain.User
+	for rows.Next() {
+		u, err := r.scan(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, u)
+	}
+	return out, r.d.MapError(rows.Err())
+}
+
 // exec1 runs a statement that must change exactly one row (else ErrNotFound).
 func (s *store) exec1(ctx context.Context, q string, args ...any) error {
 	res, err := s.tx.ExecContext(ctx, s.d.Rebind(q), args...)

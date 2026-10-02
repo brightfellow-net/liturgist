@@ -61,3 +61,8 @@ func (r sessionRepo) DeleteAllForUser(ctx context.Context, user domain.UserID) e
 	_, err := r.tx.ExecContext(ctx, r.d.Rebind("DELETE FROM sessions WHERE user_id = ?"), user)
 	return r.d.MapError(err)
 }
+
+func (r sessionRepo) DeleteExpired(ctx context.Context, now time.Time) error {
+	_, err := r.tx.ExecContext(ctx, r.d.Rebind("DELETE FROM sessions WHERE expires_at < ?"), r.d.TimeArg(now))
+	return r.d.MapError(err)
+}

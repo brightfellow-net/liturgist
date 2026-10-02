@@ -28,6 +28,8 @@ type Store interface {
 	Churches() ChurchRepo
 	Translations() TranslationRepo
 	SetupTokens() SetupTokenRepo
+	PasswordResets() PasswordResetRepo
+	InviteTokens() InviteTokenRepo // platform lookups by token; the church comes from the invite
 
 	LockInstall(ctx context.Context) error                // setup, setup-link issuing (02 §2.1)
 	LockUser(ctx context.Context, id domain.UserID) error // reset-link creation
@@ -42,6 +44,7 @@ type ChurchStore interface {
 	Church() ChurchSettingsRepo
 	Memberships() MembershipRepo
 	Roles() RoleRepo
+	Invites() InviteRepo
 }
 
 // Clock returns the current time in UTC, truncated to microseconds (02 §4).
@@ -72,6 +75,7 @@ type UserRepo interface {
 	UpdateProfile(ctx context.Context, id domain.UserID, name string, prefs domain.Preferences, now time.Time) error
 	Touch(ctx context.Context, id domain.UserID, now time.Time) error // last_seen_at
 	MembershipChurchIDs(ctx context.Context, id domain.UserID) ([]domain.ChurchID, error)
+	List(ctx context.Context) ([]domain.User, error) // operator CLI, ordered by name
 }
 
 // SessionRepo stores login sessions.
@@ -84,6 +88,7 @@ type SessionRepo interface {
 	Delete(ctx context.Context, hash string) error
 	DeleteOthers(ctx context.Context, user domain.UserID, keepHash string) error
 	DeleteAllForUser(ctx context.Context, user domain.UserID) error
+	DeleteExpired(ctx context.Context, now time.Time) error
 }
 
 // ThrottleRepo stores login-throttle counters (03 §5).
@@ -93,9 +98,18 @@ type ThrottleRepo interface {
 	// RecordFailure atomically adds one failure (02 §2.1).
 	RecordFailure(ctx context.Context, key string, rule domain.ThrottleRule, now time.Time) error
 	Delete(ctx context.Context, keys ...string) error
+	DeleteAll(ctx context.Context) error
+	// DeleteForIdentifier removes the id and idip counters of an identifier
+	// (normalised, as ThrottleKeys takes it), from every address.
+	DeleteForIdentifier(ctx context.Context, identifier string) error
+	// DeleteForAddr removes the ip and idip counters of a client address key.
+	DeleteForAddr(ctx context.Context, addrKey string) error
+	// DeleteEnded removes counters of kind whose window started before
+	// windowStart and whose lock (if any) has ended (03 §11).
+	DeleteEnded(ctx context.Context, kind domain.ThrottleKind, windowStart, now time.Time) error
 }
 
-// ChurchRepo is the platform view of churches (setup, resolver).
+// ChurchRepo is the platform view of churches (setup, resolver, invites).
 type ChurchRepo interface {
 	Create(ctx context.Context, c domain.Church) error
 	Count(ctx context.Context) (int, error)
@@ -116,6 +130,27 @@ type SetupTokenRepo interface {
 	// Claim deletes the token if hash matches and it hasn't expired (atomic claim).
 	Claim(ctx context.Context, hash string, now time.Time) (bool, error)
 	DeleteExpired(ctx context.Context, now time.Time) error
+}
+
+// PasswordResetRepo stores reset links (03 §9).
+type PasswordResetRepo interface {
+	Create(ctx context.Context, r domain.PasswordReset) error
+	// CloseOpen marks every unused link of the user as used (expired ones included).
+	CloseOpen(ctx context.Context, user domain.UserID, now time.Time) error
+	ByTokenHash(ctx context.Context, hash string) (domain.PasswordReset, error) // ErrNotFound
+	// Claim marks an unused, unexpired link used (atomic claim); false if none.
+	Claim(ctx context.Context, hash string, now time.Time) (domain.PasswordReset, bool, error)
+	Latest(ctx context.Context, users []domain.UserID) (map[domain.UserID]domain.PasswordReset, error)
+	DeleteOld(ctx context.Context, cutoff time.Time) error // expired or used before cutoff
+}
+
+// InviteTokenRepo finds and claims invites by token, across churches.
+type InviteTokenRepo interface {
+	ByTokenHash(ctx context.Context, hash string) (domain.Invite, error) // ErrNotFound; RoleIDs not loaded
+	// Claim marks a pending invite accepted by user ("" = set later with
+	// SetAcceptedUser) as one atomic claim; false if no pending invite matched.
+	Claim(ctx context.Context, hash string, user domain.UserID, now time.Time) (domain.Invite, bool, error)
+	SetAcceptedUser(ctx context.Context, id domain.InviteID, user domain.UserID) error
 }
 
 // ChurchSettingsRepo reads and writes the scoped church row.
@@ -144,4 +179,18 @@ type RoleRepo interface {
 	Update(ctx context.Context, r domain.Role) error // name, description, scopes, updated_at
 	Delete(ctx context.Context, id domain.RoleID) error
 	MemberCounts(ctx context.Context) (map[domain.RoleID]int, error)
+}
+
+// InviteRepo stores the church's invites and their roles.
+type InviteRepo interface {
+	List(ctx context.Context) ([]domain.Invite, error) // not accepted or cancelled, newest first
+	ByID(ctx context.Context, id domain.InviteID) (domain.Invite, error)
+	Create(ctx context.Context, inv domain.Invite) error // with its roles; UniqueError on the open-identifier indexes
+	// CancelExpired cancels expired open invites for the email or phone (03 §7 step 3).
+	CancelExpired(ctx context.Context, email, phone string, now time.Time) error
+	CountPending(ctx context.Context, now time.Time) (int, error)
+	// Renew gives an open invite a new token and expiry; false if not open.
+	Renew(ctx context.Context, id domain.InviteID, hash string, expires time.Time) (bool, error)
+	// Cancel cancels an open invite; false if not open.
+	Cancel(ctx context.Context, id domain.InviteID, now time.Time) (bool, error)
 }

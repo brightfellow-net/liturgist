@@ -88,9 +88,14 @@ func (a *Account) ChangePassword(ctx context.Context, sess *domain.Session, clie
 	if err := a.Auth.CheckPassword(ctx, user, current, clientAddr); err != nil {
 		return err
 	}
-	// The church name joins this check when churches exist (slice 4).
-	if err := domain.CheckPassword(next, domain.PasswordIdentity{Name: user.Name, Email: user.Email, Phone: user.Phone}); err != nil {
+	var churches []string
+	if err := a.Tx.Read(ctx, func(s Store) (err error) { churches, err = churchNames(ctx, s, user.ID); return }); err != nil {
 		return err
+	}
+	for _, cn := range append(churches, "") {
+		if err := domain.CheckPassword(next, domain.PasswordIdentity{Name: user.Name, Email: user.Email, Phone: user.Phone, ChurchName: cn}); err != nil {
+			return err
+		}
 	}
 	hash, err := a.Hasher.Hash(ctx, next)
 	if err != nil {

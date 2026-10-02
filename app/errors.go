@@ -35,15 +35,21 @@ func (e *UniqueError) Error() string {
 	return fmt.Sprintf("unique constraint %q violated", e.Constraint)
 }
 
-// Errors of the setup, church, role and member use cases (01 §10).
+// Errors of the church, role, invite and reset use cases (01 §10).
 var (
-	ErrNotSetUp        = errors.New("not set up")                              // 409 not_set_up
-	ErrAlreadySetUp    = errors.New("already set up")                          // 409 already_set_up
-	ErrForbidden       = errors.New("forbidden")                               // 403 forbidden
-	ErrLockout         = errors.New("change would leave nobody to administer") // 409 lockout_prevented
-	ErrRoleNameTaken   = errors.New("role name taken")                         // 409 role_name_taken
-	ErrIdentifierTaken = errors.New("identifier taken")                        // 409 identifier_taken
-	ErrTooManyChurches = errors.New("more than one church")                    // serve exit 7
+	ErrNotSetUp          = errors.New("not set up")                              // 409 not_set_up
+	ErrAlreadySetUp      = errors.New("already set up")                          // 409 already_set_up
+	ErrForbidden         = errors.New("forbidden")                               // 403 forbidden
+	ErrLockout           = errors.New("change would leave nobody to administer") // 409 lockout_prevented
+	ErrRoleNameTaken     = errors.New("role name taken")                         // 409 role_name_taken
+	ErrAlreadyMember     = errors.New("already a member")                        // 409 already_member
+	ErrInviteExists      = errors.New("open invite exists")                      // 409 invite_exists
+	ErrIdentifierTaken   = errors.New("identifier taken")                        // 409 identifier_taken
+	ErrInviteMismatch    = errors.New("invite is for another account")           // 403 invite_identifier_mismatch
+	ErrResetNotAllowed   = errors.New("user belongs to another church")          // 409 reset_not_allowed
+	ErrTooManyChurches   = errors.New("more than one church")                    // serve exit 7
+	ErrNotMember         = errors.New("not a member of the church")              // CLI exit 6
+	errNoReadyMadeOrigin = errors.New("unknown ready-made role")
 )
 
 // NotFoundError is ErrNotFound with the reason that is logged, never shown
@@ -73,3 +79,13 @@ func (e *ScopeNotHeldError) Error() string { return fmt.Sprintf("scopes not held
 type InvalidTokenError struct{ Reason domain.TokenReason }
 
 func (e *InvalidTokenError) Error() string { return "invalid token: " + string(e.Reason) }
+
+// LimitReachedError maps to 403 limit_reached.
+type LimitReachedError struct {
+	Limit     LimitName
+	Used, Max int
+}
+
+func (e *LimitReachedError) Error() string {
+	return fmt.Sprintf("limit %s reached (%d of %d)", e.Limit, e.Used, e.Max)
+}
