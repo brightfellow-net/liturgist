@@ -190,7 +190,7 @@ func TestReadIsReadOnly(t *testing.T) {
 			t.Fatal("insert inside Read must fail")
 		}
 		var n int
-		_ = db.Read(ctx, func(s app.Store) error {
+		mustRead(t, db, func(s app.Store) error {
 			return sqlstore.RawTx(s).QueryRowContext(ctx, "SELECT count(*) FROM t_ro").Scan(&n)
 		})
 		if n != 0 {
@@ -221,7 +221,7 @@ func TestTenantSetting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_ = db.Read(ctx, func(s app.Store) error {
+	mustRead(t, db, func(s app.Store) error {
 		if got := current(sqlstore.RawTx(s)); got != "" {
 			t.Errorf("leaked into the next transaction: %q", got)
 		}

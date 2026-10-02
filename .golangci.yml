@@ -10,7 +10,7 @@ linters:
     depguard:
       rules:
         domain:
-          files: ["**/domain/**"]
+          files: ["**/domain/**", "!$test"]
           # Standard library plus two pure-computation libraries (01 §3).
           allow:
             - "$gostd"
@@ -23,7 +23,7 @@ linters:
             - pkg: "database/sql"
               desc: "domain is pure; SQL lives in adapters (01 §3)"
         app:
-          files: ["**/app/**"]
+          files: ["**/app/**", "!$test"] # use-case tests run on real SQLite (P-12)
           allow: ["$gostd", "github.com/brightfellow-net/liturgist/domain"]
           deny:
             - pkg: "net/http"

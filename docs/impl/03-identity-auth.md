@@ -62,9 +62,9 @@ Session middleware: read cookie → look up hash → if missing or expired (`exp
 
 `POST /api/v1/auth/login` `{ "identifier": string, "password": string }`
 
-1. **Client IP and IP counter first:** determine the client address key (below) and read the `ip` counter. Locked → 429 `too_many_attempts`. This happens before the identifier is even parsed, so malformed input can't bypass throttling.
-2. **Parse the identifier.** Unparseable input is not rejected early: its counters use the SHA-256 of the trimmed raw input as `H` ([schema](../reference/schema.md#auth_throttle)). Read the `idip` and `id` counters; any locked → 429.
-3. **Load the user** by identifier in a `Tx.Read` (none for unparseable or unknown identifiers).
+1. **Client IP and identifier keys:** determine the client address key (below) and parse the identifier. Unparseable input is not rejected early: its counters use the SHA-256 of the trimmed raw input as `H` ([schema](../reference/schema.md#auth_throttle)), so malformed input can never bypass throttling.
+2. **Check all three counters** (`ip`, `idip`, `id`) in one `Tx.Read`; any locked → 429 `too_many_attempts` with `Retry-After` = the longest remaining lock.
+3. **Load the user** by identifier in the same read (none for unparseable or unknown identifiers).
 4. **Verify outside any transaction**, through the hash semaphore: against the user's hash, or against a fixed dummy hash when there is no user, so timing is the same.
 5. **Record the result in one `Tx.Write`:**
    - failure → atomically increment all three counters ([02 §2.1](02-persistence.md#21-atomic-operations)) and return 401 `invalid_credentials` (same body whether or not the account exists);
@@ -80,7 +80,7 @@ Session middleware: read cookie → look up hash → if missing or expired (`exp
 
 `H` and `A` and the exact encodings are defined in the [schema](../reference/schema.md#auth_throttle); identifiers are stored only as hashes.
 
-**Atomic update:** each failure is one `INSERT … ON CONFLICT (key) DO UPDATE` per counter that, in SQL: starts a new window (`failures = 1`, `window_started_at = $now`) if the old window has ended; otherwise adds 1; and sets `locked_until = $now + lock` when the new count reaches the limit. The statement returns the row, so the decision uses the committed values. Concurrent failures are therefore never lost.
+**Atomic update:** each failure is one `INSERT … ON CONFLICT (key) DO UPDATE` per counter that, in SQL: starts a new window (`failures = 1`, `window_started_at = $now`) if the old window has ended; otherwise adds 1; and sets `locked_until = $now + lock` when the new count reaches the limit. When a window restarts, the lock is cleared: failures are only recorded when no counter is locked, so any old lock has already ended. Concurrent failures are never lost because the whole update is one statement.
 
 - A login attempt is refused (429) if **any** of its three counters is locked; `Retry-After` is the longest remaining lock.
 - Every failure increments all three counters. A successful login deletes the identifier+IP counter (the other two keep counting until their window ends).

@@ -298,7 +298,7 @@ func TestCompositeForeignKeys(t *testing.T) {
 		// Deleting a role removes it from memberships and open invites.
 		f.must(`DELETE FROM roles WHERE id = ?`, id("RA"))
 		var n int
-		_ = db.Read(ctx, func(s app.Store) error {
+		mustRead(t, db, func(s app.Store) error {
 			return sqlstore.RawTx(s).QueryRowContext(ctx,
 				`SELECT (SELECT count(*) FROM membership_roles) + (SELECT count(*) FROM invite_roles) + (SELECT count(*) FROM role_scopes)`).Scan(&n)
 		})
@@ -363,7 +363,7 @@ func TestLocksSerialise(t *testing.T) {
 			close(start)
 			wg.Wait()
 			var rows int
-			_ = db.Read(ctx, func(s app.Store) error {
+			mustRead(t, db, func(s app.Store) error {
 				return sqlstore.RawTx(s).QueryRowContext(ctx, "SELECT count(*) FROM t_lock").Scan(&rows)
 			})
 			want := 1
