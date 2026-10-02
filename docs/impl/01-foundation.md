@@ -171,6 +171,8 @@ func WithEventBus(b app.EventBus) Option
 func WithTenantResolver(r httpapi.TenantResolver) Option
 func WithURLBuilder(u app.URLBuilder) Option
 func WithRoutes(fn func(api huma.API)) Option // SaaS adds operations; never replaces community ones
+func WithImporter(format string, i app.Importer) Option // step 2: adds or replaces the importer for a format (08 §7)
+func WithBibleTextProvider(p app.BibleTextProvider) Option // step 2: appends a provider; lookup order is registration order (07 §3.1)
 
 func New(ctx context.Context, cfg Config, opts ...Option) (*Server, error)
 func (s *Server) Handler() http.Handler

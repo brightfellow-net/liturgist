@@ -44,7 +44,7 @@ Only on the server. The web app calls `GET /readings/parse` for its live preview
 
 ### 2.4 Books
 
-Indonesian name (LAI, Terjemahan Baru), LAI abbreviation, USFM code. **The abbreviations are to be confirmed against the pilot church's documents** before approval.
+Indonesian name (LAI, Terjemahan Baru), LAI abbreviation, USFM code. Confirmed by the owner 2026-10-02; aliases found in the pilot church's documents are added to `domain/books.go` (and to TC-R-001) as they turn up.
 
 | Code | Name | Abbr. | Code | Name | Abbr. | Code | Name | Abbr. |
 |---|---|---|---|---|---|---|---|---|
@@ -115,7 +115,7 @@ All paths under `/api/v1`. **View** = any member; **edit** = `library.edit`.
 | `PATCH /readings/{id}` | edit | `{ version, text?, attribution?, reference_display? }` | Reading; 409 `version_conflict` |
 | `DELETE /readings/{id}` | edit | — | 204; 409 `reading_in_use` if `ReadingUsage.ReadingInUse` |
 
-`q` is folded ([06 §5.1](06-song-library.md#51-folding)) and matched as a **substring** of the folded reference, canonical name and text; readings are few, so no full-text index. Order: `canonical` book order (by USFM code order in §2.4), then chapter and verse, then translation.
+`q` is folded ([06 §5.1](06-song-library.md#51-folding)) and matched as a **substring** of the folded reference, canonical name and text, with `instr` (SQLite) or `strpos` (PostgreSQL) so that `%`, `_` and `\` in `q` are literal; readings are few, so no full-text index. Order: `canonical` book order (by USFM code order in §2.4), then chapter and verse, then translation.
 
 Logging: info lines `reading_created`, `reading_updated`, `reading_deleted` with IDs; never text.
 
@@ -134,7 +134,7 @@ The preview calls `GET /readings/parse` after the user stops typing for 400 ms a
 | Port | Signature | Implementation | Used by |
 |---|---|---|---|
 | `ChurchStore.Readings()` | create, update (conditional on `version`), delete, `ByID`, `ByReference`, `List`, `LatestAttribution(translation)` | `adapters/sqlstore` | Reading use cases |
-| `BibleTextProvider` | `Lookup(ctx, ref domain.Reference, translation string) (BibleText, error)` (exists since step 1, [04 §7](04-tenancy-extensions.md#7-extension-points)) | None registered | Lookup |
+| `BibleTextProvider` | `Lookup(ctx, ref domain.Reference, translation string) (BibleText, error)` (exists since step 1, [04 §7](04-tenancy-extensions.md#7-extension-points)) | None registered; `server.WithBibleTextProvider(p)` appends one | Lookup |
 | `ReadingUsage` | `ReadingInUse(ctx, church, reading) (bool, error)` | Step 2: `app.NeverUsed`; step 3: queries the liturgies | Delete |
 
 `domain.Reference` and `app.BibleText` stop being placeholders in this step (listed under **Ports** in `CHANGELOG.md`).

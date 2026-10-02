@@ -13,7 +13,7 @@ Not in step 2: EasyWorship and PowerPoint importers (pilot phase; they read bina
 
 1. The member (scope `library.edit`) chooses a format and sends the text. The server parses it with the matching `Importer` and stores an **import batch** with its **candidates**; the response lists them.
 2. The review page shows each candidate as a song preview with its warnings and, if found, the existing song it may duplicate. The member edits the draft, and decides per candidate: **accept** (new song), **merge** (into an existing song), or **skip**. "Accept all" accepts every candidate that has no duplicate; candidates with a duplicate stay undecided.
-3. **Apply** creates the songs. Each candidate is applied in its own `Tx.Write` through the normal song use cases ([06](06-song-library.md)), so validation, church scoping and search indexing are identical to typing a song in; one failing candidate does not stop the others. Applying again skips candidates already applied.
+3. **Apply** creates the songs. Each candidate is applied in its own `Tx.Write` through the normal song use cases ([06](06-song-library.md)), so validation, church scoping and search indexing are identical to typing a song in; one failing candidate does not stop the others. The transaction starts with `LockChurch` ([02 §3](02-persistence.md#3-connections-and-transactions)) and re-reads the candidate: one that is already applied is skipped. So applying again, or two simultaneous Applies, create every song exactly once.
 4. Batches are working data: a batch that is closed, discarded, or untouched for 7 days is deleted by the cleanup job ([03 §11](03-identity-auth.md#11-cleanup-job)), with its candidates.
 
 Nothing is saved to the library before **Apply**.
@@ -31,7 +31,7 @@ Domain types `domain.ImportBatch`, `domain.ImportCandidate`, `domain.SongDraft`;
 | `merge_into` | Song ID, required with `merge`; must belong to this church |
 | `duplicate_of_id` | The first existing song of this church with the same `hymnal_key`, else the same `title_key` and language; null if none. Computed when the batch is created and again on `GET`, so a song deleted meanwhile no longer counts. Not a foreign key |
 | `applied_song_id`, `error_code` | Set by **Apply**: the created or merged song, or the error code of a failure |
-| `warnings` | Codes the parser produced (§4.1); each has a translated message |
+| `warnings` | Codes the parser produced (§4.1), plus `duplicate_in_batch` when two candidates of one batch share a `hymnal_key`, or a folded title and language (both stay `pending`); each has a translated message |
 
 ### Merge
 
@@ -41,6 +41,7 @@ Merge changes the existing song as follows:
 - **Sections:** replaced by the draft's sections. A draft section takes over the **ID** of an existing section with the same kind and number (verses) or the same kind (other kinds, first unused match in order), so references to it stay valid; unmatched draft sections get new IDs; existing sections that match nothing are deleted, subject to `SongUsage` ([06 §2.4](06-song-library.md#24-editing-sections-and-concurrency-p-46)) — a section in use makes that candidate fail with `section_in_use`.
 - **Default arrangement:** the draft's if it has one, otherwise the existing one cleaned of deleted sections.
 - The song's `version` increases by one.
+- If the song to merge into was deleted after the decision, the candidate fails with `not_found`.
 
 ## 4. Formats
 
@@ -164,7 +165,7 @@ The library's empty state links here ([06 §4](06-song-library.md#4-pages)). Nav
 | TC-I-003 | Verse numbering | `1.` `3.` unlabelled; duplicate `1.` | Numbers kept / renumbered with `verse_renumbered` | More than 60 blocks → `too_many_sections` |
 | TC-I-004 | OpenLyrics | The OpenLyrics 0.8 sample song and a song with `verseOrder`, three author types, a songbook, markup in lines | Every mapping of §4.2 | Missing title → `no_song`; invalid key → `key_ignored`; unknown verse name; DOCTYPE with an entity is not expanded |
 | TC-I-005 | ChordPro | A song with chords, `{sov}`/`{soc}`, `{subtitle}`, `{key}`; a file with two songs | Chords removed, sections and metadata mapped, two candidates | Lines outside blocks; comments; `{new_song}` first line |
-| TC-I-006 | Duplicate detection | Candidates equal to an existing song by hymnal key, by title and language | `duplicate_of` set; same title in another language → none | `Besar Setia-Mu` equals `besar setia mu` after folding (duplicate), but not `besar setiamu` (no duplicate) |
+| TC-I-006 | Duplicate detection | Candidates equal to an existing song by hymnal key, by title and language; two equal candidates in one batch | `duplicate_of` set; same title in another language → none; `duplicate_in_batch` on both | `Besar Setia-Mu` equals `besar setia mu` after folding (duplicate), but not `besar setiamu` (no duplicate) |
 | TC-I-007 | Merge | Existing song with edited metadata and three sections; draft with four | Filled empty fields only; IDs kept for matching kind/number; extra existing sections deleted; version +1 | Section in use (stub) → `section_in_use` |
 
 ### Integration tests (HTTP through `httptest`; repository contract tests run on both dialects)
@@ -173,7 +174,7 @@ The library's empty state links here ([06 §4](06-song-library.md#4-pages)). Nav
 |---|---|---|---|---|
 | IT-I-001 | Paste, review, apply | Editor | Batch created, nothing in the library; accept → song exists with the sections and is found by search | — |
 | IT-I-002 | Partial failure | Batch with one candidate made invalid after creation (e.g. title edited to 201 characters directly in the database) | Others applied, failure reported with its code, batch stays `open` | — |
-| IT-I-003 | Idempotent apply | Applied batch | A second `apply` creates nothing | — |
+| IT-I-003 | Idempotent apply | Applied batch; a second batch | A second `apply` creates nothing; two simultaneous Applies of one batch (race harness, [02 §2.1](02-persistence.md#21-atomic-operations)) create each song once, on both dialects | — |
 | IT-I-004 | Decisions | Duplicates and non-duplicates | "Accept all" leaves duplicates `pending`; `merge` without `merge_into` or with another church's song → 422 / 404 | — |
 | IT-I-005 | Limits and permissions | Team member; oversize body; 201 files | 403; 413 `validation_failed`; 422 | — |
 | IT-I-006 | Isolation | Two churches | Church B cannot read, change, apply or delete church A's batch (404) | — |

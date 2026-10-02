@@ -7,6 +7,8 @@
 
 Songs and their lyrics sections, default arrangements, links between language versions, copyright fields, search, and the library pages. Readings are in [07](07-readings.md); importing songs is in [08](08-import.md).
 
+No entitlement limit applies to songs, readings or imports in step 2 ([SPEC.md §8.2](../SPEC.md#82-extensibility-and-editions)).
+
 **Not in step 2** (they need liturgies, which arrive in step 3):
 
 | Left out | Why | Where it lands |
@@ -60,15 +62,18 @@ A group links the language versions of one hymn. It has no name in the UI. A gro
 
 | Operation | Effect |
 |---|---|
-| `POST /songs/{id}/link {other_song_id}` | Neither song grouped: new group with both. One grouped: the other joins that group. Both in the same group: no change (200). Both in different groups, or the joining song's language is already in the group → 409 `group_conflict` (`reason`: `already_grouped`, `language_taken`) |
+| `POST /songs/{id}/link {other_song_id}` | The same song twice → 422 `validation_failed`. Neither song grouped: new group with both. One grouped: the other joins that group. Both in the same group: no change (200). Both in different groups, or the joining song's language is already in the group → 409 `group_conflict` (`reason`: `already_grouped`, `language_taken`) |
 | `DELETE /songs/{id}/link` | Removes the song from its group. A group left with one song is deleted and that song becomes ungrouped. Not grouped → 204, no change |
+
+Changing a grouped song's `language` to one that another song of its group already has → 409 `group_conflict` (`reason`: `language_taken`).
 
 ### 2.4 Editing sections and concurrency [P-46]
 
 - `PATCH /songs/{id}` takes the song's `version`. The update is conditional (`… WHERE id = $1 AND version = $2`, [02 §2.1](02-persistence.md#21-atomic-operations)); no row changed and the song exists → 409 `version_conflict`, nothing written. The response carries the new version.
 - `sections`, when present, is the **complete ordered list**. An entry with an `id` of this song keeps that section (and may change its fields and position); an entry without `id` is new; a section whose `id` is absent from the list is **deleted**. An `id` of another song → 422.
 - Deleting a section first asks `SongUsage.SectionsInUse` ([§6](#6-ports)); any section in use → 409 `section_in_use` with `section_ids`, nothing written. Step 2: never in use.
-- Deleted sections are also removed from `default_arrangement`. An arrangement entry that names an unknown section → 422.
+- In `POST` and `PATCH`, a **new** section carries a request-local `key` (1–40 characters, unique within the request) instead of an `id`. Entries of `default_arrangement` are existing section IDs or the `key`s of new sections in the same request, so one request can create sections and arrange them. The response contains the real IDs.
+- Deleted sections are also removed from `default_arrangement`. An arrangement entry that names an unknown ID or `key` → 422.
 - Everything above happens in one `Tx.Write`, including the search index update ([§5.3](#53-the-index)).
 
 ## 3. API
@@ -117,7 +122,7 @@ For `zh-Hans` and `zh-Hant` songs the folded text has **all** spaces removed (Ch
 - **Non-Chinese songs:** a term matches a word that **starts with** it, in the title, alternative titles, hymnal key or lyrics (full-text search). No stemming on either database.
 - **Chinese songs:** a term (spaces removed) matches when it occurs **anywhere** in the folded title or lyrics (substring).
 - **Hymnal query:** if the whole query looks like a hymnal reference (`^[a-z]+ ?\.?\d+[a-z]?$` after folding, e.g. `kj 12`, `pkj12a`), songs whose `hymnal_key` equals it are returned first.
-- **Order:** (1) exact hymnal match, (2) match in title or alternative titles, (3) match only in lyrics; inside each group by `title_key`, then `id`.
+- **Order:** (1) exact hymnal match; (2) every term matches the title, an alternative title or the hymnal text; (3) all other matches, where at least one term matches only in the lyrics. Inside each group by `title_key`, then `id`, compared bytewise (SQLite's default; `COLLATE "C"` on PostgreSQL), so both databases order identically; the same applies to the list order without a query.
 - An empty query lists all songs by `title_key`. `q` is at most 200 characters, else 422.
 - The filters combine with the query by AND.
 
@@ -172,9 +177,9 @@ In `app`, added to [02 §2](02-persistence.md#2-ports-in-app) and [04 §7](04-te
 | TC-S-002 | Section validation | Each rule in §2.2 | As specified | Verse without number; chorus with a number; two verses numbered 1; 5000 and 5001 characters; `\r\n` text normalised |
 | TC-S-003 | `Fold` | `"Besar Setia-Mu!"`, `"Cafè  Ünï"`, `"主，我愿意"` | `besar setia mu`, `cafe uni`, `主 我愿意` | Empty; only punctuation; full-width Latin letters |
 | TC-S-004 | Hymnal key | `"KJ"` + `"12"`, `" pkj "` + `"12A"` | `KJ:12`, `PKJ:12a` | Source without number is rejected |
-| TC-S-005 | Section replacement | Ordered list with kept, new and missing IDs | Kept IDs unchanged, new IDs created, missing deleted, positions dense | Foreign ID → 422; arrangement cleaned of deleted sections |
+| TC-S-005 | Section replacement | Ordered list with kept, new and missing IDs; arrangement naming a new section by `key` | Kept IDs unchanged, new IDs created, missing deleted, positions dense; the arrangement holds the real IDs | Foreign ID → 422; unknown `key` → 422; duplicate `key` → 422; arrangement cleaned of deleted sections |
 | TC-S-006 | Query parser | `"kj 12"`, `"PKJ12a"`, `"besar setia"`, `""` | Hymnal query; hymnal query; two terms; list all | 201-character query |
-| TC-S-007 | Group rules | Link and unlink sequences | New group, join, same-group no-op, `already_grouped`, `language_taken`, group deleted at one member | — |
+| TC-S-007 | Group rules | Link and unlink sequences | New group, join, same-group no-op, `already_grouped`, `language_taken`, group deleted at one member | Linking a song to itself; changing a grouped song's language to a taken one |
 
 ### Integration tests (HTTP through `httptest`; repository contract tests run on both dialects)
 
