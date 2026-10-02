@@ -102,7 +102,7 @@ func (db *DB) Migrate(ctx context.Context, o MigrateOptions) (MigrateResult, err
 	if current == target {
 		return res, nil
 	}
-	if db.path != "" {
+	if db.path != "" && current > 0 { // nothing worth copying in a brand-new database
 		if res.CopyPath, err = db.preUpgradeCopy(ctx, current, o); err != nil {
 			return res, err
 		}

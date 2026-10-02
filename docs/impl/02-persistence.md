@@ -116,7 +116,7 @@ Both SQLite (3.35+) and PostgreSQL support `ON CONFLICT … DO UPDATE` and `RETU
 - **Migration lock (SQLite):** `serve` (when migrating) and `liturgist migrate` hold an exclusive OS file lock on `<DataDir>/liturgist.lock` from the version check through the copy, the migrations and the copy cleanup. A second process waits up to 30 s, then exits 1 with "another Liturgist process is migrating this database". PostgreSQL uses the advisory lock below instead.
 - **On `serve` start** (when `AutoMigrate`) and on `liturgist migrate`:
   1. Read the current version. If it is **greater** than the newest embedded version → exit code 3 with "Database version N is newer than this program (max M). Install version ≥ X or restore a backup." — unless `--allow-newer-schema` is given (§5.1).
-  2. If migrations are pending and the driver is SQLite: write a **pre-upgrade copy** with `VACUUM INTO '<DataDir>/backups/pre-upgrade-v<current version>-<UTC timestamp>-<8 random hex>.db'`.
+  2. If migrations are pending, the driver is SQLite and the database is not brand new (version > 0): write a **pre-upgrade copy** with `VACUUM INTO '<DataDir>/backups/pre-upgrade-v<current version>-<UTC timestamp>-<8 random hex>.db'`.
      - Before copying, check free space ≥ 1.2 × (database file size + WAL file size). If there isn't enough, or the copy fails for any reason, **skip the copy**, delete any partial file, and log a warning with the needed and free bytes (as [SPEC.md §8.3](../SPEC.md#83-self-host-operations) requires), then continue.
      - **Strict mode:** with `LITURGIST_REQUIRE_PREUPGRADE_COPY=true`, a skipped or failed copy aborts instead: exit 1 with "pre-upgrade copy could not be made; migration not started".
      - After a successful copy, keep the newest 3 pre-upgrade copies (by file name) and delete older ones.
@@ -163,7 +163,7 @@ The dialect translates driver errors into `app` errors:
 | Busy / serialisation | `SQLITE_BUSY` after timeout | `40001`, `40P01` | retried by `Tx.Write` (3×), then `app.ErrUnavailable` |
 | Connection failure | open/IO error | connection error | `app.ErrUnavailable` |
 
-Constraint names are identical in both migrations (e.g. `users_email_key`) so mapping by name works for both. PostgreSQL reports the constraint name directly. SQLite reports the **columns** for ordinary unique constraints (`UNIQUE constraint failed: users.email`), so the SQLite dialect keeps a small table from columns to constraint names, filled in with each migration that adds a unique constraint; partial unique indexes are reported by index name and need no entry.
+Constraint names are identical in both migrations (e.g. `users_email_key`) so mapping by name works for both. PostgreSQL reports the constraint name directly. SQLite reports the **columns** for ordinary unique constraints (`UNIQUE constraint failed: users.email`), so the SQLite dialect keeps a small table from columns to constraint names, filled in with each migration that adds a unique constraint; this includes unique indexes, partial or not (only indexes on expressions are reported by name). When one write violates **several** unique constraints at once, the dialects may report different ones: use cases must not depend on which name comes back in that case, and the name-completeness test (TC-P-010) violates exactly one constraint per case.
 
 ## 9. Anti-patterns (DO NOT)
 

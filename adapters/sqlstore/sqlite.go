@@ -103,11 +103,51 @@ func (sqliteDialect) MapError(err error) error {
 	return err
 }
 
-// sqliteUniqueNames maps the columns SQLite reports for ordinary unique
-// constraints ("users.email") to the constraint names used in both dialects
-// (02 §8). Partial unique indexes are reported by index name and need no entry.
-// Filled in by the schema migrations (slice 2b).
-var sqliteUniqueNames = map[string]string{}
+// sqliteUniqueNames maps the columns SQLite reports for unique violations
+// ("UNIQUE constraint failed: users.email") to the constraint names used in both
+// dialects (02 §8). Every unique constraint, primary key and unique index needs an
+// entry; TestUniqueConstraintNames fails if one is missing.
+var sqliteUniqueNames = map[string]string{ //nolint:gosec // constraint names, not credentials
+	"translations.id":   "translations_pkey",
+	"translations.code": "translations_code_key",
+
+	"churches.id": "churches_pkey",
+
+	"users.id":    "users_pkey",
+	"users.email": "users_email_key",
+	"users.phone": "users_phone_key",
+
+	"memberships.id": "memberships_pkey",
+	"memberships.church_id, memberships.user_id": "memberships_church_user_key",
+	"memberships.church_id, memberships.id":      "memberships_church_id_key",
+
+	"roles.id":                        "roles_pkey",
+	"roles.church_id, roles.name_key": "roles_church_name_key",
+	"roles.church_id, roles.origin":   "roles_church_origin_key",
+	"roles.church_id, roles.id":       "roles_church_id_key",
+
+	"role_scopes.role_id, role_scopes.scope": "role_scopes_pkey",
+
+	"membership_roles.membership_id, membership_roles.role_id": "membership_roles_pkey",
+
+	"invites.id":                       "invites_pkey",
+	"invites.token_hash":               "invites_token_hash_key",
+	"invites.church_id, invites.id":    "invites_church_id_key",
+	"invites.church_id, invites.email": "invites_church_email_open_key",
+	"invites.church_id, invites.phone": "invites_church_phone_open_key",
+
+	"invite_roles.invite_id, invite_roles.role_id": "invite_roles_pkey",
+
+	"sessions.token_hash": "sessions_pkey",
+
+	"password_resets.id":         "password_resets_pkey",
+	"password_resets.token_hash": "password_resets_token_hash_key",
+	"password_resets.user_id":    "password_resets_user_open_key",
+
+	"auth_throttle.key": "auth_throttle_pkey",
+
+	"setup_tokens.id": "setup_tokens_pkey",
+}
 
 var sqliteUniqueRe = regexp.MustCompile(`UNIQUE constraint failed: (.+?)(?: \(|$)`)
 
