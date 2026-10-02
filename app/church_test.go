@@ -6,6 +6,7 @@ package app_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/url"
 	"slices"
 	"strings"
@@ -117,6 +118,18 @@ func (e cenv) role(o domain.RoleOrigin) domain.Role {
 		return err
 	})
 	return r
+}
+
+// limitAdmin takes the liturgy and library scopes away from the Church admin
+// role, so escalation can be tested with an actor who lacks some scopes.
+func (e cenv) limitAdmin() {
+	e.t.Helper()
+	admin := e.role(domain.OriginChurchAdmin)
+	limited := []domain.Scope{domain.ScopeChurchSettings, domain.ScopeMembersView, domain.ScopeMembersManage,
+		domain.ScopeRolesManage, domain.ScopeTemplatesEdit, domain.ScopeLiturgyManage}
+	if _, err := e.roles.Update(e.ctx, e.admin, admin.ID, app.RoleChange{Scopes: &limited}); err != nil {
+		e.t.Fatal(err)
+	}
 }
 
 func (e cenv) write(fn func(s app.Store) error) {
@@ -336,6 +349,7 @@ func TestMembershipAndScopeChecks(t *testing.T) {
 // IT-T-007, TC-A-007, TC-A-009: role editor safeguards.
 func TestRoleSafeguards(t *testing.T) {
 	e := newChurch(t, sqlstoretest.NewSQLite(t), nil)
+	e.limitAdmin()
 	admin := e.role(domain.OriginChurchAdmin)
 	lit := e.role(domain.OriginLiturgist)
 	l, _ := e.member("lit@example.org", lit.ID)
@@ -385,6 +399,7 @@ func TestRoleSafeguards(t *testing.T) {
 // TC-T-002, TC-A-009 and member safeguards.
 func TestMemberSafeguardsAndActions(t *testing.T) {
 	e := newChurch(t, sqlstoretest.NewSQLite(t), nil)
+	e.limitAdmin()
 	admin := e.role(domain.OriginChurchAdmin)
 	lit := e.role(domain.OriginLiturgist)
 	editor := e.role(domain.OriginEditor)
@@ -454,9 +469,27 @@ func TestMemberSafeguardsAndActions(t *testing.T) {
 	}
 }
 
+// The ready-made Church admin holds every scope, so it can invite with and
+// assign every ready-made role.
+func TestAdminGivesEveryRole(t *testing.T) {
+	e := newChurch(t, sqlstoretest.NewSQLite(t), nil)
+	_, teamID := e.member("team@example.org")
+	for i, rm := range domain.ReadyMadeRoles {
+		r := e.role(rm.Origin)
+		if _, _, err := e.invites.Create(e.ctx, e.admin, app.InviteInput{Name: "N", Email: fmt.Sprintf("n%d@example.org", i),
+			RoleIDs: []domain.RoleID{r.ID}}); err != nil {
+			t.Errorf("invite as %s: %v", rm.Origin, err)
+		}
+		if _, err := e.members.SetRoles(e.ctx, e.admin, teamID, []domain.RoleID{r.ID}); err != nil {
+			t.Errorf("assign %s: %v", rm.Origin, err)
+		}
+	}
+}
+
 // Deleting a role held by members needs its scopes and removes it from them.
 func TestDeleteRole(t *testing.T) {
 	e := newChurch(t, sqlstoretest.NewSQLite(t), nil)
+	e.limitAdmin()
 	editor := e.role(domain.OriginEditor)
 	_, mid := e.member("ed@example.org", editor.ID)
 	if err := e.roles.Delete(e.ctx, e.admin, editor.ID); !scopeNotHeld(err, domain.ScopeLibraryEdit, domain.ScopeLiturgyComment, domain.ScopeLiturgyEdit) {
@@ -481,6 +514,7 @@ func TestDeleteRole(t *testing.T) {
 // IT-A-004: invite a new user, with corrections at acceptance.
 func TestInviteNewUser(t *testing.T) {
 	e := newChurch(t, sqlstoretest.NewSQLite(t), nil)
+	e.limitAdmin()
 	editor := e.role(domain.OriginEditor)
 	if _, _, err := e.invites.Create(e.ctx, e.admin, app.InviteInput{Name: "Sari", Phone: "0812-0000-0000", RoleIDs: []domain.RoleID{editor.ID}}); !scopeNotHeld(err, domain.ScopeLibraryEdit, domain.ScopeLiturgyComment, domain.ScopeLiturgyEdit) {
 		t.Fatalf("inviting with a role whose scopes aren't held: %v", err)
@@ -647,6 +681,7 @@ func TestInviteLifecycleAndLimit(t *testing.T) {
 // IT-A-008: admin-created reset links.
 func TestAdminReset(t *testing.T) {
 	e := newChurch(t, sqlstoretest.NewSQLite(t), nil)
+	e.limitAdmin()
 	m, mid := e.member("m@example.org")
 	_, litID := e.member("lit@example.org", e.role(domain.OriginLiturgist).ID)
 

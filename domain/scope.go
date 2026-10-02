@@ -138,8 +138,8 @@ type ReadyMadeRole struct {
 
 // ReadyMadeRoles are created for every new church.
 var ReadyMadeRoles = []ReadyMadeRole{
-	{OriginChurchAdmin, map[string]string{"en": "Church admin", "id": "Admin gereja"},
-		[]Scope{ScopeChurchSettings, ScopeMembersView, ScopeMembersManage, ScopeRolesManage, ScopeTemplatesEdit, ScopeLiturgyManage}},
+	// Church admin holds every scope, so it can give every role (03 §8 rule 2).
+	{OriginChurchAdmin, map[string]string{"en": "Church admin", "id": "Admin gereja"}, AllScopes},
 	{OriginLiturgist, map[string]string{"en": "Liturgist", "id": "Liturgis"},
 		[]Scope{ScopeMembersView, ScopeLiturgyEdit, ScopeLiturgyComment, ScopeLiturgyApprove, ScopeLiturgyManage}},
 	{OriginEditor, map[string]string{"en": "Editor", "id": "Editor"},

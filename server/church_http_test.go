@@ -118,7 +118,7 @@ func TestSetupHTTP(t *testing.T) {
 	church, _ := me["church"].(map[string]any)
 	membership, _ := me["membership"].(map[string]any)
 	if church == nil || church["name"] != "GKY Citragarden" || church["default_translation_code"] != "TB" ||
-		membership == nil || len(membership["scopes"].([]any)) != 6 {
+		membership == nil || len(membership["scopes"].([]any)) != 10 {
 		t.Errorf("me after setup: %v", me)
 	}
 	rec := h.do(req{method: "POST", path: "/api/v1/setup", body: map[string]any{"token": "x",
@@ -212,7 +212,20 @@ func TestScopesHTTP(t *testing.T) {
 		body: map[string]any{"name": "A", "email": "a@example.org"}}); rec.Code != http.StatusForbidden {
 		t.Errorf("viewer invites: %d", rec.Code)
 	}
-	// Escalation is 403 scope_not_held with the scopes.
+	// Escalation is 403 scope_not_held with the scopes: first take
+	// liturgy.approve away from the admin's own role.
+	var roles []map[string]any
+	_ = json.Unmarshal(h.get("/api/v1/roles", admin).Body.Bytes(), &roles)
+	var adminRole string
+	for _, r := range roles {
+		if r["origin"] == "church_admin" {
+			adminRole = r["id"].(string)
+		}
+	}
+	if rec := h.do(req{method: "PATCH", path: "/api/v1/roles/" + adminRole, cookies: []*http.Cookie{admin},
+		body: map[string]any{"scopes": []string{"church.settings", "members.view", "members.manage", "roles.manage"}}}); rec.Code != 200 {
+		t.Fatalf("limit admin role: %d %s", rec.Code, rec.Body.String())
+	}
 	rec = h.do(req{method: "POST", path: "/api/v1/roles", cookies: []*http.Cookie{admin},
 		body: map[string]any{"name": "Approver", "scopes": []string{"liturgy.approve"}}})
 	if p := problemCode(t, rec); rec.Code != http.StatusForbidden || p["code"] != "scope_not_held" || p["scopes"].([]any)[0] != "liturgy.approve" {

@@ -49,11 +49,12 @@ func TestLockoutAndMissing(t *testing.T) {
 			t.Errorf("%s: %v", c.name, got)
 		}
 	}
-	lit, _ := ReadyMade(OriginLiturgist)
+	// The Church admin can give every ready-made role (03 §8 rule 2).
 	admin, _ := ReadyMade(OriginChurchAdmin)
-	missing := NewScopeSet(admin.Scopes...).Missing(NewScopeSet(lit.Scopes...))
-	if !slices.Equal(missing, []Scope{ScopeLiturgyApprove, ScopeLiturgyComment, ScopeLiturgyEdit}) {
-		t.Errorf("admin lacks: %v", missing)
+	for _, r := range ReadyMadeRoles {
+		if missing := NewScopeSet(admin.Scopes...).Missing(NewScopeSet(r.Scopes...)); len(missing) != 0 {
+			t.Errorf("admin lacks %v of %s", missing, r.Origin)
+		}
 	}
 }
 
