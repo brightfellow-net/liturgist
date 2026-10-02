@@ -1,7 +1,8 @@
 # Liturgist App — MVP Specification
 
-> Handoff document for Claude Code. Read this fully before writing code.
-> Where this document says **Open decision**, ask the project owner before choosing.
+> **Document type: Strategic** (what to build and why). How to build each step is in the implementation documents under [`docs/impl/`](impl/README.md); see [section 12](#12-references).
+> Read this fully before writing code. Where this document says **Open decision**, ask the project owner before choosing.
+> Sections 1–10 are authoritative. The decisions log (section 11) records when and why each decision was made; where a log row and a section differ, the section wins.
 
 ## 1. Context
 
@@ -32,20 +33,49 @@ The liturgist builds the liturgy directly in the app. Songs and readings are pic
 
 ## 4. Users and roles (MVP)
 
-| Role | Can do |
-|---|---|
-| **Liturgist** | Create/edit liturgies, assign team, pick songs/readings, review, comment, approve, publish |
-| **Administrator** | Edit liturgies, maintain song and reading library, fix content, respond to review comments |
-| **Team member** | View all published liturgies of their church (read-only) |
-| **Church admin** | Manage users, roles, templates, church settings |
+What a member may do is decided by **roles**, which each church defines itself. A role has a name, a short description and a set of **scopes**. Scopes are fixed in the code; each is one capability. A member can hold several roles.
 
-One user may hold several roles. Multimedia team is a team-member role for now; dedicated slide features come after the MVP.
+**Baseline (every member, no role needed):** view all published liturgies of the church, "my assignments", and their own profile. A member with no role is a **team member**.
+
+**Scopes:**
+
+| Scope | Allows |
+|---|---|
+| `church.settings` | Change church settings |
+| `members.view` | See the member list with contact details |
+| `members.manage` | Invite and remove members; create password-reset links |
+| `roles.manage` | Create, edit and delete roles; assign roles to members |
+| `library.edit` | Maintain songs and readings; imports |
+| `templates.edit` | Maintain templates and regular services |
+| `liturgy.edit` | Create and edit liturgies, assign the team, submit and resubmit for review |
+| `liturgy.comment` | Comment on liturgy items; resolve comments |
+| `liturgy.approve` | Approve, request changes, publish, reopen |
+| `liturgy.manage` | Archive and unarchive published liturgies; delete unpublished liturgies |
+
+**Ready-made roles**, created for every new church; names, descriptions and scopes can be changed:
+
+| Role | Scopes | Matches today's job at GKY |
+|---|---|---|
+| Church admin | `church.settings`, `members.view`, `members.manage`, `roles.manage`, `templates.edit`, `liturgy.manage` | Whoever manages the app for the church |
+| Liturgist | `members.view`, `liturgy.edit`, `liturgy.comment`, `liturgy.approve`, `liturgy.manage` | The liturgist |
+| Editor | `members.view`, `library.edit`, `liturgy.edit`, `liturgy.comment` | The administrator who drafts the document |
+
+**Safeguards:**
+1. **No lock-out:** at least one member must always hold both `roles.manage` and `members.manage`; any change that would break this is refused.
+2. **No privilege escalation:** a member can only put scopes they hold themselves into a role, and can only assign a role to someone if they hold every scope in it.
+3. Deleting a role that members hold needs confirmation and removes it from them, subject to rule 1.
+4. Scopes stay coarse, so new features usually fall under an existing scope. When a release adds a scope, a migration adds it to the ready-made roles (found by a hidden origin key even if renamed), and the release notes tell admins to check their own roles.
+5. Code checks scopes only, never role names.
+
+**Duties** (e.g. Pemandu Pujian, Pemusik, Pembaca Alkitab) are a separate concept: the tasks people are assigned in a liturgy (5.2). They are not roles and grant no permissions.
+
+The multimedia team are team members for now; dedicated slide features come after the MVP.
 
 ## 5. MVP scope
 
 ### 5.1 Liturgy templates
 - A church defines reusable templates: an ordered list of liturgy items (e.g. Votum & Salam, Pujian, Pembacaan Alkitab, Doa Syafaat, Khotbah, Persembahan, Berkat).
-- Each template item has: title, item type (song, reading, prayer, sermon, free text, other), optional default text, optional default role.
+- Each template item has: title, item type (song, reading, prayer, sermon, free text, other), optional default text, optional default duty.
 - Multiple templates per church (regular Sunday, Holy Communion, special services).
 - Each template has a **language** (e.g. a Mandarin template has Mandarin item titles), defaulting to the church's default language.
 
@@ -64,7 +94,7 @@ One user may hold several roles. Multimedia team is a team-member role for now; 
     - Non-lyric entries (intro, instrumental interlude, spoken lines) are not in the MVP; the model leaves room for them.
   - **Reading:** Bible reference (book, chapter, verse range) linked to a stored reading text.
   - **Other:** free text.
-- Assign team members to roles for this liturgy (liturgist, worship leader, musicians, readers, multimedia, etc.). Role names are configurable per church.
+- Assign team members to **duties** for this liturgy (e.g. liturgist, worship leader, musicians, readers, multimedia). Duty names are configurable per church. Duties are not roles and grant no permissions (see 4).
 - **Several people editing at once.** The liturgy and each item carry a version; every change states the version it was based on. The server rejects a change only when that same item (or, for reordering and state changes, the liturgy) changed in the meantime; the editor then shows "changed meanwhile", reloads that item and keeps the user's own text so it can be re-applied. Other people's changes appear live, and the editor shows who else is editing (e.g. "Budi is also editing").
 - **Undo/redo** is per person: Ctrl+Z undoes your own latest change, and is refused with a clear message if someone has since changed that item. The history is stored per liturgy and visible to everyone editing it.
 
@@ -110,7 +140,7 @@ Draft ──submit──▶ In Review ──approve──▶ Approved ──publ
                      └──request changes──▶ Needs Revision ──resubmit──▶ In Review
 ```
 
-- Liturgist and administrator can comment on a **specific liturgy item**, not just the liturgy as a whole. Comments can be resolved.
+- Members with `liturgy.comment` can comment on a **specific liturgy item**, not just the liturgy as a whole. Comments can be resolved.
 - Only **Draft** and **Needs Revision** liturgies can be edited. **In Review** is read-only apart from comments; to change anything, the reviewer requests changes (→ Needs Revision).
 - Approved and Published liturgies are locked. Editing after approval requires explicitly reopening it (back to Draft), and this should be recorded.
 - Keep a simple history of state changes (who, when).
@@ -136,7 +166,7 @@ Draft ──submit──▶ In Review ──approve──▶ Approved ──publ
   - Checkboxes to include or leave out songs, keys and readings.
   - WhatsApp formatting only: `*bold*` and plain URLs (no Markdown links); short lines that read well on a phone.
   - Tone of personal messages: a friendly greeting with the person's name, avoiding "kamu" or "Bapak/Ibu".
-  - Message texts use the app's translations (Indonesian and English in the MVP, Mandarin later). Message templates each church can edit come later.
+  - Messages are written in the **liturgy's language** when the app has a translation for it (Indonesian and English in the MVP, Mandarin later), otherwise in the church's default UI language. So an Indonesian service gets Indonesian messages even when the sender uses the app in English. Message templates each church can edit come later.
 
   Example team summary:
 
@@ -172,7 +202,7 @@ Draft ──submit──▶ In Review ──approve──▶ Approved ──publ
   ```
 
 ### 5.7 First-time experience
-- **Setup wizard** (the setup page from the decisions log): church name and first admin (name, email or phone, password); default language; default Bible translation; time zone (WIB, WITA or WIT); key display ("Do = G" or "G"); regular services. Everything can be changed later in settings.
+- **Setup wizard** (the setup page from the decisions log): church name and first admin (name, email or phone, password); default UI language for members (English pre-selected); default content language; default Bible translation; time zone (WIB, WITA or WIT); key display ("Do = G" or "G"); regular services. Everything can be changed later in settings.
 - **Seeded defaults**, created as normal editable data in the church's default language:
   - role types (e.g. Liturgis, Pemandu Pujian, Pemusik, Pembaca Alkitab, Pengkhotbah, Multimedia, Kolektan);
   - singing parts (Semua, Pemandu, Jemaat, Pria, Wanita, Paduan Suara);
@@ -183,12 +213,13 @@ Draft ──submit──▶ In Review ──approve──▶ Approved ──publ
 - **Helpful empty screens:** every empty list explains what to do next with direct actions (e.g. an empty song library offers EasyWorship import, paste lyrics, add a song).
 - **Team member welcome:** after accepting an invite, team members land on "Tugas saya" (my assignments) with a short welcome and simple steps to add the app to the home screen on Android and iPhone.
 - **No sample data** in installs (almost all Indonesian hymn lyrics are copyrighted).
+- **Defaults for features added later:** when a release introduces seeded defaults, its migration also adds them to existing churches that don't have them yet, so churches set up early are not left without them.
 
 ### 5.8 Accessibility and older volunteers
 Many readers, elders and liturgists are older, use mid-range Android phones with large system text, and sometimes read from a phone at the lectern.
 - **Text size:** the UI uses relative sizes (no fixed pixel sizes) and works with the phone's text size at 200%. An in-app control (A · A+ · A++) on the published view and "Tugas saya" is saved to the person's account, so it follows them to a new phone.
-- **Simpler navigation** for people who are only team members (no editing roles): just "Tugas saya" (my assignments) and "Liturgi" (published liturgies); no admin menus or empty editor screens.
-- **General rules:** tap targets of at least 48 px; buttons labelled with words, not icons alone; plain Indonesian (e.g. "Tambahkan ke layar utama", never "PWA" or "sync"); dark mode follows the phone's setting.
+- **Simpler navigation** for people who are only team members (no roles): just "Tugas saya" (my assignments) and "Liturgi" (published liturgies); no admin menus or empty editor screens.
+- **General rules:** tap targets of at least 48 px; buttons labelled with words, not icons alone; plain wording in every language (e.g. Indonesian "Tambahkan ke layar utama", English "Add to home screen"; never "PWA" or "sync"); dark mode follows the phone's setting.
 - Reading mode is described in 5.6.
 
 ## 6. Out of scope for MVP (but design for it)
@@ -210,20 +241,23 @@ Many readers, elders and liturgists are older, use mid-range Android phones with
 
 Starting point, not final. Refine as needed.
 
-- **Church**: id, name, default_language, default_translation_id, time_zone (e.g. `Asia/Jakarta`), logo_file? (stored through `Storage`), settings (incl. key display format: "Do = G" or "G", print defaults, church licences such as a CCLI licence number, and whether credit lines are shown) *(slug is SaaS-only; see 8.1.1)*
+- **Church**: id, name, default_language (content), default_ui_language (`en` or `id`), default_translation_id, time_zone (e.g. `Asia/Jakarta`), logo_file? (stored through `Storage`), settings (incl. key display format: "Do = G" or "G", print defaults, church licences such as a CCLI licence number, and whether credit lines are shown) *(slug is SaaS-only; see 8.1.1)*
 - **ChurchSlugRedirect**: old_slug, church_id *(SaaS-only, and only if slug renaming is allowed; see 8.1.1)*
 - **User**: id, name, email?, phone?, password_hash, preferences (text size, UI language), last_seen_at *(platform-wide, no church_id; at least one of email or phone; each is unique across the platform)*
-- **Membership**: id, user_id, church_id, roles *(roles apply per church; a user may belong to several churches)*
-- **RoleType**: id, church_id, name (e.g. "Pemandu Pujian", "Pemusik")
+- **Membership**: id, user_id, church_id *(roles via `MembershipRole`; roles apply per church; a user may belong to several churches)*
+- **Role**: id, church_id, name, description, origin? (`church_admin`, `liturgist`, `editor` for ready-made roles; null for roles the church creates)
+- **RoleScope**: role_id, scope *(scopes are constants in code; see 4)*
+- **MembershipRole**: membership_id, role_id
+- **Duty**: id, church_id, name (e.g. "Pemandu Pujian", "Pemusik") *(liturgy tasks; formerly `RoleType`)*
 - **Template**: id, church_id, name, language
 - **Service**: id, church_id, name, language, default_template_id
 - **ServiceTime**: id, service_id, weekday, time *(one or more per service)*
-- **TemplateItem**: id, template_id, position, title, item_type, default_text, default_role_type_id
+- **TemplateItem**: id, template_id, position, title, item_type, default_text, default_duty_id
 - **Liturgy**: id, church_id, date, service_id? (null for one-off services), service_name (copy), time?, language, template_id (origin), state, version, archived_at (null = active), archived_by, created_by, timestamps
 - **LiturgyItem**: id, liturgy_id, position, title, item_type, reading_id?, text?, version *(songs are attached through `LiturgyItemSong`)*
 - **LiturgyItemSong**: id, liturgy_item_id, position, song_id, key?, note? *(several per item = medley)*
 - **SequenceEntry**: id, liturgy_item_song_id, position, kind (MVP: `section` only; later `instrumental`, `spoken`, …), song_section_id?, singing_part_id?, key_change?, note?
-- **Assignment**: id, liturgy_id, user_id (or free-text name for non-users), role_type_id
+- **Assignment**: id, liturgy_id, user_id (or free-text name for non-users), duty_id
 - **Song**: id, church_id, song_group_id?, language, title, alt_titles, hymnal_source, hymnal_number, lyricist, composer, translator, default_key, copyright_holder, copyright_line, ccli_song_number?, licence_status (unknown, public_domain, church_licence, permission_obtained), license_notes, default_arrangement? (ordered list of section ids)
 - **SongSection**: id, song_id, position, kind (verse, pre_chorus, chorus, bridge, tag, intro, ending, other), number?, label (Verse 1, Chorus…), text
 - **SingingPart**: id, church_id, name (e.g. Semua, Pemandu, Jemaat, Pria, Wanita, Paduan Suara; seeded with defaults, editable per church)
@@ -246,6 +280,13 @@ Starting point, not final. Refine as needed.
   - Migrations must run on both. Tests should run against both, or at minimum against SQLite with PostgreSQL in CI.
   - The SaaS uses one shared PostgreSQL database (decided 2026-10-02; see decisions log).
 - **Tenant-ready:** all church-owned data scoped by `church_id`, behind a tenant context and church-scoped repositories (8.1). One church per community install; multi-church hosting is SaaS-only (8.1.1).
+- **UI language:** English first, Indonesian second, with i18n from the start. English is the source language for all UI text; every Indonesian message file must contain every key. Each church has a default UI language for its members (English unless changed); each user can choose their own, saved in `User.preferences`. This is separate from content language (5.2), which stays per church, liturgy and song.
+- **Mobile-friendly:** team members will mostly open links on phones.
+- **Privacy:** no analytics or tracking scripts in any install. A short privacy notice page in the app explains what personal data is stored (names, phone numbers, emails; IP addresses only briefly, to block password guessing, deleted within about an hour), why, and who can see it; the church admin can add the church's contact details. It is linked from the login and invite pages. Applies to every install (Indonesia's UU PDP).
+- **Accessibility:** WCAG 2.2 AA as the target, checked automatically with axe in the Playwright tests (see 5.8).
+- **No bundled copyrighted content** (lyrics, Bible text).
+- Apache-2.0 license headers/notice per repository convention.
+- Tests for workflow state transitions and permissions at minimum.
 
 ### 8.1 Tenancy
 
@@ -254,9 +295,9 @@ Each community install serves **exactly one church**. To serve several churches,
 **Community foundation (this repository):**
 
 1. **Church-owned data.** Every church-owned row has `church_id`; indexes and foreign keys between church-owned tables include it.
-2. **Tenant context.** Every request carries the church it is for, provided by the `TenantResolver` port. The community implementation returns the single church from config. Handlers never decide the church themselves.
+2. **Tenant context.** Every request carries the church it is for, provided by the `TenantResolver` port. The community implementation returns the install's only church from the database (created by setup); the server refuses to start if the database holds more than one church. Handlers never decide the church themselves.
 3. **Scoped data access.** All queries for church-owned data go through the tenant context, so a handler cannot fetch another church's records by accident (e.g. a repository/query layer that requires the tenant, rather than ad-hoc `WHERE church_id = ?` in handlers).
-4. **Authorization checks membership.** Users are platform-wide (see 7), so on every request the use cases verify that the logged-in user is a member of the request's church with the needed role; otherwise 403 (or 404 to avoid revealing what exists). **This is the most important security requirement of the tenancy design.** Community tests cover users without a membership and users with the wrong role, for liturgies, comments, PDF, share links and API endpoints.
+4. **Authorization checks membership.** Users are platform-wide (see 7), so on every request the use cases verify that the logged-in user is a member of the request's church with the needed role; otherwise 404 if they are not a member or cannot see the resource (identical to "doesn't exist"), and 403 if they can see it but lack the scope for the action. **This is the most important security requirement of the tenancy design.** Community tests cover users without a membership and users with the wrong role, for liturgies, comments, PDF, share links and API endpoints.
 5. **URL generation through `URLBuilder`.** All internal links, redirects, PDF links and share links are built by the `URLBuilder` port. The community implementation adds no prefix (`/liturgies/…`, `/api/v1/…`). No hardcoded paths in handlers or the frontend's link-building code.
 6. **Share links.** Published-liturgy links (web view, PDF, "my assignments") are normal church URLs and require login; after login the user returns to the link they opened. Guest links without login are deferred (see decisions log).
 7. **First-time setup** creates the install's one church and its first admin (see decisions log).
@@ -278,13 +319,6 @@ e.g. https://liturgist.brightfellow.net/gky-citragarden/liturgies/2026-10-11
 - **Cross-church tests.** All churches share one domain, so the session cookie is valid on every church's path. Dedicated tests: a user of church A requesting church B's liturgy, comments, PDF, share links and API endpoints through B's URLs.
 - **Church onboarding** and **PostgreSQL row-level security policies** (see decisions log).
 
-- **UI language:** Indonesian first, with i18n from the start (English as second locale).
-- **Mobile-friendly:** team members will mostly open links on phones.
-- **Privacy:** no analytics or tracking scripts in any install. A short privacy notice page in the app explains what personal data is stored (names, phone numbers, emails), why, and who can see it; the church admin can add the church's contact details. It is linked from the login and invite pages. Applies to every install (Indonesia's UU PDP).
-- **Accessibility:** WCAG 2.2 AA as the target, checked automatically with axe in the Playwright tests (see 5.8).
-- **No bundled copyrighted content** (lyrics, Bible text).
-- Apache-2.0 license headers/notice per repository convention.
-- Tests for workflow state transitions and permissions at minimum.
 
 ### 8.2 Extensibility and editions
 
@@ -298,7 +332,7 @@ e.g. https://liturgist.brightfellow.net/gky-citragarden/liturgies/2026-10-11
 | `BibleTextProvider` | Return text for a reference + translation | Manual entry with reuse (5.4) | Licensed provider API, public-domain translations |
 | `Exporter` | Render a liturgy to an output format | PDF, web view | Slides (PPTX/OpenLP/presenter), other print layouts |
 | `Storage` | Store generated files and future media | Local filesystem | Object storage (S3-compatible) |
-| `AuthProvider` | Authenticate users | Per open decision 2 | SSO / Google login |
+| `AuthProvider` | Authenticate users | Password login for invited accounts (see decisions log) | SSO / Google login, passkeys, email magic links |
 | `EventBus` | Deliver live "liturgy changed" and presence events to open editors | In-memory (one process) | PostgreSQL `LISTEN/NOTIFY` across several server instances (SaaS) |
 | `Importer` | Turn a file or pasted text into import candidates (songs, readings) | Paste and split, OpenLyrics, ChordPro; then EasyWorship 6/7 and `.pptx` for the pilot | `.docx`, other presentation software; AI-assisted extraction (opt-in) |
 
@@ -340,10 +374,10 @@ Limit names are constants defined in one place, next to feature names. Self-host
 **Rules for `max_active_liturgies`:**
 
 1. **What counts.** Every liturgy that is not archived counts, in any state (Draft, In Review, Needs Revision, Approved, Published), past or upcoming, and whether it was created from a template or from scratch. Each service counts separately when a date has several.
-2. **Archiving frees a slot.** Users with the liturgist or church admin role can archive a **Published** liturgy. Archiving is a manual action; the app never archives anything automatically. Archived liturgies are kept in full, are never deleted by the limit, and **remain viewable read-only on every plan**, including PDF export. Archiving manages slots and clutter; it does not take a church's history away.
-3. **Deleting unpublished liturgies frees a slot.** Users with the liturgist or church admin role can delete any liturgy that is not yet Published (Draft, In Review, Needs Revision, Approved), with a confirmation step. Deletion removes the liturgy with its items, assignments and comments. Published liturgies cannot be deleted, only archived.
+2. **Archiving frees a slot.** Members with `liturgy.manage` (by default Liturgist and Church admin) can archive a **Published** liturgy. Archiving is a manual action; the app never archives anything automatically. Archived liturgies are kept in full, are never deleted by the limit, and **remain viewable read-only on every plan**, including PDF export. Archiving manages slots and clutter; it does not take a church's history away.
+3. **Deleting unpublished liturgies frees a slot.** Members with `liturgy.manage` (by default Liturgist and Church admin) can delete any liturgy that is not yet Published (Draft, In Review, Needs Revision, Approved), with a confirmation step. Deletion removes the liturgy with its items, assignments and comments. Published liturgies cannot be deleted, only archived.
 4. **Creation is blocked at the limit.** Creating a new liturgy (from a template, from scratch, by duplicating, or through "Prepare next week") when the church is at the limit is blocked with a message offering the ways forward: upgrade, archive a published liturgy, or delete an unpublished one. The message should list the oldest published liturgies with a one-click archive action, so a church can continue in seconds.
-   - **"Prepare next week" at the limit:** the list shows how many of the week's liturgies fit within both limits. When the week needs more slots than are free, it offers one button: "Archive last week's N published liturgies and create these N" (only Published liturgies, only for liturgist or church admin). The user can instead untick extras, or archive or delete other liturgies first. Archiving still happens only when the user presses the button; nothing is archived automatically.
+   - **"Prepare next week" at the limit:** the list shows how many of the week's liturgies fit within both limits. When the week needs more slots than are free, it offers one button: "Archive last week's N published liturgies and create these N" (only Published liturgies, only for members with `liturgy.manage`). The user can instead untick extras, or archive or delete other liturgies first. Archiving still happens only when the user presses the button; nothing is archived automatically.
 5. **Restoring needs a slot.** Unarchiving a liturgy makes it count again, so it is only allowed when the church is under the limit.
 6. **Existing work is never blocked.** Editing, reviewing, approving, publishing, viewing, and exporting liturgies that already exist are never affected by the limit; only creating new ones is.
 7. **Downgrades are gentle.** If a church on a paid plan drops to free while over the limit, nothing is archived or locked automatically. The church simply cannot create new liturgies until it archives enough to get under the limit.
@@ -360,14 +394,14 @@ Limit names are constants defined in one place, next to feature names. Self-host
 
 **Rules for `max_team_members`:**
 
-1. **What counts.** Every active membership in the church, whatever its roles (liturgist, administrator, church admin, team member), plus every pending, unexpired invite. Free-text names used in assignments are not counted and stay unlimited. A person who belongs to several churches counts once in each.
+1. **What counts.** Every active membership in the church, whatever its roles (including members with no role), plus every pending, unexpired invite. Free-text names used in assignments are not counted and stay unlimited. A person who belongs to several churches counts once in each.
 2. **Invites reserve a slot.** Creating an invite takes a slot, so accepting it never fails. Expired or cancelled invites free their slot.
 3. Enforced at the moment of adding: inviting or adding a member beyond the limit is blocked with a clear upgrade message.
 4. **Freeing a slot.** A church admin can remove a member or cancel an invite; the slot is freed immediately. "Remove member" is part of the MVP.
 5. Existing members are never removed or locked out automatically, including after a downgrade; new invites are simply blocked until the count is under the limit.
 6. Church settings show usage (e.g. "9 of 12 team members").
 
-**Tests:** counting across all states and multiple services per date; blocked creation via every creation path (template, scratch, duplicate, "Prepare next week") for each limit separately; "Prepare next week" shows correctly how many liturgies fit and creates none beyond the limits; the combined archive-and-create button archives only Published liturgies, only for permitted roles, and only when pressed; archive only allowed for Published and only by permitted roles; delete only allowed for unpublished liturgies and only by permitted roles; archived liturgies viewable and exportable on the free plan; unarchive blocked at the limit; existing liturgies fully usable at and over the limit; downgrade behavior; blocked member invites; team-member count includes every role and pending invites but not free-text assignees; accepting a reserved invite never fails; expired, cancelled or removed entries free a slot.
+**Tests:** counting across all states and multiple services per date; blocked creation via every creation path (template, scratch, duplicate, "Prepare next week") for each limit separately; "Prepare next week" shows correctly how many liturgies fit and creates none beyond the limits; the combined archive-and-create button archives only Published liturgies, only for members with `liturgy.manage`, and only when pressed; archive only allowed for Published and only with `liturgy.manage`; delete only allowed for unpublished liturgies and only with `liturgy.manage`; archived liturgies viewable and exportable on the free plan; unarchive blocked at the limit; existing liturgies fully usable at and over the limit; downgrade behavior; blocked member invites; team-member count includes every role and pending invites but not free-text assignees; accepting a reserved invite never fails; expired, cancelled or removed entries free a slot.
 
 ### 8.3 Self-host operations
 
@@ -381,7 +415,8 @@ The person running a community install is usually a volunteer without IT trainin
 
 **Upgrades**
 - Replace the binary (or pull the new image) and restart. Migrations run automatically on startup, after writing a pre-upgrade copy of the database (`backups/pre-upgrade-<old version>.db` for SQLite).
-- Downgrade protection: if the database is newer than the binary, the app refuses to start and says which version is needed.
+- Downgrade protection: if the database is newer than the binary, the app refuses to start and says which version is needed. An `--allow-newer-schema` flag (off by default, for operators) overrides this when rolling back one version.
+- Migrations are forward-only, and follow the expand/contract rule: a release never removes or renames something the previous release still uses, so the previous version can run on the current schema.
 - `--no-auto-migrate` and `liturgist migrate` give manual control (also used by the SaaS, which migrates as a separate deploy step under a PostgreSQL lock).
 
 **Backups and restore**
@@ -421,12 +456,12 @@ The person running a community install is usually a volunteer without IT trainin
 
 ## 10. Suggested build order
 
-1. Project skeleton, data model, migrations (SQLite + PostgreSQL), auth, church + users + roles, tenant context, `TenantResolver` and `URLBuilder` ports, membership tests (8.1), extension-point interfaces and entitlement stub with feature and limit checks (8.2, 8.2.1).
+1. Project skeleton, data model, migrations (SQLite + PostgreSQL) with downgrade protection and the SQLite pre-upgrade copy, auth (with login throttling and trusted proxies), church + users + custom roles with the role editor, tenant context, `TenantResolver` and `URLBuilder` ports, membership tests (8.1), extension-point interfaces and entitlement stub with feature and limit checks (8.2, 8.2.1).
 2. Song library (CRUD, sections, search) and readings store.
 3. Templates and weekly liturgy editor (items, reorder, songs, readings, assignments).
 4. Review workflow with item-level comments and state history.
 5. Published web view, "my assignments" view, PDF output.
-6. Self-host packaging per 8.3: release builds for Linux, Windows and Docker, automatic migrations with pre-upgrade copy, `liturgist backup` / `restore` and scheduled backups, built-in HTTPS, health checks, system page, install and off-site backup guides, README.
+6. Self-host packaging per 8.3: release builds for Linux, Windows and Docker, `liturgist backup` / `restore` and scheduled backups, built-in HTTPS, health checks, system page, install and off-site backup guides, README.
 
 Pilot with GKY Citragarden after step 5; gather feedback from the liturgist, administrator, and multimedia team before starting slides. The pilot plan (goal, success criteria, hosting, timeline, feedback, risk rules) is in [PILOT.md](PILOT.md).
 
@@ -449,11 +484,11 @@ Record resolved decisions here (date, decision, reason). Move items from section
 | 2026-10-02 | Free plan also limits unpublished liturgies (planned: 4), counting Draft, In Review, Needs Revision and Approved | Caps work-in-progress; counting all unpublished states prevents bypassing via review |
 | 2026-10-02 | Clean architecture: domain → application (use cases + ports) → adapters, wired in one composition root by configuration. Persistence, search, transactions and the 8.2 extension points are ports; repositories are tenant-scoped | Core logic stays independent of the database and framework, so SQLite and PostgreSQL can be swapped without touching it; tenant-scoped ports enforce 8.1 rule 3 |
 | 2026-10-02 | One shared SQL persistence adapter with a small dialect layer (placeholders, upserts, locking, full-text search), not separate SQLite and PostgreSQL adapters. Separate migration folders per database with matching versions | Each query is written once and the two databases can't silently drift apart; database-specific differences stay in one small place |
-| 2026-10-02 | Use-case tests run against the real SQLite adapter (in-memory), not hand-written fakes. Repository contract tests run against both SQLite and PostgreSQL (PostgreSQL in CI) | Fast enough for every test run; avoids keeping a third, fake persistence implementation; meets the "tests against both" requirement in 8 |
+| 2026-10-02 | *(Amended 2026-10-02: a temporary SQLite file instead of in-memory, copied from a migrated template; see [02-persistence.md §6](impl/02-persistence.md#6-testing-strategy).)* Use-case tests run against the real SQLite adapter (in-memory), not hand-written fakes. Repository contract tests run against both SQLite and PostgreSQL (PostgreSQL in CI) | Fast enough for every test run; avoids keeping a third, fake persistence implementation; meets the "tests against both" requirement in 8 |
 | 2026-10-02 | Tech stack: Go backend exposing a JSON API (the HTTP adapter over the use cases) + React SPA (Vite + TypeScript) for all web pages, built into the Go binary with `go:embed`. A React Native (Expo) mobile app may follow later, for team members and the multimedia team | Owner has 5 years of Go and knows React. One frontend approach on every page. The multimedia presenter needs client-side, offline-capable code, and React skills and TypeScript packages carry over to React Native. Self-hosters still get a single binary |
 | 2026-10-02 | Backend libraries: chi router; Huma (code-first OpenAPI 3.1); `database/sql` + `sqlx` with hand-written SQL; `modernc.org/sqlite` (pure Go, no CGO) and `pgx`; goose migrations (embedded); ULID IDs; `log/slog`; `go-i18n`; testcontainers-go for PostgreSQL in CI; `depguard` to enforce layer boundaries | Small, stable dependencies; static single binary; OpenAPI generated from Go types keeps the TypeScript client in sync |
-| 2026-10-02 | Frontend libraries: `openapi-typescript` + `openapi-fetch` (types and client generated from the OpenAPI spec); TanStack Query; React Router; React Hook Form + Zod; Tailwind + shadcn/ui; dnd-kit; i18next (same message files as Go, `id` default, `en` second); `vite-plugin-pwa`; Vitest + Testing Library; Playwright for end-to-end | Common, maintained choices. API client, types and i18n can be shared with a future React Native app. shadcn/ui code lives in the repo, which limits dependency churn |
-| 2026-10-02 | Sessions are server-side and stored in the database, in an HttpOnly SameSite=Lax cookie with CSRF protection; a mobile app later uses bearer tokens through `AuthProvider`. The login method itself is still open decision 2 | Sessions can be revoked and work the same on SQLite and PostgreSQL |
+| 2026-10-02 | Frontend libraries: `openapi-typescript` + `openapi-fetch` (types and client generated from the OpenAPI spec); TanStack Query; React Router; React Hook Form + Zod; Tailwind + shadcn/ui; dnd-kit; i18next (same message files as Go, `id` default, `en` second *(amended 2026-10-02: English first; see the UI-language row below)*); `vite-plugin-pwa`; Vitest + Testing Library; Playwright for end-to-end | Common, maintained choices. API client, types and i18n can be shared with a future React Native app. shadcn/ui code lives in the repo, which limits dependency churn |
+| 2026-10-02 | Sessions are server-side and stored in the database, in an HttpOnly SameSite=Lax cookie with CSRF protection; a mobile app later uses bearer tokens through `AuthProvider`. *(The login method was resolved later the same day; see the auth row below.)* | Sessions can be revoked and work the same on SQLite and PostgreSQL |
 | 2026-10-02 | *(Superseded 2026-10-02 by the tenancy-split row below.)* URL layout: in `multi` mode the API is at `/<church_slug>/api/v1/...` and SPA routes at `/<church_slug>/...` (the server returns `index.html`); in `single` mode `/api/v1/...` and `/...`. Platform routes (login, platform API) sit outside any church prefix | Keeps 8.1 unchanged: the first path segment is the church, so the tenant middleware and URL helper work for both API and pages |
 | 2026-10-02 | The API returns the actions the current user may take on each resource (e.g. `"actions": {"submit": true, "edit": false}`). The UI shows or hides controls from these and never re-implements permission or workflow rules | All rules stay in Go, in one place; web and mobile clients stay consistent |
 | 2026-10-02 | *(Amended 2026-10-02: undo is per person, not shared; see the concurrent-editing row below.)* Undo/redo in the liturgy editor is server-side: each editor change is a use-case command recorded per liturgy with the data to reverse it. History is shared by everyone editing that liturgy and lasts after reload, while the liturgy is editable (Draft, Needs Revision). The UI may apply undo immediately and confirm with the server in the background | History is the same on every device and for both editors; it can also show what changed since the last review |
@@ -506,3 +541,26 @@ Record resolved decisions here (date, decision, reason). Move items from section
 | 2026-10-02 | Older volunteers and accessibility: the UI follows the phone's text size (works at 200%), plus an A · A+ · A++ control saved to the account (`User.preferences`). Reading mode in the MVP: large text in one column, high contrast, the viewer's own items highlighted with "Go to my part", a keep-screen-on toggle (Wake Lock), offline through the PWA. People who are only team members see just "Tugas saya" and "Liturgi". WCAG 2.2 AA as the target with automated axe checks; tap targets of at least 48 px, labelled buttons, plain Indonesian, dark mode following the phone | Many team members are older and read from phones at the lectern; these are cheap to build in from the start and expensive to retrofit |
 | 2026-10-02 | Pilot plan recorded in `docs/PILOT.md`: owner-hosted community edition during the pilot (then self-hosting or SaaS); one Indonesian service first, about 8 weeks with a 2-week parallel run; baseline and success criteria; feedback through a WhatsApp group, an in-app feedback link, weekly check-ins, end interviews, a survey and a test with older volunteers; no updates Friday to Sunday, a weekend contact, tested backups | A plan is project work rather than product specification, so it lives in its own file; the product requirements it needs are in this spec |
 | 2026-10-02 | Product requirements from the pilot plan, for every install: no analytics or tracking scripts; a privacy notice page (linked from login and invite pages); an optional "Kirim masukan" feedback link set in settings; `User.last_seen_at` for usage figures from the app's own database | Personal data of church members is covered by UU PDP; usage can be measured without tracking; feedback should be one tap away |
+| 2026-10-02 | UI language: English first, Indonesian second. English is the source language for UI text (`en.json` is the reference; `id.json` must have every key). Each church has a default UI language for its members (`Church.default_ui_language`, chosen in the setup wizard, English pre-selected); each user can override it in `User.preferences`. Content language is unaffected. WhatsApp messages use the liturgy's language when a translation exists, otherwise the church's default UI language. The accessibility rule becomes "plain wording in every language" | Owner's choice. A church-level default lets an Indonesian church give its volunteers Indonesian without each person switching; messages follow the service so an Indonesian team gets Indonesian messages |
+| 2026-10-02 | Roles are defined by each church from fixed scopes (`church.settings`, `members.view`, `members.manage`, `roles.manage`, `library.edit`, `templates.edit`, `liturgy.edit`, `liturgy.comment`, `liturgy.approve`, `liturgy.manage`). Every church starts with three editable ready-made roles: Church admin, Liturgist, Editor. A member with no role is a team member (baseline: view published liturgies, my assignments, own profile). Safeguards: at least one member always holds `roles.manage` and `members.manage`; no granting of scopes one doesn't hold; code checks scopes, never role names. The role editor is part of build step 1. Liturgy tasks (formerly `RoleType`) are renamed **duties** and grant no permissions | "Church admin" and "Administrator" were easy to confuse; letting each church name its roles avoids that and fits churches organised differently from GKY. Ready-made roles keep the default simple. `liturgy.manage` keeps the earlier decision that both liturgist and church admin can archive and delete |
+| 2026-10-02 | Migrations: forward-only (no down migrations); downgrade protection with an `--allow-newer-schema` override for operators (off by default); the expand/contract rule for removing or renaming schema parts; the SQLite pre-upgrade copy moves from build step 6 to step 1 | Down migrations can't restore dropped data and rarely get tested; the pilot starts after step 5 and needs the pre-upgrade copy before then; expand/contract allows rolling back the program one version and SaaS rolling deploys |
+| 2026-10-02 | Sessions also have an absolute maximum lifetime of 1 year (configurable), even when used daily. Every login creates a new session token and deletes a session the browser already had. A "Log out on all other devices" button on the profile page is in build step 1; a devices list and an admin "log member out everywhere" action are later | Limits how long a stolen cookie works; prevents session fixation; gives volunteers a simple answer to a lost phone |
+| 2026-10-02 | Setup link: the token is stored as a hash in the database and valid 24 hours; each start while not set up, and a `liturgist setup-link` command, print a fresh link in a framed block. Releases that add seeded defaults also seed them into existing churches | Volunteers running Docker from a dashboard can get a link with one command instead of searching logs; churches set up early still receive later defaults |
+| 2026-10-02 | The community install finds its church in the database (the only `churches` row, cached), not in configuration; it refuses to start if the database holds more than one church | The church is created at runtime by setup, and "nothing must be configured to start"; never silently picking one church protects against restored or imported databases |
+| 2026-10-02 | Response codes for access: 401 when not logged in; 404 when not a member or when the resource is not visible to the member, with bodies identical to "doesn't exist" and the reason only in the log; 403 when the member can see the resource but lacks the scope | Reveals nothing to outsiders (important for the SaaS) while giving members a clear "no permission" message |
+| 2026-10-02 | All extension-point interfaces are defined in build step 1 and marked provisional until the step that first uses them. Until v1.0 any port may change; port changes are listed under "Ports" in `CHANGELOG.md` | Owner's choice: the full set of extension points is visible from the start; the changelog keeps SaaS updates manageable |
+| 2026-10-02 | Step-1 implementation documents (`docs/impl/`, `docs/reference/schema.md`) approved: proposals P-01 to P-32 | Recorded in [docs/impl/README.md](impl/README.md#3-proposed-decisions) |
+| 2026-10-02 | Login throttling uses three counters (identifier + IP: 5 failures/15 min; identifier: 50/hour; IP: 100/15 min) and trusts client IPs only from configured reverse proxies, both in build step 1 | Most installs sit behind a proxy or tunnel; Indonesian mobile carriers and church Wi-Fi share IP addresses; counting per identifier + IP stops one person locking another out |
+
+## 12. References
+
+| Topic | Document | Type |
+|---|---|---|
+| Index of implementation documents and proposed decisions | [docs/impl/README.md](impl/README.md) | Implementation |
+| Repository layout, build, configuration, server, logging, errors | [docs/impl/01-foundation.md](impl/01-foundation.md) | Implementation |
+| Persistence: dialects, transactions, migrations, contract tests | [docs/impl/02-persistence.md](impl/02-persistence.md) | Implementation |
+| Identity and auth: users, memberships, roles, sessions, invites, resets, setup | [docs/impl/03-identity-auth.md](impl/03-identity-auth.md) | Implementation |
+| Tenancy, authorization, extension points, entitlements | [docs/impl/04-tenancy-extensions.md](impl/04-tenancy-extensions.md) | Implementation |
+| Web app shell for step 1 | [docs/impl/05-web-shell.md](impl/05-web-shell.md) | Implementation |
+| Database schema (tables, columns, constraints) | [docs/reference/schema.md](reference/schema.md) | Reference |
+| Pilot plan | [docs/PILOT.md](PILOT.md) | Project plan |
