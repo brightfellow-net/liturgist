@@ -22,16 +22,18 @@ import (
 // Problem is an RFC 9457 problem with a stable code (01 §10). Clients
 // translate by code, never by detail.
 type Problem struct {
-	Status int                 `json:"status"`
-	Title  string              `json:"title"`
-	Code   string              `json:"code"`
-	Detail string              `json:"detail,omitempty"`
-	Reason string              `json:"reason,omitempty"`
-	Scopes []string            `json:"scopes,omitempty"` // scope_not_held
-	Limit  string              `json:"limit,omitempty"`  // limit_reached
-	Used   *int                `json:"used,omitempty"`
-	Max    *int                `json:"max,omitempty"`
-	Errors []*huma.ErrorDetail `json:"errors,omitempty"`
+	Status int      `json:"status"`
+	Title  string   `json:"title"`
+	Code   string   `json:"code"`
+	Detail string   `json:"detail,omitempty"`
+	Reason string   `json:"reason,omitempty"`
+	Scopes []string `json:"scopes,omitempty"` // scope_not_held
+	Limit  string   `json:"limit,omitempty"`  // limit_reached
+	Used   *int     `json:"used,omitempty"`
+	Max    *int     `json:"max,omitempty"`
+	// SectionIDs lists the sections in use (section_in_use).
+	SectionIDs []string            `json:"section_ids,omitempty"`
+	Errors     []*huma.ErrorDetail `json:"errors,omitempty"`
 }
 
 // Error implements error.
@@ -97,6 +99,8 @@ func MapError(ctx context.Context, err error, log *slog.Logger) error {
 		badToken *app.InvalidTokenError
 		limit    *app.LimitReachedError
 		nf       *app.NotFoundError
+		inUse    *app.SectionInUseError
+		group    *app.GroupConflictError
 	)
 	info := RequestInfoFrom(ctx)
 	switch {
@@ -134,6 +138,16 @@ func MapError(ctx context.Context, err error, log *slog.Logger) error {
 		p := problem(http.StatusForbidden, "limit_reached", "The plan's limit has been reached.")
 		p.Limit, p.Used, p.Max = string(limit.Limit), &limit.Used, &limit.Max
 		return p
+	case errors.As(err, &inUse):
+		p := problem(http.StatusConflict, "section_in_use", "A section is used in a liturgy that isn't published yet.")
+		for _, id := range inUse.IDs {
+			p.SectionIDs = append(p.SectionIDs, string(id))
+		}
+		return p
+	case errors.As(err, &group):
+		p := problem(http.StatusConflict, "group_conflict", "These songs can't be linked.")
+		p.Reason = group.Reason
+		return p
 	case errors.Is(err, app.ErrForbidden):
 		log.Info("forbidden", "user_id", string(info.UserID), "request_id", info.RequestID)
 		return problem(http.StatusForbidden, "forbidden", "You don't have permission to do this.")
@@ -166,6 +180,8 @@ var conflicts = map[error]*Problem{
 	app.ErrInviteExists:    problem(http.StatusConflict, "invite_exists", "This person already has an open invite."),
 	app.ErrIdentifierTaken: problem(http.StatusConflict, "identifier_taken", "This email or phone number belongs to another account."),
 	app.ErrResetNotAllowed: problem(http.StatusConflict, "reset_not_allowed", "This person also belongs to another church."),
+	app.ErrVersionConflict: problem(http.StatusConflict, "version_conflict", "This was changed by someone else. Reload to see their version."),
+	app.ErrSongInUse:       problem(http.StatusConflict, "song_in_use", "This song is used in a liturgy that isn't published yet."),
 	app.ErrInviteMismatch: problem(http.StatusForbidden, "invite_identifier_mismatch",
 		"This invite is for another account. Log out and log in as that person."),
 }

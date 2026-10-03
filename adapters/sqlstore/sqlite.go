@@ -97,6 +97,10 @@ func (sqliteDialect) MapError(err error) error {
 	case sqlite3.SQLITE_CONSTRAINT_CHECK:
 		return fmt.Errorf("%w: %w", app.ErrInvalid, err)
 	}
+	// ON DELETE RESTRICT reports its failure with another extended code.
+	if e.Code()&0xff == sqlite3.SQLITE_CONSTRAINT && strings.Contains(e.Error(), "FOREIGN KEY constraint failed") {
+		return fmt.Errorf("%w: %w", app.ErrReferenced, err)
+	}
 	if e.Code()&0xff == sqlite3.SQLITE_FULL {
 		return fmt.Errorf("%w: disk full", app.ErrUnavailable)
 	}
@@ -147,6 +151,22 @@ var sqliteUniqueNames = map[string]string{ //nolint:gosec // constraint names, n
 	"auth_throttle.key": "auth_throttle_pkey",
 
 	"setup_tokens.id": "setup_tokens_pkey",
+
+	"songs.church_id, songs.song_group_id, songs.language": "songs_group_language_key",
+	"song_sections.song_id, song_sections.number":          "song_sections_verse_key",
+
+	"song_groups.id":                        "song_groups_pkey",
+	"song_groups.church_id, song_groups.id": "song_groups_church_id_key",
+
+	"songs.id":                  "songs_pkey",
+	"songs.church_id, songs.id": "songs_church_id_key",
+
+	"song_sections.id": "song_sections_pkey",
+	"song_sections.church_id, song_sections.song_id, song_sections.id": "song_sections_church_song_id_key",
+
+	"song_arrangement_entries.song_id, song_arrangement_entries.position": "song_arrangement_entries_pkey",
+
+	"song_search.church_id, song_search.song_id": "song_search_pkey",
 }
 
 var sqliteUniqueRe = regexp.MustCompile(`UNIQUE constraint failed: (.+?)(?: \(|$)`)
@@ -165,3 +185,48 @@ func sqliteConstraintName(msg string) string {
 	}
 	return cols
 }
+
+// --- song search (06 §5.3) ---
+
+func (d sqliteDialect) WriteSongIndex(ctx context.Context, tx *sqlx.Tx, churchID, songID, language, head, lyrics string) error {
+	if err := d.DeleteSongIndex(ctx, tx, churchID, songID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO song_search (church_id, song_id, language, head_fold, lyrics_fold)
+		VALUES (?, ?, ?, ?, ?)`, churchID, songID, language, head, lyrics); err != nil {
+		return d.MapError(err)
+	}
+	_, err := tx.ExecContext(ctx, "INSERT INTO song_fts (head, lyrics, church_id, song_id) VALUES (?, ?, ?, ?)",
+		head, lyrics, churchID, songID)
+	return d.MapError(err)
+}
+
+func (d sqliteDialect) DeleteSongIndex(ctx context.Context, tx *sqlx.Tx, churchID, songID string) error {
+	if _, err := tx.ExecContext(ctx, "DELETE FROM song_fts WHERE church_id = ? AND song_id = ?", churchID, songID); err != nil {
+		return d.MapError(err)
+	}
+	_, err := tx.ExecContext(ctx, "DELETE FROM song_search WHERE church_id = ? AND song_id = ?", churchID, songID)
+	return d.MapError(err)
+}
+
+func (d sqliteDialect) DeleteChurchIndex(ctx context.Context, tx *sqlx.Tx, churchID string) error {
+	if _, err := tx.ExecContext(ctx, "DELETE FROM song_fts WHERE church_id = ?", churchID); err != nil {
+		return d.MapError(err)
+	}
+	_, err := tx.ExecContext(ctx, "DELETE FROM song_search WHERE church_id = ?", churchID)
+	return d.MapError(err)
+}
+
+// TermMatch asks the FTS5 index for a prefix match; terms hold only letters
+// and digits (Fold), so quoting them is enough.
+func (sqliteDialect) TermMatch(term string, headOnly bool) (string, []any) {
+	match := `"` + term + `"*`
+	if headOnly {
+		match = "head : " + match
+	}
+	return "ss.song_id IN (SELECT song_id FROM song_fts WHERE song_fts MATCH ? AND church_id = ss.church_id)", []any{match}
+}
+
+func (sqliteDialect) Contains(col string) string { return "instr(" + col + ", ?) > 0" }
+
+func (sqliteDialect) OrderBytes(col string) string { return col }

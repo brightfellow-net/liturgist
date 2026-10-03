@@ -31,6 +31,7 @@ import (
 type deps struct {
 	auth     httpapi.AuthDeps
 	church   httpapi.ChurchDeps
+	library  httpapi.LibraryDeps
 	session  func(http.Handler) http.Handler // nil: no session middleware (OpenAPI only)
 	resolver httpapi.TenantResolver          // nil: no tenant middleware (OpenAPI only)
 }
@@ -97,6 +98,7 @@ func newAPI(router chi.Router, o options, d deps) huma.API {
 	}
 	httpapi.RegisterAuth(api, d.auth)
 	httpapi.RegisterChurch(api, d.church)
+	httpapi.RegisterLibrary(api, d.library)
 	for _, fn := range o.routes {
 		fn(api)
 	}

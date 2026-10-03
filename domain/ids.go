@@ -18,4 +18,10 @@ type (
 	InviteID string
 	// TranslationID identifies a Bible translation.
 	TranslationID string
+	// SongID identifies a song of a church (06).
+	SongID string
+	// SectionID identifies one section (verse, chorus …) of a song.
+	SectionID string
+	// SongGroupID identifies the group that links the language versions of a hymn.
+	SongGroupID string
 )

@@ -89,3 +89,25 @@ type LimitReachedError struct {
 func (e *LimitReachedError) Error() string {
 	return fmt.Sprintf("limit %s reached (%d of %d)", e.Limit, e.Used, e.Max)
 }
+
+// Errors of the song library (01 §10, 06).
+var (
+	ErrVersionConflict = errors.New("changed by someone else") // 409 version_conflict
+	ErrSongInUse       = errors.New("song in use")             // 409 song_in_use
+)
+
+// SectionInUseError maps to 409 section_in_use with the section IDs.
+type SectionInUseError struct{ IDs []domain.SectionID }
+
+func (e *SectionInUseError) Error() string { return "sections in use" }
+
+// Reasons of GroupConflictError.
+const (
+	ReasonAlreadyGrouped = "already_grouped"
+	ReasonLanguageTaken  = "language_taken"
+)
+
+// GroupConflictError maps to 409 group_conflict with a reason.
+type GroupConflictError struct{ Reason string }
+
+func (e *GroupConflictError) Error() string { return "group conflict: " + e.Reason }

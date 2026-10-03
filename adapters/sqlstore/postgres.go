@@ -98,3 +98,38 @@ func (postgresDialect) MapError(err error) error {
 	}
 	return err
 }
+
+// --- song search (06 §5.3) ---
+
+func (d postgresDialect) WriteSongIndex(ctx context.Context, tx *sqlx.Tx, churchID, songID, language, head, lyrics string) error {
+	_, err := tx.ExecContext(ctx, `INSERT INTO song_search (church_id, song_id, language, head_fold, lyrics_fold, fts_head, fts_lyrics)
+		VALUES ($1, $2, $3, $4, $5, to_tsvector('simple', $4), to_tsvector('simple', $5))
+		ON CONFLICT (church_id, song_id) DO UPDATE SET language = EXCLUDED.language, head_fold = EXCLUDED.head_fold,
+		lyrics_fold = EXCLUDED.lyrics_fold, fts_head = EXCLUDED.fts_head, fts_lyrics = EXCLUDED.fts_lyrics`,
+		churchID, songID, language, head, lyrics)
+	return d.MapError(err)
+}
+
+func (d postgresDialect) DeleteSongIndex(ctx context.Context, tx *sqlx.Tx, churchID, songID string) error {
+	_, err := tx.ExecContext(ctx, "DELETE FROM song_search WHERE church_id = $1 AND song_id = $2", churchID, songID)
+	return d.MapError(err)
+}
+
+func (d postgresDialect) DeleteChurchIndex(ctx context.Context, tx *sqlx.Tx, churchID string) error {
+	_, err := tx.ExecContext(ctx, "DELETE FROM song_search WHERE church_id = $1", churchID)
+	return d.MapError(err)
+}
+
+// TermMatch builds a prefix query; the term holds only letters and digits
+// (Fold) and is bound as a parameter, never concatenated into the SQL.
+func (postgresDialect) TermMatch(term string, headOnly bool) (string, []any) {
+	arg := term + ":*"
+	if headOnly {
+		return "ss.fts_head @@ to_tsquery('simple', ?)", []any{arg}
+	}
+	return "(ss.fts_head @@ to_tsquery('simple', ?) OR ss.fts_lyrics @@ to_tsquery('simple', ?))", []any{arg, arg}
+}
+
+func (postgresDialect) Contains(col string) string { return "strpos(" + col + ", ?) > 0" }
+
+func (postgresDialect) OrderBytes(col string) string { return col + ` COLLATE "C"` }

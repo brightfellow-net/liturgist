@@ -384,6 +384,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/songs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search and list songs */
+        get: operations["listSongs"];
+        put?: never;
+        /** Add a song */
+        post: operations["createSong"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/songs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A song with its sections */
+        get: operations["getSong"];
+        put?: never;
+        post?: never;
+        /** Delete a song */
+        delete: operations["deleteSong"];
+        options?: never;
+        head?: never;
+        /** Change a song, its sections or its arrangement */
+        patch: operations["updateSong"];
+        trace?: never;
+    };
+    "/songs/{id}/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Link another-language version of the same hymn */
+        post: operations["linkSong"];
+        /** Unlink a song from its other-language versions */
+        delete: operations["unlinkSong"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/translations": {
         parameters: {
             query?: never;
@@ -488,6 +543,33 @@ export interface components {
             name: string;
             scopes: string[] | null;
         };
+        CreateSongRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/CreateSongRequest.json
+             */
+            readonly $schema?: string;
+            alt_titles?: string[] | null;
+            ccli_song_number?: string;
+            composer?: string;
+            copyright_holder?: string;
+            copyright_line?: string;
+            /** @description keys of the new sections */
+            default_arrangement?: string[] | null;
+            default_key?: string;
+            hymnal_number?: string;
+            hymnal_source?: string;
+            /** @enum {string} */
+            language: "id" | "en" | "zh-Hans" | "zh-Hant";
+            licence_notes?: string;
+            /** @enum {string} */
+            licence_status?: "unknown" | "public_domain" | "church_licence" | "permission_obtained";
+            lyricist?: string;
+            sections?: components["schemas"]["SongSection"][] | null;
+            title: string;
+            translator?: string;
+        };
         CreatedInviteOutputBody: {
             /**
              * Format: uri
@@ -552,6 +634,15 @@ export interface components {
         Item1: {
             description: string;
             scope: string;
+        };
+        LinkSongRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/LinkSongRequest.json
+             */
+            readonly $schema?: string;
+            other_song_id: string;
         };
         LinkView: {
             /**
@@ -651,6 +742,7 @@ export interface components {
             max?: number;
             reason?: string;
             scopes?: string[] | null;
+            section_ids?: string[] | null;
             /** Format: int64 */
             status: number;
             title: string;
@@ -715,6 +807,19 @@ export interface components {
             origin: string | null;
             scopes: string[] | null;
         };
+        SectionView: {
+            id: string;
+            /** @enum {string} */
+            kind: "verse" | "pre_chorus" | "chorus" | "bridge" | "tag" | "intro" | "ending" | "other";
+            /** @description null: derive from kind and number */
+            label: string | null;
+            /**
+             * Format: int64
+             * @description verses only
+             */
+            number: number | null;
+            text: string;
+        };
         SetMemberRolesRequest: {
             /**
              * Format: uri
@@ -734,6 +839,95 @@ export interface components {
             admin: components["schemas"]["AdminStruct"];
             church: components["schemas"]["ChurchStruct"];
             token: string;
+        };
+        SongActions: {
+            delete: boolean;
+            edit: boolean;
+        };
+        SongListOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/SongListOutputBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["SongSummaryView"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
+        SongRefView: {
+            id: string;
+            /** @enum {string} */
+            language: "id" | "en" | "zh-Hans" | "zh-Hant";
+            title: string;
+        };
+        SongSection: {
+            /** @description an existing section of this song; omit for a new one */
+            id?: string;
+            /** @description request-local name of a new section, for default_arrangement */
+            key?: string;
+            /** @enum {string} */
+            kind: "verse" | "pre_chorus" | "chorus" | "bridge" | "tag" | "intro" | "ending" | "other";
+            label?: string;
+            /**
+             * Format: int64
+             * @description verses only (1-99)
+             */
+            number?: number;
+            text: string;
+        };
+        SongSummaryView: {
+            actions: components["schemas"]["SongActions"];
+            alt_titles: string[] | null;
+            has_group: boolean;
+            hymnal_number: string;
+            hymnal_source: string;
+            id: string;
+            /** @enum {string} */
+            language: "id" | "en" | "zh-Hans" | "zh-Hant";
+            /** @enum {string} */
+            licence_status: "unknown" | "public_domain" | "church_licence" | "permission_obtained";
+            title: string;
+        };
+        SongView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/SongView.json
+             */
+            readonly $schema?: string;
+            actions: components["schemas"]["SongActions"];
+            alt_titles: string[] | null;
+            ccli_song_number: string;
+            composer: string;
+            copyright_holder: string;
+            copyright_line: string;
+            /** Format: date-time */
+            created_at: string;
+            /** @description section IDs; empty: none defined, use all sections in order */
+            default_arrangement: string[] | null;
+            default_key: string;
+            hymnal_number: string;
+            hymnal_source: string;
+            id: string;
+            /** @enum {string} */
+            language: "id" | "en" | "zh-Hans" | "zh-Hant";
+            licence_notes: string;
+            /** @enum {string} */
+            licence_status: "unknown" | "public_domain" | "church_licence" | "permission_obtained";
+            lyricist: string;
+            sections: components["schemas"]["SectionView"][] | null;
+            title: string;
+            translator: string;
+            /** Format: date-time */
+            updated_at: string;
+            /**
+             * Format: int64
+             * @description send it back with every change
+             */
+            version: number;
+            /** @description the other-language versions linked to this song */
+            versions: components["schemas"]["SongRefView"][] | null;
         };
         StatusOutputBody: {
             /**
@@ -800,6 +994,39 @@ export interface components {
             description?: string;
             name?: string;
             scopes?: string[];
+        };
+        UpdateSongRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/UpdateSongRequest.json
+             */
+            readonly $schema?: string;
+            alt_titles?: string[];
+            ccli_song_number?: string;
+            composer?: string;
+            copyright_holder?: string;
+            copyright_line?: string;
+            /** @description section IDs or keys of new sections; [] clears it */
+            default_arrangement?: string[];
+            default_key?: string;
+            hymnal_number?: string;
+            hymnal_source?: string;
+            /** @enum {string} */
+            language?: "id" | "en" | "zh-Hans" | "zh-Hant";
+            licence_notes?: string;
+            /** @enum {string} */
+            licence_status?: "unknown" | "public_domain" | "church_licence" | "permission_obtained";
+            lyricist?: string;
+            /** @description the complete ordered list; omitted sections are deleted */
+            sections?: components["schemas"]["SongSection"][];
+            title?: string;
+            translator?: string;
+            /**
+             * Format: int64
+             * @description the version the client loaded
+             */
+            version: number;
         };
         UsageStruct: {
             team_members: components["schemas"]["TeamMembersStruct"];
@@ -1679,6 +1906,238 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["StatusOutputBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listSongs: {
+        parameters: {
+            query?: {
+                /** @description title, hymnal number or lyrics */
+                q?: string;
+                language?: string;
+                licence_status?: string;
+                hymnal_source?: string;
+                /** @description exact; needs hymnal_source */
+                hymnal_number?: string;
+                /** @description default 50, at most 100 */
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SongListOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    createSong: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSongRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SongView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getSong: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SongView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    deleteSong: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    updateSong: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSongRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SongView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    linkSong: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkSongRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SongView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    unlinkSong: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

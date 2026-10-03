@@ -45,6 +45,7 @@ type ChurchStore interface {
 	Memberships() MembershipRepo
 	Roles() RoleRepo
 	Invites() InviteRepo
+	Songs() SongRepo // songs, sections, arrangements, groups and search (06)
 }
 
 // Clock returns the current time in UTC, truncated to microseconds (02 §4).
@@ -193,4 +194,85 @@ type InviteRepo interface {
 	Renew(ctx context.Context, id domain.InviteID, hash string, expires time.Time) (bool, error)
 	// Cancel cancels an open invite; false if not open.
 	Cancel(ctx context.Context, id domain.InviteID, now time.Time) (bool, error)
+}
+
+// SongRef names a song in lists of linked versions.
+type SongRef struct {
+	ID       domain.SongID
+	Title    string
+	Language string
+}
+
+// SongRow is one line of a song list or search result (no lyrics).
+type SongRow struct {
+	ID            domain.SongID
+	GroupID       domain.SongGroupID
+	Title         string
+	AltTitles     []string
+	Language      string
+	HymnalSource  string
+	HymnalNumber  string
+	LicenceStatus domain.LicenceStatus
+}
+
+// SongSearch is a prepared search (06 §5.2): the use case has folded the
+// query and parsed the hymnal reference. Terms are folded and ANDed; no
+// terms lists every song.
+type SongSearch struct {
+	Terms           []string
+	HymnalQueryKey  string // exact hymnal key to list first, "" if the query is not a hymnal reference
+	Language        string // filters; "" = any
+	LicenceStatus   domain.LicenceStatus
+	HymnalSourceKey string
+	HymnalKey       string // exact key filter (source and number)
+	Limit, Offset   int
+}
+
+// SongPage is one page of search results.
+type SongPage struct {
+	Items []SongRow
+	Total int
+}
+
+// SongRepo stores the church's songs with their sections, default
+// arrangements, language groups and search index (06). Every write that
+// changes a song also rewrites its index rows, in the same transaction.
+type SongRepo interface {
+	ByID(ctx context.Context, id domain.SongID) (domain.Song, error) // with sections and arrangement; ErrNotFound
+	Create(ctx context.Context, s domain.Song) error                 // song, sections, arrangement entries, index
+	// Update replaces the song row, its sections, arrangement and index rows if
+	// the stored version is expectedVersion (atomic conditional update, 02 §2.1);
+	// false when the song is missing or its version differs.
+	// UniqueError songs_group_language_key when the language is taken in its group.
+	Update(ctx context.Context, s domain.Song, expectedVersion int) (bool, error)
+	Delete(ctx context.Context, id domain.SongID) error
+	Search(ctx context.Context, q SongSearch) (SongPage, error)
+	CreateGroup(ctx context.Context, id domain.SongGroupID, now time.Time) error
+	DeleteGroup(ctx context.Context, id domain.SongGroupID) error
+	// SetGroup puts the songs into the group ("" = no group) and adds one to
+	// each version. UniqueError songs_group_language_key.
+	SetGroup(ctx context.Context, songs []domain.SongID, group domain.SongGroupID, now time.Time) error
+	GroupMembers(ctx context.Context, group domain.SongGroupID) ([]SongRef, error) // ordered by language
+	Reindex(ctx context.Context) error                                             // rebuilds this church's index rows
+}
+
+// SongUsage tells whether unpublished liturgies use a song or its sections
+// (06 §6). Step 2 has no liturgies: NeverUsed answers "unused"; step 3
+// replaces it with a query.
+type SongUsage interface {
+	SongInUse(ctx context.Context, church domain.ChurchID, song domain.SongID) (bool, error)
+	SectionsInUse(ctx context.Context, church domain.ChurchID, song domain.SongID, sections []domain.SectionID) ([]domain.SectionID, error)
+}
+
+// NeverUsed is the step-2 usage check: nothing is ever in use.
+type NeverUsed struct{}
+
+// SongInUse implements SongUsage.
+func (NeverUsed) SongInUse(context.Context, domain.ChurchID, domain.SongID) (bool, error) {
+	return false, nil
+}
+
+// SectionsInUse implements SongUsage.
+func (NeverUsed) SectionsInUse(context.Context, domain.ChurchID, domain.SongID, []domain.SectionID) ([]domain.SectionID, error) {
+	return nil, nil
 }

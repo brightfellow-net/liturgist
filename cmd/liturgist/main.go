@@ -51,6 +51,7 @@ commands:
   member grant-admin <email-or-phone>    give a member the Church admin role (recovery)
   auth clear-throttle --identifier X | --ip Y | --all
                                          delete login-throttle counters
+  search reindex                         rebuild the song search index
   openapi                                print the OpenAPI document
   version                                print version information`
 
@@ -80,6 +81,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return withOperator("member grant-admin", args[2:], stdout, stderr, grantAdmin)
 	case len(args) > 1 && args[0] == "auth" && args[1] == "clear-throttle":
 		return withOperator("auth clear-throttle", args[2:], stdout, stderr, clearThrottle)
+	case len(args) > 1 && args[0] == "search" && args[1] == "reindex":
+		return withOperator("search reindex", args[2:], stdout, stderr, reindexSongs)
 	case args[0] == "openapi":
 		doc, err := server.OpenAPI()
 		if err != nil {
@@ -306,6 +309,18 @@ func clearThrottle(ctx context.Context, op *server.Operator, args []string, stdo
 		return err
 	}
 	fmt.Fprintln(stdout, "Login-throttle counters deleted.")
+	return nil
+}
+
+func reindexSongs(ctx context.Context, op *server.Operator, args []string, stdout, _ io.Writer) error {
+	if len(args) != 0 {
+		return errUsage
+	}
+	n, err := op.ReindexSongs(ctx)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "Song search index rebuilt for %d church(es).\n", n)
 	return nil
 }
 

@@ -39,6 +39,11 @@ func churchRowsIn(t *testing.T, s app.Store, db *sqlstore.DB, cid string) string
 			"SELECT * FROM membership_roles WHERE church_id = ? ORDER BY membership_id, role_id",
 			"SELECT * FROM invites WHERE church_id = ? ORDER BY id",
 			"SELECT * FROM invite_roles WHERE church_id = ? ORDER BY invite_id, role_id",
+			"SELECT * FROM song_groups WHERE church_id = ? ORDER BY id",
+			"SELECT * FROM songs WHERE church_id = ? ORDER BY id",
+			"SELECT * FROM song_sections WHERE church_id = ? ORDER BY song_id, position",
+			"SELECT * FROM song_arrangement_entries WHERE church_id = ? ORDER BY song_id, position",
+			"SELECT * FROM song_search WHERE church_id = ? ORDER BY song_id",
 		} {
 			rows, err := sqlstore.RawTx(s).QueryxContext(ctx, db.Dialect().Rebind(q), cid)
 			if err != nil {
@@ -204,6 +209,58 @@ func TestScopedRepositories(t *testing.T) {
 		"Invites.Cancel": func(cs app.ChurchStore, now time.Time) error {
 			return unchanged(cs.Invites().Cancel(ctx, domain.InviteID(id("IB")), now))
 		},
+		"Songs.ByID": func(cs app.ChurchStore, _ time.Time) error {
+			s, err := cs.Songs().ByID(ctx, domain.SongID(id("SA1")))
+			if err != nil || len(s.Sections) != 2 || len(s.DefaultArrangement) != 3 {
+				return fmt.Errorf("own song: %+v %w", s, err)
+			}
+			_, err = cs.Songs().ByID(ctx, domain.SongID(id("SB1")))
+			return notFound(err)
+		},
+		"Songs.Create": func(cs app.ChurchStore, now time.Time) error {
+			s := testSong(id("SX"), "Hijack", "id", now)
+			s.GroupID = domain.SongGroupID(id("GB"))
+			if err := cs.Songs().Create(ctx, s); !errors.Is(err, app.ErrReferenced) {
+				return fmt.Errorf("joining church B's group through A: %w", err)
+			}
+			return errRollback
+		},
+		"Songs.Update": func(cs app.ChurchStore, now time.Time) error {
+			s := testSong(id("SB1"), "Hijack", "en", now)
+			s.Version = 2
+			return unchanged(cs.Songs().Update(ctx, s, 1))
+		},
+		"Songs.Delete": func(cs app.ChurchStore, _ time.Time) error {
+			return notFound(cs.Songs().Delete(ctx, domain.SongID(id("SB1"))))
+		},
+		"Songs.Search": func(cs app.ChurchStore, _ time.Time) error {
+			for _, q := range []app.SongSearch{{Limit: 50}, {Limit: 50, Terms: []string{"cinta"}}} {
+				page, err := cs.Songs().Search(ctx, q)
+				if err != nil || page.Total != 1 || len(page.Items) != 1 || page.Items[0].ID != domain.SongID(id("SA1")) {
+					return fmt.Errorf("search %+v: %+v %w", q, page, err)
+				}
+			}
+			return nil
+		},
+		"Songs.CreateGroup": func(cs app.ChurchStore, now time.Time) error {
+			return cs.Songs().CreateGroup(ctx, domain.SongGroupID(id("GX")), now)
+		},
+		"Songs.DeleteGroup": func(cs app.ChurchStore, _ time.Time) error {
+			return cs.Songs().DeleteGroup(ctx, domain.SongGroupID(id("GB"))) // matches no row of church A
+		},
+		"Songs.SetGroup": func(cs app.ChurchStore, now time.Time) error {
+			return cs.Songs().SetGroup(ctx, []domain.SongID{domain.SongID(id("SB1"))}, "", now)
+		},
+		"Songs.GroupMembers": func(cs app.ChurchStore, _ time.Time) error {
+			m, err := cs.Songs().GroupMembers(ctx, domain.SongGroupID(id("GB")))
+			if err == nil && len(m) != 0 {
+				err = fmt.Errorf("church B's group members through A: %+v", m)
+			}
+			return err
+		},
+		"Songs.Reindex": func(cs app.ChurchStore, _ time.Time) error {
+			return cs.Songs().Reindex(ctx)
+		},
 	}
 
 	// Reflection check: the harness covers every method of every repository.
@@ -241,6 +298,30 @@ func TestScopedRepositories(t *testing.T) {
 			t.Fatal(err)
 		}
 		f.must(`INSERT INTO invite_roles (church_id, invite_id, role_id) VALUES (?, ?, ?)`, id("CHB"), id("IB"), id("RB"))
+		mustWrite(t, db, func(s app.Store) error {
+			a, err := s.ForChurch(ctx, domain.ChurchID(id("CHA")))
+			if err != nil {
+				return err
+			}
+			if err := a.Songs().Create(ctx, testSong(id("SA1"), "Cinta Tuhan", "id", f.now)); err != nil {
+				return err
+			}
+			b, err := s.ForChurch(ctx, domain.ChurchID(id("CHB")))
+			if err != nil {
+				return err
+			}
+			if err := b.Songs().CreateGroup(ctx, domain.SongGroupID(id("GB")), f.now); err != nil {
+				return err
+			}
+			for sid, lang := range map[string]string{"SB1": "en", "SB2": "id"} {
+				song := testSong(id(sid), "Cinta Tuhan B", lang, f.now)
+				song.GroupID = domain.SongGroupID(id("GB"))
+				if err := b.Songs().Create(ctx, song); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
 
 		// Each call runs in its own transaction, rolled back afterwards, so
 		// every call sees the same rows; changes to B would show up inside.
@@ -397,4 +478,19 @@ func TestPlatformRepos(t *testing.T) {
 			return nil
 		})
 	})
+}
+
+// testSong is a song with a verse, a chorus and the arrangement V1 C V1,
+// whose section IDs are derived from the song ID.
+func testSong(songID, title, language string, now time.Time) domain.Song {
+	verse, chorus := domain.SectionID(songID[:24]+"V1"), domain.SectionID(songID[:24]+"C1")
+	return domain.Song{
+		ID: domain.SongID(songID), Language: language, Title: title, AltTitles: []string{}, LicenceStatus: domain.LicenceUnknown,
+		Sections: []domain.Section{
+			{ID: verse, Kind: domain.SectionVerse, Number: 1, Text: "cinta yang besar"},
+			{ID: chorus, Kind: domain.SectionChorus, Text: "setia selamanya"},
+		},
+		DefaultArrangement: []domain.SectionID{verse, chorus, verse},
+		Version:            1, CreatedAt: now, UpdatedAt: now,
+	}
 }

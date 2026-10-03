@@ -23,9 +23,10 @@ The React single-page app for step 1: workspace layout, pages, routing, API clie
 | `/settings/members` | Members (assign roles, remove, reset link) and invites (create with roles, copy/share link, regenerate, cancel), usage "9 of 12" when limited | Members with `members.view` (actions per `actions`) | `/members`, `/invites`, `/roles` |
 | `/settings/roles` | Role editor: list roles with member counts; create, rename, edit description, tick scopes (each with a plain-language description); delete with confirmation showing how many members hold it | Members with `roles.manage` | `/roles`, `/scopes` |
 | `/privacy` | Privacy notice: what is stored (names, phone numbers, emails; IP addresses only briefly, for blocking password guessing, deleted within an hour), why, who can see it, plus the church's contact text | Anyone | `GET /church` when logged in; static text otherwise |
+| `/library`, `/library/songs/…`, `/library/readings/…`, `/library/import/…` | Song library, readings and importing (step 2): [06 §4](06-song-library.md#4-pages), [07 §5](07-readings.md#5-pages), [08 §6](08-import.md#6-pages) | View: all members; edit and import: `library.edit` | `/songs`, `/readings`, `/imports` |
 | `*` | Not found | Anyone | — |
 
-Navigation: people with no roles (team members) see **Home** and **Profile** (Liturgies arrive in step 5); members holding any of `church.settings`, `members.view`, `members.manage`, `roles.manage` also see **Settings**. The menu is driven by `membership.scopes` from `GET /me`.
+Navigation: people with no roles (team members) see **Home**, **Library** (from step 2) and **Profile** (Liturgies arrive in step 5); members holding any of `church.settings`, `members.view`, `members.manage`, `roles.manage` also see **Settings**. The menu is driven by `membership.scopes` from `GET /me`.
 
 ## 3. Workspace layout
 
