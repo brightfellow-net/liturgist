@@ -1,7 +1,7 @@
 // Copyright 2026 Brightfellow contributors
 // SPDX-License-Identifier: Apache-2.0
 import { expect, test } from "@playwright/test";
-import { adminApi, adminPage, createInvite, createMember, expectAccessible } from "./helpers";
+import { adminApi, adminPage, createInvite, createMember, createSong, expectAccessible } from "./helpers";
 
 // E2E-W-005: axe finds no WCAG 2.2 A/AA violation on any step-1 page. The
 // setup page is checked in setup.spec.ts, before setup completes.
@@ -50,6 +50,49 @@ test.describe("E2E-W-005 accessibility", () => {
     await api.dispose();
     await page.goto(link);
     await expect(page.getByLabel("New password")).toBeVisible();
+    await expectAccessible(page);
+  });
+});
+
+// The library pages (06 §4): the empty library first, before any test adds a
+// song, then a list, a song, and the form.
+test.describe("E2E-W-005 accessibility of the library", () => {
+  test("empty library", async ({ browser }) => {
+    const page = await adminPage(browser);
+    await page.goto("/library");
+    await expect(page.getByRole("heading", { name: "Your library is empty" })).toBeVisible();
+    await expectAccessible(page);
+  });
+
+  test("list, song, and forms", async ({ browser }) => {
+    const id = await createSong({
+      title: "Lagu untuk uji aksesibilitas",
+      hymnal_source: "KJ",
+      hymnal_number: "1",
+      sections: [{ kind: "verse", number: 1, text: "Satu" }, { kind: "chorus", text: "Reff" }],
+    });
+    const page = await adminPage(browser);
+    await page.goto("/library");
+    await expect(page.getByRole("link", { name: /Lagu untuk uji aksesibilitas/ })).toBeVisible();
+    await expectAccessible(page);
+
+    await page.goto(`/library/songs/${id}`);
+    await expect(page.getByRole("heading", { name: "Lagu untuk uji aksesibilitas", level: 1 })).toBeVisible();
+    await expectAccessible(page);
+
+    await page.getByRole("button", { name: "Link another version…" }).click();
+    await expect(page.getByLabel("Find the song to link")).toBeVisible();
+    await expectAccessible(page);
+
+    await page.goto(`/library/songs/${id}/edit`);
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Lagu untuk uji aksesibilitas");
+    await page.getByRole("button", { name: "Add to the order" }).click();
+    await expectAccessible(page);
+
+    await page.goto("/library/songs/new");
+    await expect(page.getByRole("heading", { name: "Add a song", level: 1 })).toBeVisible();
+    await page.getByRole("button", { name: "Save song" }).click(); // shows the errors
+    await expect(page.getByText("This field is required.")).toBeVisible();
     await expectAccessible(page);
   });
 });

@@ -13,7 +13,15 @@ export const paths = {
   members: "/settings/members",
   roles: "/settings/roles",
   privacy: "/privacy",
+  library: "/library",
+  songNew: "/library/songs/new",
+  song: "/library/songs/:id",
+  songEdit: "/library/songs/:id/edit",
 } as const;
+
+// songPath and songEditPath fill in a song's ID.
+export const songPath = (id: string) => paths.song.replace(":id", encodeURIComponent(id));
+export const songEditPath = (id: string) => paths.songEdit.replace(":id", encodeURIComponent(id));
 
 // loginWithNext is the login page returning to next afterwards.
 export function loginWithNext(next: string): string {
