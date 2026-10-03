@@ -4,9 +4,15 @@ import { expect, test } from "@playwright/test";
 import { adminPage, createSong } from "./helpers";
 
 test("E2E-W-007 add a song and find it", async ({ browser }) => {
+  // A song that matches none of the searches below: it must disappear from
+  // the results, which proves the search was applied.
+  await createSong({
+    title: "Lagu Pembanding", hymnal_source: "PKJ", hymnal_number: "9",
+    sections: [{ kind: "verse", number: 1, text: "Kata lain sama sekali" }],
+  });
   const page = await adminPage(browser);
   await page.goto("/library");
-  await page.getByRole("link", { name: "Add a song" }).click();
+  await page.getByRole("link", { name: "Add a song" }).first().click();
   await expect(page.getByRole("heading", { name: "Add a song", level: 1 })).toBeVisible();
 
   await page.getByLabel("Title", { exact: true }).fill("Tuhan Gembalaku");
@@ -19,24 +25,43 @@ test("E2E-W-007 add a song and find it", async ({ browser }) => {
   await page.getByRole("button", { name: "Add a section" }).click();
   const second = page.getByRole("group", { name: /^Section 2:/ });
   await second.getByLabel("Kind").selectOption("chorus");
-  await second.getByLabel("Lyrics").fill("Hosana bagi Raja");
+  await second.getByLabel("Lyrics").fill("Terpujilah Yehova Rafa");
   await page.getByRole("button", { name: "Save song" }).click();
+  await expect(page.getByRole("heading", { name: "Tuhan Gembalaku", level: 1 })).toBeVisible();
 
-  // The song page shows the sections with their standard names.
+  // After a reload, so that the page shows what the server stored and not the
+  // copy the form put in the browser's cache: sections, their texts and metadata.
+  await page.reload();
   await expect(page.getByRole("heading", { name: "Tuhan Gembalaku", level: 1 })).toBeVisible();
   await expect(page.getByRole("heading", { level: 3 })).toHaveText(["Verse 1", "Chorus"]);
+  await expect(page.getByText("takkan kekurangan aku")).toBeVisible();
+  await expect(page.getByText("Terpujilah Yehova Rafa")).toBeVisible();
   await expect(page.getByText("KJ 47")).toBeVisible();
+  await expect(page.getByText("Indonesian")).toBeVisible();
 
-  // Found by a word from the lyrics, and by its hymnal number.
+  // Found by a word from each section, and by the hymnal number. Each search
+  // waits for the answer to its own query and checks what the server returned,
+  // so a search that ignored its query could not pass.
   await page.getByRole("link", { name: "Back to the library" }).click();
-  await page.getByLabel("Search songs").fill("kekurangan");
-  await page.getByRole("button", { name: "Search", exact: true }).click();
+  const search = async (q: string, titles: string[]) => {
+    const answer = page.waitForResponse((r) => r.url().includes("/api/v1/songs?") && new URL(r.url()).searchParams.get("q") === q);
+    await page.getByLabel("Search songs").fill(q);
+    await page.getByRole("button", { name: "Search", exact: true }).click();
+    const body = (await (await answer).json()) as { items: { title: string }[] };
+    expect(body.items.map((i) => i.title)).toEqual(titles);
+    // The form is rebuilt for the new query; wait for that before the next one.
+    await expect(page.getByLabel("Search songs")).toHaveValue(q);
+    await expect.poll(() => new URL(page.url()).searchParams.get("q")).toBe(q);
+  };
+  await search("kekurangan", ["Tuhan Gembalaku"]);
   await expect(page.getByRole("link", { name: /Tuhan Gembalaku/ })).toBeVisible();
-  await page.getByLabel("Search songs").fill("kj 47");
-  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await expect(page.getByRole("link", { name: /Lagu Pembanding/ })).toHaveCount(0);
+  await search("yehova", ["Tuhan Gembalaku"]);
   await expect(page.getByRole("link", { name: /Tuhan Gembalaku/ })).toBeVisible();
-  await page.getByLabel("Search songs").fill("tidak ada lagu ini");
-  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await search("kj 47", ["Tuhan Gembalaku"]);
+  await expect(page.getByRole("link", { name: /Tuhan Gembalaku/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Lagu Pembanding/ })).toHaveCount(0);
+  await search("tidak ada lagu ini", []);
   await expect(page.getByText("No songs match.", { exact: false })).toBeVisible();
 });
 
