@@ -85,7 +85,7 @@ type URLBuilder interface {
   "actions": { "edit_roles": true, "remove": true, "create_reset_link": true } }
 ```
 
-**Actions are advisory only:** they help the UI show the right buttons, but they never authorize anything. Every mutation re-loads the actor's membership, roles and scopes and re-checks the safeguards inside its own write transaction before changing data. An action is `true` only if the scope check **and** the safeguards would pass (e.g. `remove` is `false` for the only member holding `roles.manage` and `members.manage`, or for a member whose roles hold scopes the viewer lacks). The UI never decides permissions itself.
+**Actions are advisory only:** they help the UI show the right buttons, but they never authorize anything. Every mutation re-loads the actor's membership, roles and scopes and re-checks the safeguards inside its own write transaction before changing data. An action is `true` only if the scope check **and** the safeguards that can be known from the data already loaded for that response would pass (e.g. `remove` is `false` for the only member holding `roles.manage` and `members.manage`, or for a member whose roles hold scopes the viewer lacks). A safeguard that needs an extra query per row is **not** part of `actions`: the 409 explains it (e.g. a duty or template in use still shows `delete: true`, [09 §4](09-planning.md#4-api)). The UI never decides permissions itself.
 
 ## 6. Step-1 church and member API
 

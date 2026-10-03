@@ -202,7 +202,7 @@ Draft ──submit──▶ In Review ──approve──▶ Approved ──publ
   ```
 
 ### 5.7 First-time experience
-- **Setup wizard** (the setup page from the decisions log): church name and first admin (name, email or phone, password); default UI language for members (English pre-selected); default content language; default Bible translation; time zone (WIB, WITA or WIT); key display ("Do = G" or "G"); regular services. Everything can be changed later in settings.
+- **Setup wizard** (the setup page from the decisions log): church name and first admin (name, email or phone, password); default UI language for members (English pre-selected); default content language; default Bible translation; time zone (WIB, WITA or WIT); key display ("Do = G" or "G"). Regular services are added afterwards on the Services page (decisions log, 2026-10-03). Everything can be changed later in settings.
 - **Seeded defaults**, created as normal editable data in the church's default language:
   - role types (e.g. Liturgis, Pemandu Pujian, Pemusik, Pembaca Alkitab, Pengkhotbah, Multimedia, Kolektan);
   - singing parts (Semua, Pemandu, Jemaat, Pria, Wanita, Paduan Suara);
@@ -554,6 +554,7 @@ Record resolved decisions here (date, decision, reason). Move items from section
 | 2026-10-02 | Adversarial review round 2 (implementation documents and schema) handled: atomic operations for all single-use tokens, counters and setup (P-37); binary listens on 127.0.0.1 by default (P-38); allowed-host check and supported deployment setups (P-39); live invite roles in a join table (P-40); optional strict upgrade mode (P-41); setup link in logs accepted as a risk (P-42); changing one's own email/phone deferred (P-43) | All CRITICAL findings fixed and every HIGH finding decided; see the [review log](impl/README.md#6-review-log) |
 | 2026-10-02 | Login throttling uses three counters (identifier + IP: 5 failures/15 min; identifier: 50/hour; IP: 100/15 min) and trusts client IPs only from configured reverse proxies, both in build step 1 | Most installs sit behind a proxy or tunnel; Indonesian mobile carriers and church Wi-Fi share IP addresses; counting per identifier + IP stops one person locking another out |
 | 2026-10-02 | The ready-made Church admin role holds all ten scopes (amends P-15) | With the earlier six scopes, safeguard 2 meant nobody in a new church could ever give the Liturgist or Editor role or any `library.*`/`liturgy.*` scope; found while testing the members page in build step 1 |
+| 2026-10-03 | The setup wizard does not ask for regular services; a church adds them on the Services page, which explains what a service is when empty (amends §5.7) | The wizard of step 1 is approved and merged, and services are a two-minute task with a helpful empty state; a wizard step can be added with the onboarding checklist later |
 
 ## 12. References
 
