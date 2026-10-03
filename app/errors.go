@@ -111,3 +111,37 @@ const (
 type GroupConflictError struct{ Reason string }
 
 func (e *GroupConflictError) Error() string { return "group conflict: " + e.Reason }
+
+// ErrReadingInUse means unpublished liturgies still use the reading (07);
+// it maps to 409 reading_in_use.
+var ErrReadingInUse = errors.New("reading in use")
+
+// ReadingExistsError maps to 409 reading_exists with the existing reading.
+type ReadingExistsError struct{ ID domain.ReadingID }
+
+func (e *ReadingExistsError) Error() string { return "reading exists: " + string(e.ID) }
+
+// Reasons of ImportUnreadableError (08 §4.4).
+const (
+	ImportNotUTF8         = "not_utf8"
+	ImportNotXML          = "not_xml"
+	ImportNoSong          = "no_song"
+	ImportTooManySections = "too_many_sections"
+	ImportFileTooLarge    = "file_too_large"
+	ImportTooComplex      = "too_complex"
+	ImportAlreadyApplied  = "already_applied"
+	ImportTargetChanged   = "target_changed"
+)
+
+// ImportUnreadableError maps to 422 import_unreadable with a reason.
+type ImportUnreadableError struct{ Reason string }
+
+func (e *ImportUnreadableError) Error() string { return "import unreadable: " + e.Reason }
+
+// ImportConflictError maps to 409 import_conflict with a reason.
+type ImportConflictError struct{ Reason string }
+
+func (e *ImportConflictError) Error() string { return "import conflict: " + e.Reason }
+
+// ErrImportTooLarge maps to 413 validation_failed (08 §5).
+var ErrImportTooLarge = errors.New("import too large")

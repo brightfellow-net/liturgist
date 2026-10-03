@@ -202,31 +202,37 @@ func (u *Songs) Create(ctx context.Context, sess *domain.Session, in SongInput) 
 		if err := sc.actor.Require(domain.ScopeLibraryEdit); err != nil {
 			return err
 		}
-		song.ID = domain.SongID(u.IDs.NewID())
-		secs, keys, _, err := resolveSections(in.Sections, nil, u.IDs)
-		if err != nil {
-			return err
-		}
-		arr, err := resolveArrangement(in.Arrangement, keys, secs)
-		if err != nil {
-			return err
-		}
-		song.Sections, song.DefaultArrangement = secs, arr
-		if err := domain.ValidateSections(song.Sections); err != nil {
-			return err
-		}
-		if err := domain.ValidateArrangement(song.DefaultArrangement, song.Sections); err != nil {
-			return err
-		}
-		now := u.Clock.Now()
-		song.Version, song.CreatedAt, song.UpdatedAt = 1, now, now
-		if err := sc.cs.Songs().Create(ctx, song); err != nil {
-			return err
-		}
-		res, err = songView(ctx, sc, song.ID)
+		res, err = u.createIn(ctx, sc, song, in)
 		return err
 	})
 	return res, err
+}
+
+// createIn saves a validated song inside the caller's transaction; the
+// caller has checked library.edit.
+func (u *Songs) createIn(ctx context.Context, sc churchScope, song domain.Song, in SongInput) (SongView, error) {
+	song.ID = domain.SongID(u.IDs.NewID())
+	secs, keys, _, err := resolveSections(in.Sections, nil, u.IDs)
+	if err != nil {
+		return SongView{}, err
+	}
+	arr, err := resolveArrangement(in.Arrangement, keys, secs)
+	if err != nil {
+		return SongView{}, err
+	}
+	song.Sections, song.DefaultArrangement = secs, arr
+	if err := domain.ValidateSections(song.Sections); err != nil {
+		return SongView{}, err
+	}
+	if err := domain.ValidateArrangement(song.DefaultArrangement, song.Sections); err != nil {
+		return SongView{}, err
+	}
+	now := u.Clock.Now()
+	song.Version, song.CreatedAt, song.UpdatedAt = 1, now, now
+	if err := sc.cs.Songs().Create(ctx, song); err != nil {
+		return SongView{}, err
+	}
+	return songView(ctx, sc, song.ID)
 }
 
 // Update changes a song, its sections and its arrangement (library.edit). The
@@ -241,68 +247,74 @@ func (u *Songs) Update(ctx context.Context, sess *domain.Session, id domain.Song
 		if err := sc.actor.Require(domain.ScopeLibraryEdit); err != nil {
 			return err
 		}
-		cur, err := sc.cs.Songs().ByID(ctx, id)
-		if err != nil {
-			return missing(err)
-		}
-		if cur.Version != ch.Version {
-			return ErrVersionConflict
-		}
-		next := cur
-		next.AltTitles = slices.Clone(cur.AltTitles)
-		applyChange(&next, ch)
-		if next.AltTitles == nil {
-			next.AltTitles = []string{}
-		}
-		if err := domain.ValidateSong(&next); err != nil {
-			return err
-		}
-		if ch.Sections != nil {
-			secs, keys, removed, err := resolveSections(*ch.Sections, cur.Sections, u.IDs)
-			if err != nil {
-				return err
-			}
-			if len(removed) > 0 {
-				busy, err := u.Usage.SectionsInUse(ctx, sc.actor.ChurchID, id, removed)
-				if err != nil {
-					return err
-				}
-				if len(busy) > 0 {
-					return &SectionInUseError{IDs: busy}
-				}
-			}
-			next.Sections = secs
-			if ch.Arrangement != nil {
-				if next.DefaultArrangement, err = resolveArrangement(*ch.Arrangement, keys, secs); err != nil {
-					return err
-				}
-			} else {
-				next.DefaultArrangement = keepArrangement(cur.DefaultArrangement, secs)
-			}
-		} else if ch.Arrangement != nil {
-			var err error
-			if next.DefaultArrangement, err = resolveArrangement(*ch.Arrangement, nil, next.Sections); err != nil {
-				return err
-			}
-		}
-		if err := domain.ValidateSections(next.Sections); err != nil {
-			return err
-		}
-		if err := domain.ValidateArrangement(next.DefaultArrangement, next.Sections); err != nil {
-			return err
-		}
-		next.Version, next.UpdatedAt = cur.Version+1, u.Clock.Now()
-		ok, err := sc.cs.Songs().Update(ctx, next, cur.Version)
-		if err != nil {
-			return mapGroupLanguage(err)
-		}
-		if !ok {
-			return ErrVersionConflict
-		}
-		res, err = songView(ctx, sc, id)
+		res, err = u.updateIn(ctx, sc, id, ch)
 		return err
 	})
 	return res, err
+}
+
+// updateIn changes a song inside the caller's transaction; the caller has
+// checked library.edit.
+func (u *Songs) updateIn(ctx context.Context, sc churchScope, id domain.SongID, ch SongChange) (SongView, error) {
+	cur, err := sc.cs.Songs().ByID(ctx, id)
+	if err != nil {
+		return SongView{}, missing(err)
+	}
+	if cur.Version != ch.Version {
+		return SongView{}, ErrVersionConflict
+	}
+	next := cur
+	next.AltTitles = slices.Clone(cur.AltTitles)
+	applyChange(&next, ch)
+	if next.AltTitles == nil {
+		next.AltTitles = []string{}
+	}
+	if err := domain.ValidateSong(&next); err != nil {
+		return SongView{}, err
+	}
+	if ch.Sections != nil {
+		secs, keys, removed, err := resolveSections(*ch.Sections, cur.Sections, u.IDs)
+		if err != nil {
+			return SongView{}, err
+		}
+		if len(removed) > 0 {
+			busy, err := u.Usage.SectionsInUse(ctx, sc.actor.ChurchID, id, removed)
+			if err != nil {
+				return SongView{}, err
+			}
+			if len(busy) > 0 {
+				return SongView{}, &SectionInUseError{IDs: busy}
+			}
+		}
+		next.Sections = secs
+		if ch.Arrangement != nil {
+			if next.DefaultArrangement, err = resolveArrangement(*ch.Arrangement, keys, secs); err != nil {
+				return SongView{}, err
+			}
+		} else {
+			next.DefaultArrangement = keepArrangement(cur.DefaultArrangement, secs)
+		}
+	} else if ch.Arrangement != nil {
+		var err error
+		if next.DefaultArrangement, err = resolveArrangement(*ch.Arrangement, nil, next.Sections); err != nil {
+			return SongView{}, err
+		}
+	}
+	if err := domain.ValidateSections(next.Sections); err != nil {
+		return SongView{}, err
+	}
+	if err := domain.ValidateArrangement(next.DefaultArrangement, next.Sections); err != nil {
+		return SongView{}, err
+	}
+	next.Version, next.UpdatedAt = cur.Version+1, u.Clock.Now()
+	ok, err := sc.cs.Songs().Update(ctx, next, cur.Version)
+	if err != nil {
+		return SongView{}, mapGroupLanguage(err)
+	}
+	if !ok {
+		return SongView{}, ErrVersionConflict
+	}
+	return songView(ctx, sc, id)
 }
 
 // Delete removes a song for good (library.edit). A group left with one song is dissolved.

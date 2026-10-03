@@ -367,6 +367,7 @@ Church-owned. **[P-50]**
 | `updated_at` | ts | no | |
 
 - UNIQUE `readings_church_ref_key` (`church_id`, `reference`, `translation_id`) — church-leading.
+- INDEX `readings_church_translation_idx` (`church_id`, `translation_id`, `updated_at`) — church-leading; serves the translation filter and `LatestAttribution`.
 
 ### import_batches
 
@@ -411,7 +412,7 @@ Church-owned.
 
 ### Unique constraints added to the SQLite name mapping ([02 §8](../impl/02-persistence.md#8-error-mapping))
 
-`songs_group_language_key`, `song_sections_verse_key`, `readings_church_ref_key`.
+`songs_group_language_key`, `song_sections_verse_key`, `readings_church_ref_key`, `import_batches_pkey`, `import_candidates_pkey`.
 
 ## Later steps
 

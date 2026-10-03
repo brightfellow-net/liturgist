@@ -32,6 +32,7 @@ A candidate has a `decision` (what the member chose) and an `outcome` (what Appl
 
 - A candidate whose outcome is `applied` cannot be edited or re-decided: `PATCH` → 409 `import_conflict` (`reason`: `already_applied`). A `failed` candidate can be edited and re-decided, which clears its outcome.
 - Batch `status` is `open` until **every candidate is terminal**; Apply then sets it to `closed` in the same transaction as the last candidate. A batch with a failed or undecided candidate stays `open`. Discarding deletes the batch at once.
+- Changing the decision of a candidate in a `closed` batch (for example a skipped one) makes the batch `open` again.
 - There is no "applying" state: each candidate is applied inside one short transaction under the church lock, so a second Apply simply sees `applied` and skips it.
 
 ## 3. Data
@@ -45,11 +46,11 @@ Domain types `domain.ImportBatch`, `domain.ImportCandidate`, `domain.SongDraft`;
 | `SongDraft` | The fields of a song create request ([06 §2](06-song-library.md#2-data-model)) with `sections` as a list without IDs, and `default_arrangement` as indexes into `sections` |
 | Candidate `decision` / `outcome` | [§2.1](#21-states) |
 | `merge_into` | Song ID, required with `merge`; must belong to this church |
-| `merge_target_version` | The `version` of the `merge_into` song when the decision was saved; Apply compares it with the song's current version and fails with `import_conflict` (`reason`: `target_changed`) if it differs. The member then reopens the preview, which shows the song as it is now, and saves the decision again |
+| `merge_target_version` | The `version` of the `merge_into` song when the decision was saved (a version that is not the current one is refused when saving, 409 `import_conflict` / `target_changed`); Apply compares it with the song's current version and fails with `import_conflict` (`reason`: `target_changed`) if it differs. The member then reopens the preview, which shows the song as it is now, and saves the decision again |
 | `remove_unmatched` | Boolean, default false; meaningful only with `merge` ([§3.2](#32-merge)) |
 | `duplicate_of_id` | The first existing song of this church with the same `hymnal_key`, else the same `title_key` and language; null if none. Computed when the batch is created and again on `GET`, so a song deleted meanwhile no longer counts. Not a foreign key |
-| `applied_song_id`, `error_code` | Set by Apply with `outcome` |
-| `warnings` | Codes the parser produced (§4), plus `duplicate_in_batch` when two candidates of one batch share a `hymnal_key`, or a folded title and language (both stay `pending`); each has a translated message |
+| `applied_song_id`, `error_code` | Set by Apply with `outcome`. `error_code` is one of `validation_failed`, `section_in_use`, `not_found`, `target_changed` |
+| `warnings` | Codes the parser produced (§4), plus `duplicate_in_batch` when two candidates of one batch share a `hymnal_key`, or a folded title and language (both stay `pending`); the batch warning is computed whenever a batch is read and is not stored; each has a translated message |
 
 ### 3.2 Merge
 
@@ -118,7 +119,7 @@ One song per file. The file is XML (`encoding/xml`; no DTD or external entity is
 | `properties/ccliNo` | `ccli_song_number` (digits only, else warning `ccli_ignored`) |
 | `properties/songbooks/songbook` (`name`, `entry`) — the first | `hymnal_source`, `hymnal_number` |
 | `properties/key` | `default_key` if it fits the key rule, else warning `key_ignored` |
-| `lyrics/verse` `name`: `v1` verse 1, `c`/`c1` chorus, `p` pre-chorus, `b` bridge, `i` intro, `e` ending, `o`/other other | `sections` with kind and number; the text is the `lines` with `<br/>` as line breaks and all markup (chords, formatting tags) removed |
+| `lyrics/verse` `name`: `v1` verse 1, `c`/`c1` chorus, `p` pre-chorus, `b` bridge, `i` intro, `e` ending, `o`/other other. A number on a non-verse name is dropped (`number_dropped`); a verse number that appears twice or is missing is renumbered in order (`verse_renumbered`); author types other than the three listed are ignored | `sections` with kind and number; the text is the `lines` with `<br/>` as line breaks and all markup (chords, formatting tags) removed |
 | `properties/verseOrder` (space-separated verse names) | `default_arrangement` (a name that doesn't exist → warning `arrangement_ignored`, no arrangement) |
 
 ### 4.3 ChordPro
@@ -127,7 +128,7 @@ A file may hold several songs separated by `{new_song}`. Chords in `[brackets]` 
 
 | ChordPro | Draft |
 |---|---|
-| `{title: …}` / `{t: …}`; `{subtitle: …}` / `{st: …}` (alternative title) | `title`, `alt_titles` |
+| `{title: …}` / `{t: …}`; `{subtitle: …}` / `{st: …}` (alternative title) | `title`, `alt_titles`. Without a title the file name (without extension) is the title, warning `title_from_file` |
 | `{lyricist: …}`, `{composer: …}`, `{key: …}`, `{ccli: …}`, `{copyright: …}`; `{meta: songbook …}` / `{meta: number …}` | the matching fields |
 | `{start_of_verse}`/`{sov}`, `{start_of_chorus}`/`{soc}`, `{start_of_bridge}`/`{sob}` … `{end_of_…}`; a label argument (`{sov: Verse 2}`) is read with the table of §4.1 | `sections` |
 | Lines outside any block | Split by §4.1 rules 1–3 as one more paste |
@@ -150,6 +151,7 @@ All paths under `/api/v1`; every operation needs `library.edit`. **Authorization
 | Method & path | Request | Response |
 |---|---|---|
 | `POST /imports` | `{ format, language?, files: [{ name, text }] }` — `paste`: exactly one file whose `name` is the title | 201 `{ id, status, candidates: [Candidate], rejected: [...] }` |
+| `GET /imports` | — | `{ items: [{ id, source_format, created_at, updated_at }] }`: the church's batches that are `open`, newest first (for the library page's "unfinished import" notice, [§6](#6-pages)) |
 | `GET /imports/{id}` | — | The batch with its candidates |
 | `PATCH /imports/{id}/candidates/{cid}` | `{ draft }` (a complete `SongDraft`, validated as in [06 §2](06-song-library.md#2-data-model)) | The candidate; `duplicate_of` recomputed |
 | `PATCH /imports/{id}/candidates` | `{ decisions: [{ id, decision, merge_into?, merge_target_version?, remove_unmatched? }] }` (at most 500); `merge` needs `merge_into` and the `target_version` of its preview | The candidates; 409 `import_conflict` for an applied candidate |
@@ -157,7 +159,7 @@ All paths under `/api/v1`; every operation needs `library.edit`. **Authorization
 | `POST /imports/{id}/apply` | — | `{ created, merged, skipped, failed: [{ candidate_id, code }] }`; status `closed` when nothing is `pending` |
 | `DELETE /imports/{id}` | — | 204 (batch and candidates deleted) |
 
-`Candidate` = `id`, `draft`, `duplicate_of: { id, title, hymnal_source, hymnal_number } | null`, `decision`, `merge_into`, `merge_target_version`, `remove_unmatched`, `warnings`, `outcome`, `applied_song_id`, `error_code`.
+`Candidate` = `id`, `draft`, `duplicate_of: { id, title, hymnal_source, hymnal_number }`, `decision`, `merge_into`, `merge_target_version`, `remove_unmatched`, `warnings`, `outcome`, `applied_song_id`, `error_code`. `duplicate_of`, `merge_into`, `merge_target_version`, `outcome`, `applied_song_id` and `error_code` are **left out** when they have no value (the API description language of Huma cannot mark a reference as nullable, as in [07 §4](07-readings.md#4-api)).
 
 **Limits [P-51]:**
 
@@ -182,6 +184,8 @@ Logging: info lines `import_created` (batch ID, format, number of candidates), `
 | `/library/import` | Step 1: three choices — "Paste lyrics" (title, language, text box), "OpenLyrics files" and "ChordPro files" (file picker, several files allowed). Text says what the app accepts and that nothing is saved yet |
 | `/library/import/{id}` | Step 2, review: a list of candidates (title, number of sections, warnings in words, duplicate notice with a link to the existing song); a preview of the selected candidate with its sections and an editor like [06 §4](06-song-library.md#4-pages); per candidate a choice **Add as new song**, **Merge into "…"** (offered with the duplicate preselected as a suggestion, never as a default; choosing it opens the **merge preview** of §3.2 with the checkbox "Remove the N sections that are not in the import", unticked), **Skip**; buttons "Add all without duplicates" and "Import chosen songs". After **Apply**: a summary and links to the new songs; failures are listed with their reason and a "Try again" button; a `target_changed` failure reopens the preview of the song as it is now |
 
+Step 2 as built: **Merge** is offered only for a candidate with a detected duplicate and merges into that song (no search for another target); the editor covers title, other titles, language, hymnal, sections and order, and keeps the credit and licence fields as imported; warnings and the duplicate notice appear in the candidate list; the browser reads files as strict UTF-8 and holds back a file over 1 MiB, listing it with the reason (`not_utf8`, `file_too_large`) together with the files the server rejected; the review page also has "Cancel this import" (`DELETE /imports/{id}`, after a confirmation).
+
 The library's empty state links here ([06 §4](06-song-library.md#4-pages)). Navigating away from a review keeps the batch for 7 days; the library page shows "You have an unfinished import" with a link while an `open` batch of the member's church exists.
 
 ## 7. Ports
@@ -192,6 +196,10 @@ The library's empty state links here ([06 §4](06-song-library.md#4-pages)). Nav
 | `ChurchStore.Imports()` | batches and candidates: create, get, update draft, set decisions, mark applied, delete, delete older than | `adapters/sqlstore` | Import use case, cleanup job |
 
 `app.ImportHint` and `app.ImportCandidate` stop being placeholders in this step (listed under **Ports** in `CHANGELOG.md`).
+
+`Parse` returns one `ImportCandidate` per song found. A song that cannot be read is an entry with `Reject` set to the reason code (and no draft); the use case turns it into a `rejected` entry with its `song_index`. A document that cannot be read at all is an `*app.ImportUnreadableError{Reason}`.
+
+`Cleanup.Hourly` visits every church in its own transaction to delete its old batches (`ImportRepo.DeleteOlderThan`), because repositories are church-scoped.
 
 ## 8. Anti-patterns (DO NOT)
 

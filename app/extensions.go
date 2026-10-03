@@ -57,8 +57,14 @@ type Notifier interface {
 	Compose(ctx context.Context, event NotifyEvent) ([]Message, error)
 }
 
-// BibleText is the text of a reading (placeholder; readings, step 2).
-type BibleText struct{}
+// BibleText is what a BibleTextProvider returns (07 §3.1). Source must be
+// the provider's own ID; MayStore says whether the app may save the text.
+type BibleText struct {
+	Text        string
+	Attribution string
+	Source      string
+	MayStore    bool
+}
 
 // ErrNotAvailable means no BibleTextProvider can supply the text.
 var ErrNotAvailable = errors.New("bible text not available")
@@ -66,6 +72,9 @@ var ErrNotAvailable = errors.New("bible text not available")
 // BibleTextProvider looks up the text of a reading. None is registered in
 // the community edition: use cases treat a nil provider as ErrNotAvailable.
 type BibleTextProvider interface {
+	// ID names the provider (1 to 40 characters). It is stored as the
+	// source of the readings saved from it.
+	ID() string
 	Lookup(ctx context.Context, ref domain.Reference, translation string) (BibleText, error)
 }
 
@@ -77,13 +86,25 @@ type Exporter interface {
 	Export(ctx context.Context, liturgy PublishedVersion, format string, w io.Writer) error
 }
 
-// ImportHint says what kind of document is imported (placeholder; step 2).
-type ImportHint struct{}
+// ImportHint says what kind of document is imported (08 §4).
+type ImportHint struct {
+	Format   domain.ImportFormat
+	Language string // BCP 47, one of domain.ContentLanguages
+	Name     string // file name; for pasted lyrics, the title
+}
 
-// ImportCandidate is one item found in an imported document (placeholder; step 2).
-type ImportCandidate struct{}
+// ImportCandidate is one song found in an imported document. A song that
+// could not be read has Reject set to the reason code instead of a draft (08
+// §4.4); the other songs of the document are still returned.
+type ImportCandidate struct {
+	Draft    domain.SongDraft
+	Warnings []string
+	Reject   string
+}
 
-// Importer finds songs or readings in a document (step 2).
+// Importer finds songs in a document (08 §4). A document that cannot be read
+// at all returns an *ImportUnreadableError. An importer is a pure function of
+// its text: it never writes or fetches anything.
 type Importer interface {
 	Parse(ctx context.Context, r io.Reader, hint ImportHint) ([]ImportCandidate, error)
 }

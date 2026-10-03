@@ -82,3 +82,41 @@ test("E2E-W-008 edit a song and reorder its sections", async ({ browser }) => {
   await page.getByRole("button", { name: "Reload" }).click();
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue("Judul orang lain");
 });
+
+test("E2E-W-009 add a reading and be told it exists", async ({ browser }) => {
+  const page = await adminPage(browser);
+  await page.goto("/library");
+  await page.getByRole("navigation", { name: "Library" }).getByRole("link", { name: "Readings" }).click();
+  await page.getByRole("link", { name: "Add a reading" }).click();
+  await expect(page.getByRole("heading", { name: "Add a reading", level: 1 })).toBeVisible();
+
+  // The reference is understood by the server's parser, in the Indonesian book name.
+  await page.getByLabel("Bible reference").fill("Yoh 3:16-21");
+  await expect(page.getByText("Understood as: Yohanes 3:16-21")).toBeVisible();
+  await page.getByLabel("Translation").selectOption("TB");
+  await page.getByLabel("Text of the reading").fill("Karena begitu besar kasih Allah akan dunia ini,\nsehingga Ia telah mengaruniakan Anak-Nya yang tunggal.");
+  await page.getByLabel("Credit line (optional)").fill("Terjemahan Baru © LAI");
+  await page.getByRole("button", { name: "Save reading" }).click();
+
+  await expect(page.getByRole("heading", { name: "Yohanes 3:16-21 (TB)", level: 1 })).toBeVisible();
+  await expect(page.getByText("Terjemahan Baru © LAI")).toBeVisible();
+
+  // Found by a word from the text.
+  await page.getByRole("link", { name: "Back to the readings" }).click();
+  await page.getByLabel("Search readings").fill("mengaruniakan");
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await expect(page.getByRole("link", { name: /Yohanes 3:16-21 \(TB\)/ })).toBeVisible();
+
+  // The same passage typed another way: the page says it exists and links to it.
+  await page.getByRole("link", { name: "Add a reading" }).click();
+  await page.getByLabel("Bible reference").fill("Yohanes 3 : 16 – 21");
+  await page.getByLabel("Translation").selectOption("TB");
+  await expect(page.getByText("You already saved this reading.")).toBeVisible();
+  await page.getByRole("link", { name: "Open the saved reading" }).click();
+  await expect(page.getByRole("heading", { name: "Yohanes 3:16-21 (TB)", level: 1 })).toBeVisible();
+
+  // Nonsense is explained, not saved.
+  await page.goto("/library/readings/new");
+  await page.getByLabel("Bible reference").fill("Foo 1");
+  await expect(page.getByText("I don't know this book. Try the usual short name, e.g. Yoh or Mzm.")).toBeVisible();
+});

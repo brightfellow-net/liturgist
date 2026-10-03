@@ -17,6 +17,9 @@ import (
 	"github.com/brightfellow-net/liturgist/adapters/entitlements/unlimited"
 	"github.com/brightfellow-net/liturgist/adapters/eventbus/memory"
 	"github.com/brightfellow-net/liturgist/adapters/httpapi"
+	"github.com/brightfellow-net/liturgist/adapters/importers/chordpro"
+	"github.com/brightfellow-net/liturgist/adapters/importers/openlyrics"
+	"github.com/brightfellow-net/liturgist/adapters/importers/paste"
 	"github.com/brightfellow-net/liturgist/adapters/notify/copyshare"
 	"github.com/brightfellow-net/liturgist/adapters/sqlstore"
 	"github.com/brightfellow-net/liturgist/adapters/storage/localfs"
@@ -24,6 +27,7 @@ import (
 	"github.com/brightfellow-net/liturgist/adapters/tenancy"
 	"github.com/brightfellow-net/liturgist/adapters/ulidgen"
 	"github.com/brightfellow-net/liturgist/app"
+	"github.com/brightfellow-net/liturgist/domain"
 	"github.com/brightfellow-net/liturgist/internal/logging"
 	"github.com/danielgtaylor/huma/v2"
 )
@@ -41,6 +45,9 @@ type options struct {
 	events       app.EventBus // unused until the liturgy editor (step 3)
 	notifier     app.Notifier // unused until publishing (step 5)
 	clock        app.Clock    // tests only
+
+	bibleProviders []app.BibleTextProvider
+	importers      map[domain.ImportFormat]app.Importer
 }
 
 // WithRoutes lets the SaaS add operations. It may only add: registering an
@@ -67,6 +74,23 @@ func WithStorage(s app.Storage) Option { return func(o *options) { o.storage = s
 // WithEventBus replaces the community in-process event bus.
 func WithEventBus(b app.EventBus) Option { return func(o *options) { o.events = b } }
 
+// WithBibleTextProvider appends a provider of Bible text; readings are looked
+// up in the providers in the order they were added (07 §3.1).
+func WithBibleTextProvider(p app.BibleTextProvider) Option {
+	return func(o *options) { o.bibleProviders = append(o.bibleProviders, p) }
+}
+
+// WithImporter adds or replaces the importer of a format (08 §7). The
+// community edition registers paste, openlyrics and chordpro.
+func WithImporter(format domain.ImportFormat, imp app.Importer) Option {
+	return func(o *options) {
+		if o.importers == nil {
+			o.importers = map[domain.ImportFormat]app.Importer{}
+		}
+		o.importers[format] = imp
+	}
+}
+
 // WithNotifier replaces the community copy-and-share notifier.
 func WithNotifier(n app.Notifier) Option { return func(o *options) { o.notifier = n } }
 
@@ -91,6 +115,8 @@ type useCases struct {
 	invites  *app.Invites
 	resets   *app.Resets
 	songs    *app.Songs
+	readings *app.Readings
+	imports  *app.Imports
 	operator *app.Operator
 	cleanup  *app.Cleanup
 }
@@ -119,6 +145,13 @@ func wire(cfg Config, db app.Tx, o *options, refresh func()) useCases {
 	ids := ulidgen.New()
 	hasher := argon2pw.New(argon2pw.Default)
 	auth := &app.Auth{Tx: db, Hasher: hasher, Clock: clock, SessionTTL: cfg.SessionTTL, SessionMaxAge: cfg.SessionMaxAge}
+	songs := &app.Songs{Tx: db, Clock: clock, IDs: ids, Usage: app.NeverUsed{}}
+	importers := map[domain.ImportFormat]app.Importer{
+		domain.FormatPaste: paste.Importer{}, domain.FormatOpenLyrics: openlyrics.Importer{}, domain.FormatChordPro: chordpro.Importer{},
+	}
+	for format, imp := range o.importers {
+		importers[format] = imp
+	}
 	return useCases{
 		auth:     auth,
 		account:  &app.Account{Tx: db, Hasher: hasher, Clock: clock, Auth: auth},
@@ -128,7 +161,9 @@ func wire(cfg Config, db app.Tx, o *options, refresh func()) useCases {
 		roles:    &app.Roles{Tx: db, Clock: clock, IDs: ids},
 		invites: &app.Invites{Tx: db, Hasher: hasher, Clock: clock, IDs: ids, URLs: o.urls,
 			Entitlements: o.entitlements, Auth: auth},
-		songs:    &app.Songs{Tx: db, Clock: clock, IDs: ids, Usage: app.NeverUsed{}},
+		songs:    songs,
+		imports:  &app.Imports{Tx: db, Clock: clock, IDs: ids, Songs: songs, Importers: importers},
+		readings: &app.Readings{Tx: db, Clock: clock, IDs: ids, Usage: app.NeverUsed{}, Providers: o.bibleProviders, Log: cfg.Logger},
 		resets:   &app.Resets{Tx: db, Hasher: hasher, Clock: clock, IDs: ids, URLs: o.urls, Auth: auth},
 		operator: &app.Operator{Tx: db, Clock: clock, IDs: ids},
 		cleanup:  &app.Cleanup{Tx: db, Clock: clock},
@@ -173,7 +208,7 @@ func New(ctx context.Context, cfg Config, opts ...Option) (*Server, error) {
 		auth: httpapi.AuthDeps{Auth: s.uc.auth, Account: s.uc.account, Cookies: cookies, Clock: s.uc.auth.Clock, Log: cfg.Logger},
 		church: httpapi.ChurchDeps{Setup: s.uc.setup, Churches: s.uc.churches, Members: s.uc.members, Roles: s.uc.roles,
 			Invites: s.uc.invites, Resets: s.uc.resets, Cookies: cookies, Clock: s.uc.auth.Clock, Log: cfg.Logger},
-		library:  httpapi.LibraryDeps{Songs: s.uc.songs, Log: cfg.Logger},
+		library:  httpapi.LibraryDeps{Songs: s.uc.songs, Readings: s.uc.readings, Imports: s.uc.imports, Log: cfg.Logger},
 		session:  httpapi.SessionMiddleware(s.uc.auth, cookies, s.uc.auth.Clock, cfg.Logger),
 		resolver: o.resolver,
 	}

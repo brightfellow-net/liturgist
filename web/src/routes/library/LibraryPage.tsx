@@ -11,8 +11,9 @@ import { Input, Select } from "@/components/ui/input";
 import { ErrorAlert } from "@/components/ErrorAlert";
 import { Field } from "@/components/Field";
 import { hasScope } from "@/lib/scopes";
+import { importsQuery } from "@/lib/imports";
 import { hymnalText, licenceStatuses, limits, songLanguages, songsQuery, type SongFilters } from "@/lib/library";
-import { paths, songPath } from "../paths";
+import { importPath, paths, songPath } from "../paths";
 
 // LibraryPage is the song list: a search box, filters, and the results a page
 // at a time. The search terms live in the address bar, so a result list can
@@ -31,6 +32,7 @@ export function LibraryPage() {
   };
   const songs = useQuery({ ...songsQuery(filters), placeholderData: (previous) => previous });
   const canEdit = hasScope(me, "library.edit");
+  const unfinished = useQuery({ ...importsQuery, enabled: canEdit }).data?.items?.[0];
   const filtered = Boolean(filters.q || filters.language || filters.licence_status || filters.hymnal_source);
 
   // update changes some search terms and goes back to the first page.
@@ -61,10 +63,18 @@ export function LibraryPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold">{t("library.title")}</h1>
-        {canEdit && !emptyLibrary && <Link className={buttonVariants()} to={paths.songNew}>{t("library.add_song")}</Link>}
-      </div>
+      {unfinished && (
+        <Alert className="space-y-1">
+          <p>{t("import.unfinished")}</p>
+          <Link className="underline" to={importPath(unfinished.id)}>{t("import.unfinished_link")}</Link>
+        </Alert>
+      )}
+      {canEdit && !emptyLibrary && (
+        <div className="flex flex-wrap gap-2">
+          <Link className={buttonVariants()} to={paths.songNew}>{t("library.add_song")}</Link>
+          <Link className={buttonVariants({ variant: "outline" })} to={paths.import}>{t("library.import_songs")}</Link>
+        </div>
+      )}
 
       {emptyLibrary ? (
         <section className="space-y-3 rounded-md border border-border p-4">
@@ -72,7 +82,11 @@ export function LibraryPage() {
           {canEdit ? (
             <>
               <p>{t("library.empty_text")}</p>
-              <Link className={buttonVariants()} to={paths.songNew}>{t("library.add_song")}</Link>
+              <div className="flex flex-wrap gap-2">
+                <Link className={buttonVariants()} to={paths.import}>{t("library.import_paste")}</Link>
+                <Link className={buttonVariants({ variant: "outline" })} to={paths.import}>{t("library.import_file")}</Link>
+                <Link className={buttonVariants({ variant: "outline" })} to={paths.songNew}>{t("library.add_song")}</Link>
+              </div>
             </>
           ) : (
             <p>{t("library.empty_viewer")}</p>

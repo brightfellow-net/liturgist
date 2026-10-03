@@ -45,7 +45,9 @@ type ChurchStore interface {
 	Memberships() MembershipRepo
 	Roles() RoleRepo
 	Invites() InviteRepo
-	Songs() SongRepo // songs, sections, arrangements, groups and search (06)
+	Songs() SongRepo       // songs, sections, arrangements, groups and search (06)
+	Readings() ReadingRepo // saved Bible readings (07)
+	Imports() ImportRepo   // import batches and their candidates (08)
 }
 
 // Clock returns the current time in UTC, truncated to microseconds (02 §4).
@@ -254,6 +256,9 @@ type SongRepo interface {
 	SetGroup(ctx context.Context, songs []domain.SongID, group domain.SongGroupID, now time.Time) error
 	GroupMembers(ctx context.Context, group domain.SongGroupID) ([]SongRef, error) // ordered by language
 	Reindex(ctx context.Context) error                                             // rebuilds this church's index rows
+	// FindDuplicate returns the oldest song with the hymnal key (when not
+	// empty), else the oldest with the folded title in the language (08 §3).
+	FindDuplicate(ctx context.Context, hymnalKey, titleKey, language string) (DuplicateRef, bool, error)
 }
 
 // SongUsage tells whether unpublished liturgies use a song or its sections
@@ -275,4 +280,76 @@ func (NeverUsed) SongInUse(context.Context, domain.ChurchID, domain.SongID) (boo
 // SectionsInUse implements SongUsage.
 func (NeverUsed) SectionsInUse(context.Context, domain.ChurchID, domain.SongID, []domain.SectionID) ([]domain.SectionID, error) {
 	return nil, nil
+}
+
+// ReadingRepo stores the church's readings (07 §6). Unique on (reference,
+// translation): a second Create returns a UniqueError named readings_church_ref_key.
+type ReadingRepo interface {
+	ByID(ctx context.Context, id domain.ReadingID) (domain.Reading, error)
+	ByReference(ctx context.Context, reference string, translation domain.TranslationID) (domain.Reading, error)
+	Create(ctx context.Context, r domain.Reading) error
+	// Update writes text, attribution, display and version when the stored
+	// version is expectedVersion; false means it was not.
+	Update(ctx context.Context, r domain.Reading, expectedVersion int) (bool, error)
+	Delete(ctx context.Context, id domain.ReadingID) error
+	// List returns every reading that matches, in no particular order; the use
+	// case orders them (readings are few).
+	List(ctx context.Context, q ReadingSearch) ([]ReadingRow, error)
+	// LatestAttribution is the attribution of the most recently updated reading
+	// in a translation, or "" when there is none or it has none.
+	LatestAttribution(ctx context.Context, translation domain.TranslationID) (string, error)
+}
+
+// ReadingSearch filters a list. Fold and FoldZh are the folded query for
+// Latin and Chinese readings; both empty lists everything.
+type ReadingSearch struct {
+	Fold, FoldZh string
+	Translation  string // translation code, or ""
+}
+
+// ReadingRow is a reading in a list; TextStart is the first characters of the text.
+type ReadingRow struct {
+	ID               domain.ReadingID
+	Reference        string
+	ReferenceDisplay string
+	Translation      domain.Translation
+	TextStart        string
+}
+
+// ReadingUsage tells whether unpublished liturgies use a reading (07 §6).
+// Step 2 has no liturgies: NeverUsed answers "unused".
+type ReadingUsage interface {
+	ReadingInUse(ctx context.Context, church domain.ChurchID, reading domain.ReadingID) (bool, error)
+}
+
+// ReadingInUse implements ReadingUsage.
+func (NeverUsed) ReadingInUse(context.Context, domain.ChurchID, domain.ReadingID) (bool, error) {
+	return false, nil
+}
+
+// DuplicateRef is an existing song a candidate may duplicate.
+type DuplicateRef struct {
+	ID                         domain.SongID
+	Title                      string
+	HymnalSource, HymnalNumber string
+}
+
+// ImportRepo stores batches and candidates (08 §7). The use case holds the
+// church lock for every change, so the methods are plain reads and writes.
+type ImportRepo interface {
+	CreateBatch(ctx context.Context, b domain.ImportBatch, candidates []domain.ImportCandidate) error
+	Batch(ctx context.Context, id domain.ImportBatchID) (domain.ImportBatch, error) // ErrNotFound
+	// OpenBatches lists the batches with status open, newest first.
+	OpenBatches(ctx context.Context) ([]domain.ImportBatch, error)
+	Candidates(ctx context.Context, batch domain.ImportBatchID) ([]domain.ImportCandidate, error) // by position
+	Candidate(ctx context.Context, batch domain.ImportBatchID, id domain.ImportCandidateID) (domain.ImportCandidate, error)
+	// UpdateCandidate writes every mutable field of the candidate.
+	UpdateCandidate(ctx context.Context, c domain.ImportCandidate) error
+	// SetBatch sets status and updated_at.
+	SetBatch(ctx context.Context, id domain.ImportBatchID, status domain.ImportStatus, now time.Time) error
+	// Unfinished counts the candidates that are not terminal.
+	Unfinished(ctx context.Context, batch domain.ImportBatchID) (int, error)
+	DeleteBatch(ctx context.Context, id domain.ImportBatchID) error // with its candidates
+	// DeleteOlderThan deletes this church's batches not changed since cutoff.
+	DeleteOlderThan(ctx context.Context, cutoff time.Time) error
 }

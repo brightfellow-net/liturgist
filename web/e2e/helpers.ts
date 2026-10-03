@@ -77,3 +77,13 @@ export async function createSong(song: { title: string; language?: string; hymna
   await api.dispose();
   return id;
 }
+
+// createReading saves a reading through the API as the church admin and returns its ID.
+export async function createReading(reading: { reference: string; translation: string; text: string; attribution?: string }): Promise<string> {
+  const api = await adminApi();
+  const res = await api.post("/api/v1/readings", { data: reading });
+  expect(res.status(), await res.text()).toBe(201);
+  const { id } = (await res.json()) as { id: string };
+  await api.dispose();
+  return id;
+}
