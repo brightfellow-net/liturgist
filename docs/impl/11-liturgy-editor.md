@@ -52,6 +52,16 @@ One page, a column of cards; no modal dialogs (confirmations are inline as in `C
 
 **Accessibility:** every control has a visible text label; the sequence rows are fieldsets with a legend ("Entry 3: Chorus"); moving uses buttons with text, never drag alone; no information by colour alone (the unsaved marker has text); axe covers every state listed in §8.
 
+**As built (slice 3C).** Differences from the text above:
+
+- A reading chosen in the picker is part of the item's draft and is saved with **Save item**, not at once.
+- "Add a song" saves at once, but only while the item's song list has no unsaved edits; otherwise the card says to save first. **Save item** on a song item sends up to two requests (the item fields, then the complete song list); if the second fails, the first stays saved.
+- A locked liturgy is shown read-only (cards without forms). Its look is covered by a component test only: no route in step 3 can put a liturgy into review, so there is no end-to-end or axe check of it until step 4.
+- The new-liturgy form offers only templates of the chosen language and sends no template when the preselected one does not match.
+- English dates read "12 October 2026". An ordinary item edit appears in Recent changes as "changed X"; only a key change names the key.
+- The item-conflict flow has its own end-to-end test (E2E-W-013, second test); E2E-W-015 in slice 3D covers the same flow with two live sessions.
+- The Indonesian `liturgy.*` wording is a draft for the owner's review.
+
 ## 5. Web code layout
 
 New files under `web/src/routes/liturgy/` (pages and editor parts), `web/src/lib/liturgy.ts` (queries, `formatKey`, limits), and the API client types; query keys `["liturgies", filters]`, `["liturgy", id]`, `["templates"]`, `["services"]`, `["duties"]`, `["singing-parts"]`, `["prepare", week]`. A saved item updates `["liturgy", id]` from the response and does not refetch the whole liturgy.
