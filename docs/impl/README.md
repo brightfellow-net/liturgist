@@ -38,6 +38,15 @@
 | [11-liturgy-editor.md](11-liturgy-editor.md) | Liturgy pages and the editor (slice 3C); undo and redo (slice 3D); the iceboxed live-updates design |
 | [../reference/schema.md](../reference/schema.md#step-3-tables) | Step 3 tables (Reference) |
 
+## 1c. Documents for step 4
+
+[SPEC.md §10](../SPEC.md#10-suggested-build-order), step 4: review workflow up to Approved, item-level comments, state history. **Status: decisions Approved** 2026-10-04 (Spec Gate 9.0/10, self-scored; adversarial review round 4 done). Built in two slices: 4A states and history, 4B comments. Publishing is step 5 (owner decision 2026-10-04).
+
+| Document | Covers |
+|---|---|
+| [12-review.md](12-review.md) | Transitions, notes, history, the undo floor, comments, pages |
+| [../reference/schema.md](../reference/schema.md#step-4-tables) | Step 4 tables (Reference) |
+
 ## 2. How to use these documents
 
 - **Required reading before writing any step-1 code:** [SPEC.md](../SPEC.md) and **every** document in the table above. This index alone is not a specification.
@@ -150,6 +159,28 @@ These need an answer, not just an approval; the draft shows the assumed default.
 | Q-3.8 | May every holder of `liturgy.edit` see the names of all church members (to assign them), even without `members.view`? Only the display name is returned | Yes ([10 §4](10-liturgy.md#4-editing-items-songs-and-assignments)). **Decided 2026-10-03 (owner):** yes, as drafted: id and display name of every member, nothing else. No opt-out for now |
 | Q-3.9 | Should renaming a duty change the wording of drafts at once (published versions stay as published)? | Yes, live names; the published copy freezes them ([09 §2.1](09-planning.md#21-duties-and-singing-parts-p-55)). **Decided 2026-10-03 (owner):** yes, as drafted. **Requirement for step 5:** a published version stores the displayed duty names, not only the IDs |
 
+## 4d. Proposed decisions (step 4)
+
+**Approved** by the owner on 2026-10-04, after the Spec Gate (9.0/10, self-scored) and review round 4. The owner decided the scope (publishing in step 5, flat comments, self-approval allowed, open comments only warn), answered Q-4.1 to Q-4.3, and accepted every HIGH finding of round 4 as fixed in the draft, including the hard 500-comment cap.
+
+| ID | Proposal | Where | Status |
+|---|---|---|---|
+| P-68 | Four transition routes (`submit`, `approve`, `request-changes`, `reopen`) with the scopes `liturgy.edit` / `liturgy.approve`, an optional note (0–500 characters), and one conditional update per transition on `state` and `edit_seq`; Approved → Published is step 5 | [12 §2](12-review.md#2-states-and-transitions-p-68), [§3](12-review.md#3-api-p-68) | **Approved** 2026-10-04 |
+| P-69 | Submit is refused for a liturgy with no items (`empty_liturgy`) or with any `problem` of [10 §2.5](10-liturgy.md#25-problems) (`has_problems`); approving never re-checks | [12 §2](12-review.md#2-states-and-transitions-p-68) | **Approved** 2026-10-04 |
+| P-70 | Approve and request changes state the `edit_seq` the reviewer saw; a mismatch is 409 `review_stale` | [12 §2](12-review.md#2-states-and-transitions-p-68) | **Approved** 2026-10-04 |
+| P-71 | The history sequence update (`NextSeq`) becomes conditional on an editable state and returns `ErrNoSeq` on zero rows, which one helper turns into 404 or 409 `liturgy_locked`, so an edit or undo cannot commit after a transition (changes the 3B and 3D code) | [12 §2](12-review.md#2-states-and-transitions-p-68) | **Approved** 2026-10-04 |
+| P-72 | Flat comments (1–2,000 characters, at most 500 per liturgy), on an item or the whole liturgy; anyone with `liturgy.comment` may resolve or reopen any; no edit or delete; allowed in `draft`, `in_review`, `needs_revision`; kept when their item is removed (no foreign key, title snapshot), re-attached by undo | [12 §4](12-review.md#4-comments-p-72) | **Approved** 2026-10-04 |
+| P-73 | Tables `liturgy_state_changes` (migration `00008_state_changes.sql`, slice 4A) and `liturgy_comments` (`00009_comments.sql`, slice 4B), both dialects | [12 §5](12-review.md#5-data-model-p-73), [schema](../reference/schema.md#step-4-tables) | **Approved** 2026-10-04 |
+| P-74 | Comments and state changes are readable only with a `liturgy.*` scope, whatever the state; creating or resolving a comment first takes the liturgy row lock with a no-op update that re-checks the state, then counts, reads the item title and inserts | [12 §2](12-review.md#2-states-and-transitions-p-68), [§4](12-review.md#4-comments-p-72) | **Approved** 2026-10-04 |
+
+### 4e. Questions for the owner (step 4)
+
+| # | Question | Proposed answer |
+|---|---|---|
+| Q-4.1 | Should a submit be refused while an item is unfinished (a song item with no song, a reading item with no reading)? | Yes, so the reviewer never reads a half-filled order; the alternative is a warning only (P-69). **Decided 2026-10-04 (owner):** yes, refuse |
+| Q-4.2 | Should the author be able to delete their own comment? | No: resolve it; deletion is not planned (P-72). **Decided 2026-10-04 (owner):** no |
+| Q-4.3 | Should the reviewer's note on "request changes" be required? | No, optional (P-68). **Decided 2026-10-04 (owner):** optional |
+
 ## 5. Process
 
 1. Owner approves, changes or rejects each P-xx.
@@ -165,3 +196,4 @@ These need an answer, not just an approval; the draft shows the assumed default.
 | 1 | 2026-10-02 | This index only ([adversarial-review.md](adversarial-review.md)); the linked documents were not reviewed | 2 CRITICAL, 7 HIGH, 7 MEDIUM. Fixed: #1, #2, #3, #4, #6, #8, #10, #12, #13, #14, #16 (P-33 to P-36 plus clarifications). Clarified, already covered: #5, #7, #11. No change, already covered elsewhere: #9 (SPEC §8.1, 04 §3), #15 (SPEC §8, §5.2). No open CRITICAL or HIGH |
 | 2 | 2026-10-02 | 01–05 ([implementation-adversarial-review.md](implementation-adversarial-review.md)) and the schema reference ([schema-adversarial-review.md](../reference/schema-adversarial-review.md)) | Implementation: 3 CRITICAL, 13 HIGH, 14 MEDIUM. Schema: 2 CRITICAL, 8 HIGH, 8 MEDIUM. All CRITICAL fixed (atomic claims for invites, resets and setup; setup token singleton; throttle key encodings). HIGH: all fixed (P-37 to P-40 and clarifications) except the setup-link-in-logs finding, **accepted** as P-42 with reasons. MEDIUM: all fixed or clarified; changing one's own email/phone **deferred** (P-43). No open CRITICAL; every HIGH has a decision |
 | 3 | 2026-10-03 | Step 2 documents 06, 07, 08 and the step 2 schema ([step2-adversarial-review.md](step2-adversarial-review.md)); reviewed by another model | 2 CRITICAL, 12 HIGH, 10 MEDIUM. **CRITICAL fixed:** failed imports vs. batch closing (candidate states, retry, closing rule: 08 §2.1); client-bypassable provider storage rule (server-side `from-provider`, 07 §3.1). **HIGH, all fixed in the documents (none deferred):** search parity contract and ordered-ID tests, canonical hymnal keys, merge preview and non-destructive default, stale merge target, versions on link/unlink, arrangement table with foreign keys, per-file/aggregate/complexity import limits, deterministic section matching, failure granularity for multi-song files, search tiers and per-dialect queries, paste repeat mapping with examples, ChordPro directive list. **MEDIUM fixed:** fold order, arrangement representation, book ordinals, parser input limit, atomic reindex, candidate edits vs. Apply, state machine, provider timeouts, authorization per route, migration split. P-51 merge rule re-confirmed by the owner 2026-10-03. No open CRITICAL or HIGH |
+| 4 | 2026-10-04 | Step 4 document 12 and the step 4 schema; reviewed by a fresh Claude session with the adversarial prompt (same provider, which the stream-coding rule discourages) | 2 CRITICAL, 7 HIGH, 8 MEDIUM, 4 LOW. **CRITICAL fixed in the draft:** the conditional `NextSeq` would have answered 404/500 for a locked liturgy (`ErrNoSeq` and the `nextSeq` helper, P-71); submit could bypass the problems check in a race (update conditional on `state` and `edit_seq`, 12 §2). **HIGH fixed in the draft, accepted by the owner 2026-10-04:** review data visible on published liturgies (P-74), comment locking and cap, the approve warning source, order of checks, migration split (`00008`/`00009`), comment id scoping. **MEDIUM and LOW** fixed in the draft. The claims about `NextSeq`, `record`, `undo.step` and `openLiturgy` were checked against the code; nothing was run |

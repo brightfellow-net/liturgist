@@ -529,6 +529,18 @@ Written by slice 3D, from the second review of the undo rules ([11 §7.2](../imp
 | `liturgies` | `undo_floor_seq` | int | no | Default 0; `CHECK (undo_floor_seq >= 0)` `liturgies_undo_floor_check`. History rows with `seq` at or below it are no undo or redo targets. Set by step 4's state changes, read by slice 3D |
 | `liturgy_edits` | `skipped` | bool | no | Default false. A `done` edit whose undo was refused and that is no longer offered as a target (non-structural edits only) |
 
+## Step 4 tables
+
+> Status: **Approved** 2026-10-04, with [12-review.md](../impl/12-review.md). Two migrations after `00007_undo.sql`, in both dialect folders: `00008_state_changes.sql` (slice 4A, `liturgy_state_changes`) and `00009_comments.sql` (slice 4B, `liturgy_comments`). Conventions as for step 3.
+
+### liturgy_state_changes
+
+`id` (PK `liturgy_state_changes_pkey`), `church_id`, `liturgy_id` (FK (`church_id`, `liturgy_id`) → `liturgies` ON DELETE CASCADE `liturgy_state_changes_liturgy_fkey`), `from_state`, `to_state` (each `CHECK` against the five states `liturgy_state_changes_from_check`, `…_to_check`), `user_id` (FK → `users(id)` ON DELETE RESTRICT `liturgy_state_changes_user_fkey`), `note` (text, empty when none; length 0–500 **(app)**), `edit_seq` (int, `CHECK (edit_seq >= 0)` `liturgy_state_changes_seq_check`), `created_at`. `UNIQUE liturgy_state_changes_church_id_key` (`church_id`, `id`). Index `liturgy_state_changes_church_liturgy_idx` (`church_id`, `liturgy_id`, `created_at`, `id`). The allowed (from, to) pairs are enforced by the app, not by a check.
+
+### liturgy_comments
+
+`id` (PK `liturgy_comments_pkey`), `church_id`, `liturgy_id` (FK (`church_id`, `liturgy_id`) → `liturgies` ON DELETE CASCADE `liturgy_comments_liturgy_fkey`), `item_id` (nullable; **no foreign key**: a comment outlives its removed item, [12 §4](../impl/12-review.md#4-comments-p-72); checked by the app on create), `item_title` (text, empty for the whole liturgy), `author_id` (FK → `users(id)` ON DELETE RESTRICT `liturgy_comments_author_fkey`), `body` (text; 1–2000 **(app)**), `resolved_at`, `resolved_by` (nullable; `CHECK ((resolved_at IS NULL) = (resolved_by IS NULL))` `liturgy_comments_resolved_check`; `resolved_by` FK → `users(id)` ON DELETE RESTRICT `liturgy_comments_resolved_by_fkey`), `created_at`. `UNIQUE liturgy_comments_church_id_key` (`church_id`, `id`). Index `liturgy_comments_church_liturgy_idx` (`church_id`, `liturgy_id`, `created_at`, `id`) (serves every listing, resolved or not); partial index `liturgy_comments_church_open_idx` (`church_id`, `liturgy_id`) `WHERE resolved_at IS NULL`.
+
 ## Later steps
 
 Tables for comments, state changes and published versions are added in the steps that build them, following [SPEC.md §7](../SPEC.md#7-data-model-sketch) and the conventions above.
