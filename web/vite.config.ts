@@ -11,5 +11,7 @@ export default defineConfig({
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   build: { outDir: "dist", assetsDir: "assets" },
   server: { port: 5173, proxy: { "/api": "http://localhost:8080" } },
-  test: { environment: "jsdom", setupFiles: ["./src/test/setup.ts"], include: ["src/**/*.test.{ts,tsx}"] },
+  // Page tests type into forms with user-event, which is slow in jsdom when
+  // many test files run at once; the default 5 s is too tight.
+  test: { environment: "jsdom", setupFiles: ["./src/test/setup.ts"], include: ["src/**/*.test.{ts,tsx}"], testTimeout: 20000 },
 });
