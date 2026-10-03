@@ -130,7 +130,7 @@ All interfaces are defined in `app` in step 1 and are **provisional [P-27]**: si
 | `Storage` | `Put(ctx, key string, r io.Reader) error`, `Open(ctx, key string) (io.ReadCloser, error)`, `Delete(ctx, key string) error` | `adapters/storage/localfs` under `<DataDir>/files`; keys are `[a-z0-9/_.-]` only, no `..` | Logo upload (later step) |
 | `EventBus` | `Publish(ctx, topic string, payload []byte) error`, `Subscribe(ctx, topic string) (<-chan []byte, func())` | `adapters/eventbus/memory` | Liturgy editor (step 3) |
 | `Notifier` | `Compose(ctx, event NotifyEvent) ([]Message, error)` | `adapters/notify/copyshare` returning an empty list | Publishing (step 5) |
-| `BibleTextProvider` | `Lookup(ctx, ref domain.Reference, translation string) (BibleText, error)` | none registered; returns `ErrNotAvailable` | Readings (step 2) |
+| `BibleTextProvider` | `ID() string`, `Lookup(ctx, ref domain.Reference, translation string) (BibleText, error)` | none registered; returns `ErrNotAvailable` | Readings (step 2) |
 | `Exporter` | `Export(ctx, liturgy PublishedVersion, format string, w io.Writer) error` | none | Step 5 |
 | `Importer` | `Parse(ctx, r io.Reader, hint ImportHint) ([]ImportCandidate, error)` | none | Step 2 |
 

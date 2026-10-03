@@ -144,7 +144,7 @@ Domain type `domain.Reading`; table in [reference/schema.md](../reference/schema
 
 The community build registers no provider, so only step 1 happens.
 
-**Provider failures.** Every `Lookup` gets a **5-second deadline** derived from the request's context. Any error other than `ErrNotAvailable`, a timeout, and a result that breaks a limit (`Source` different from the registered provider ID, text over 20000 characters, attribution over 300) are logged at warn level (provider ID and error class, never text) and treated as "not available" for this lookup; the next provider is still tried. When no stored reading was found and at least one provider failed this way, the response has `provider_error: true`, and the web app says the Bible text source could not be reached and that the text can still be pasted.
+**Provider failures.** Every `Lookup` gets a **5-second deadline** derived from the request's context (`Readings.ProviderTimeout`, zero meaning 5 s). The call runs in its own goroutine and the use case stops waiting at the deadline, so a provider that ignores its context cannot hold the request; its goroutine ends when the provider returns. Any error other than `ErrNotAvailable`, a timeout, and a result that breaks a limit (`Source` different from the registered provider ID, text over 20000 characters, attribution over 300) are logged at warn level (provider ID and error class, never text) and treated as "not available" for this lookup; the next provider is still tried. When no stored reading was found and at least one provider failed this way, the response has `provider_error: true`, and the web app says the Bible text source could not be reached and that the text can still be pasted.
 
 **Storing provider text is a server decision.** Provider text is saved only by `POST /readings/from-provider { reference, translation, provider }`: the server repeats the lookup with that provider and saves the text and attribution **it receives from the provider**, and only when `may_store` is true (otherwise 422 `validation_failed`, field `provider`). `POST /readings` has no `source_provider` field (a request containing one is rejected as an unknown field, 422) and always records `manual`. So a client can neither label text as coming from a provider nor make the app persist provider text that forbids storing.
 
@@ -162,14 +162,14 @@ All paths under `/api/v1`. **View** = any member; **edit** = `library.edit`.
 | `GET /readings/lookup` | view | query `reference` (typed), `translation` (default: the church's) | `{ reference, canonical, display, translation, reading: Reading \| null, provider: { text, attribution, source, may_store } \| null, provider_error, suggested_attribution }`; unparsable reference → 422 `invalid_reference` |
 | `GET /readings` | view | query `q`, `translation`, `limit` (default 50, max 100), `offset` | `{ items: [ReadingSummary], total }`; summary = `id`, `reference`, `canonical`, `reference_display`, `translation`, a 120-character `snippet`, `actions` |
 | `GET /readings/{id}` | view | — | Reading with `text`, `attribution`, `source_provider`, `version`, `actions: { edit, delete }` |
-| `POST /readings` | edit | `{ reference, translation, text, attribution? }` | 201 Reading with `source_provider: "manual"`; 409 `reading_exists` |
+| `POST /readings` | edit | `{ reference, translation?, text, attribution? }` (no `translation`: the church's default) | 201 Reading with `source_provider: "manual"`; 409 `reading_exists` |
 | `POST /readings/from-provider` | edit | `{ reference, translation, provider }` | 201 Reading with `source_provider` = the provider's ID; 409 `reading_exists`; 422 `validation_failed` if the provider has no text or `may_store` is false |
-| `PATCH /readings/{id}` | edit | `{ version, text?, attribution?, reference_display? }` | Reading; 409 `version_conflict` |
+| `PATCH /readings/{id}` | edit | `{ version, text?, attribution?, reference_display? }`; a `reference_display` must still parse to the reading's own reference, otherwise 422 `validation_failed` (field `reference_display`) | Reading; 409 `version_conflict` |
 | `DELETE /readings/{id}` | edit | — | 204; 409 `reading_in_use` if `ReadingUsage.ReadingInUse` |
 
 **Authorization and `actions`:** every route needs a session and membership of the church; `POST`, `PATCH`, `DELETE` and `from-provider` need `library.edit` (403 `forbidden`). `actions` is `{ edit, delete }` on `Reading` and `ReadingSummary`, both true exactly when the member holds `library.edit`.
 
-`q` is folded ([06 §5.1](06-song-library.md#51-folding)) and matched as a **substring** of the folded reference, canonical name and text, with `instr` (SQLite) or `strpos` (PostgreSQL) so that `%`, `_` and `\` in `q` are literal; readings are few, so no full-text index. Order: book ordinal (the `#` column of §2.4), then the first chapter and verse of the passage, then translation code.
+`q` is folded ([06 §5.1](06-song-library.md#51-folding)) and matched as a **substring** of the folded reference, canonical name and text, with `instr` (SQLite) or `strpos` (PostgreSQL) so that `%`, `_` and `\` in `q` are literal; readings are few, so no full-text index. A `q` that folds to nothing (only punctuation) lists every reading, as in [06 §5.2](06-song-library.md#52-query-semantics-p-48). Order: book ordinal (the `#` column of §2.4), then the first chapter and verse of the passage, then translation code, then the standard reference (so `JHN 3:16` comes before `JHN 3:16-21`), then ID. The use case sorts and pages the matching rows in memory: the `readings` table has no ordinal columns, and readings are few.
 
 Logging: info lines `reading_created`, `reading_updated`, `reading_deleted` with IDs; never text.
 
@@ -177,9 +177,9 @@ Logging: info lines `reading_created`, `reading_updated`, `reading_deleted` with
 
 | Route | Page | Who |
 |---|---|---|
-| `/library/readings` | Second tab of the library: list with search and a translation filter; empty state explains "Type a reference and paste the text once; next time it's filled in" with the action "Add a reading" | View |
+| `/library/readings` | Second tab of the library (the songs list is the first; both sit under one "Library" heading with the two tabs): list with search and a translation filter; empty state explains "Type a reference and paste the text once; next time it's filled in" with the action "Add a reading" | View |
 | `/library/readings/new` | Reference input with a live preview of how it was understood ("Yohanes 3:16-21"), translation select (the church's default pre-selected), text box, attribution (pre-filled from `suggested_attribution`). If the reading already exists the page says so and links to it; if a provider has the text it is offered with its attribution and saved with "Save this text" (`POST /readings/from-provider`; the button is absent when `may_store` is false) | `library.edit` |
-| `/library/readings/{id}` | The reading, attribution below it; "Edit" and "Delete" per `actions` | View |
+| `/library/readings/{id}` | The reading, attribution below it; "Edit" (text and attribution, in place on the same page; the reference and translation cannot change) and "Delete" per `actions` | View |
 
 The preview calls `GET /readings/parse` after the user stops typing for 400 ms and on leaving the field; an error shows the translated reason (`unknown_book`: "I don't know this book. Try the usual short name, e.g. Yoh or Mzm."). Book names in the preview are Indonesian in both UI languages in step 2 [P-49].
 
@@ -188,7 +188,7 @@ The preview calls `GET /readings/parse` after the user stops typing for 400 ms a
 | Port | Signature | Implementation | Used by |
 |---|---|---|---|
 | `ChurchStore.Readings()` | create, update (conditional on `version`), delete, `ByID`, `ByReference`, `List`, `LatestAttribution(translation)` | `adapters/sqlstore` | Reading use cases |
-| `BibleTextProvider` | `Lookup(ctx, ref domain.Reference, translation string) (BibleText, error)` (exists since step 1, [04 §7](04-tenancy-extensions.md#7-extension-points)) | None registered; `server.WithBibleTextProvider(p)` appends one; 5 s deadline per call (§3.1) | Lookup |
+| `BibleTextProvider` | `ID() string` and `Lookup(ctx, ref domain.Reference, translation string) (BibleText, error)` (`Lookup` exists since step 1, `ID` is added in step 2 so that a stored reading and `POST /readings/from-provider` can name the provider, [04 §7](04-tenancy-extensions.md#7-extension-points)) | None registered; `server.WithBibleTextProvider(p)` appends one; 5 s deadline per call (§3.1) | Lookup |
 | `ReadingUsage` | `ReadingInUse(ctx, church, reading) (bool, error)` | Step 2: `app.NeverUsed`; step 3: queries the liturgies | Delete |
 
 `domain.Reference` and `app.BibleText` stop being placeholders in this step (listed under **Ports** in `CHANGELOG.md`).
