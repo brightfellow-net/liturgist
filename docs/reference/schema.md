@@ -311,6 +311,7 @@ Church-owned. Order is `position`; IDs are stable **[P-46]**.
 - UNIQUE `song_sections_church_song_id_key` (`church_id`, `song_id`, `id`) — target of the arrangement foreign key; church-leading.
 - UNIQUE partial index `song_sections_verse_key` (`song_id`, `number`) `WHERE kind = 'verse'` — no two verses with one number.
 - Index `song_sections_church_song_idx` (`church_id`, `song_id`, `position`) — church-leading.
+- UNIQUE `song_sections_church_id_key` (`church_id`, `id`) — added by `00006_liturgies.sql`; target of the composite foreign key `sequence_entries_section_fkey`. That the section belongs to the item song's song stays an app rule.
 
 ### song_arrangement_entries
 
@@ -367,6 +368,7 @@ Church-owned. **[P-50]**
 | `updated_at` | ts | no | |
 
 - UNIQUE `readings_church_ref_key` (`church_id`, `reference`, `translation_id`) — church-leading.
+- UNIQUE `readings_church_id_key` (`church_id`, `id`) — added by `00006_liturgies.sql`; target of the composite foreign key `liturgy_items_reading_fkey`.
 - INDEX `readings_church_translation_idx` (`church_id`, `translation_id`, `updated_at`) — church-leading; serves the translation filter and `LatestAttribution`.
 
 ### import_batches
@@ -510,13 +512,13 @@ PK `church_seeds_pkey` (`church_id`, `seed_key`) — church-leading. Written onl
 
 ### liturgy_edits
 
-`id`, `church_id`, `liturgy_id` (FK cascade `liturgy_edits_liturgy_fkey`), `user_id` (FK → `users(id)` ON DELETE RESTRICT), `seq` (int; from `liturgies.edit_seq`; UNIQUE (`liturgy_id`, `seq`) `liturgy_edits_seq_key`), `command` (`CHECK (command IN ('liturgy.create','liturgy.update','item.add','item.remove','item.update','item.songs','items.reorder','assignment.add','assignment.remove','undo','redo'))` `liturgy_edits_command_check`), `target_edit_id` (id, nullable; for `undo` and `redo` rows the edit they act on; not a foreign key), `item_id` (id, nullable, **not** a foreign key: the item may be deleted), `before`, `after` (json, nullable; **no size cap**: the largest legal image is about 300 KB, 10 §7), `liturgy_version_after` (int), `item_version_after` (int, nullable; both informational, never compared by undo), `status` (`CHECK (status IN ('done','undone','dropped'))` `liturgy_edits_status_check`; always `done` for `undo` and `redo` rows), `undo_seq` (int, nullable; the `seq` of the `undo` row, set while `status = 'undone'`), `created_at`.
+`id`, `church_id`, `liturgy_id` (FK cascade `liturgy_edits_liturgy_fkey`), `user_id` (FK → `users(id)` ON DELETE RESTRICT), `seq` (int; from `liturgies.edit_seq`; UNIQUE (`liturgy_id`, `seq`) `liturgy_edits_seq_key`), `command` (`CHECK (command IN ('liturgy.create','liturgy.update','item.add','item.remove','item.update','item.songs','items.reorder','assignment.add','assignment.remove','undo','redo'))` `liturgy_edits_command_check`), `target_edit_id` (id, nullable; for `undo` and `redo` rows the edit they act on; not a foreign key), `item_id` (id, nullable, **not** a foreign key: the item may be deleted), `before`, `after` (text holding JSON, nullable; **no size cap**: the largest legal image is about 300 KB, 10 §7), `liturgy_version_after` (int), `item_version_after` (int, nullable; both informational, never compared by undo), `status` (`CHECK (status IN ('done','undone','dropped'))` `liturgy_edits_status_check`; always `done` for `undo` and `redo` rows), `undo_seq` (int, nullable; the `seq` of the `undo` row, set while `status = 'undone'`), `created_at`.
 
 - Index `liturgy_edits_church_liturgy_idx` (`church_id`, `liturgy_id`, `seq`); index `liturgy_edits_church_user_idx` (`church_id`, `liturgy_id`, `user_id`, `status`, `seq`).
 
 ### Unique constraints added to the SQLite name mapping (step 3)
 
-`duties_church_name_key`, `singing_parts_church_name_key`, `templates_church_name_key`, `services_church_name_key`, `service_times_slot_key`, `liturgies_service_slot_key`, `assignments_user_key`, `assignments_name_key`, `church_seeds_pkey`, plus the `<table>_pkey` of every new table.
+`duties_church_name_key`, `singing_parts_church_name_key`, `templates_church_name_key`, `services_church_name_key`, `service_times_slot_key`, `liturgies_service_slot_key`, `assignments_user_key`, `assignments_name_key`, `church_seeds_pkey`, plus the `<table>_pkey` of every new table, plus `readings_church_id_key` and `song_sections_church_id_key`. SQLite names the failing index by columns, so a repeated section ID can report `song_sections_church_id_key` instead of `song_sections_pkey`; both mean a duplicate ID.
 
 ## Later steps
 

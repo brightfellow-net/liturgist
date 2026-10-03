@@ -53,7 +53,7 @@ type ChurchStore interface {
 }
 
 // Liturgy-use checks for deleting songs, sections and readings (06 §6, 07 §6). Step 2 passes
-// app.NeverUsed, which answers "unused"; step 3 replaces it with a query over the liturgies.
+// app.NeverUsed, which answers "unused"; step 3 replaces these ports with the transaction-bound `UsageRepo` of [10 §6](10-liturgy.md#6-usage-ports-and-deleted-songs-readings-sections).
 type SongUsage interface {
     SongInUse(ctx context.Context, church domain.ChurchID, song domain.SongID) (bool, error)
     SectionsInUse(ctx context.Context, church domain.ChurchID, song domain.SongID, sections []domain.SectionID) ([]domain.SectionID, error)
