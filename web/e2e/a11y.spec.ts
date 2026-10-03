@@ -1,7 +1,7 @@
 // Copyright 2026 Brightfellow contributors
 // SPDX-License-Identifier: Apache-2.0
 import { expect, test } from "@playwright/test";
-import { adminApi, adminPage, createInvite, createMember, createSong, expectAccessible } from "./helpers";
+import { adminApi, adminPage, createInvite, createMember, createReading, createSong, expectAccessible } from "./helpers";
 
 // E2E-W-005: axe finds no WCAG 2.2 A/AA violation on any step-1 page. The
 // setup page is checked in setup.spec.ts, before setup completes.
@@ -93,6 +93,38 @@ test.describe("E2E-W-005 accessibility of the library", () => {
     await expect(page.getByRole("heading", { name: "Add a song", level: 1 })).toBeVisible();
     await page.getByRole("button", { name: "Save song" }).click(); // shows the errors
     await expect(page.getByText("This field is required.")).toBeVisible();
+    await expectAccessible(page);
+  });
+});
+
+test.describe("E2E-W-005 accessibility of readings", () => {
+  test("empty readings", async ({ browser }) => {
+    const page = await adminPage(browser);
+    await page.goto("/library/readings");
+    await expect(page.getByRole("heading", { name: "No readings saved yet" })).toBeVisible();
+    await expectAccessible(page);
+  });
+
+  test("list, reading, and form", async ({ browser }) => {
+    const id = await createReading({ reference: "Mzm 23", translation: "TB", text: "TUHAN adalah gembalaku, takkan kekurangan aku.", attribution: "© LAI" });
+    const page = await adminPage(browser);
+    await page.goto("/library/readings");
+    await expect(page.getByRole("link", { name: /Mazmur 23 \(TB\)/ })).toBeVisible();
+    await expectAccessible(page);
+
+    await page.goto(`/library/readings/${id}`);
+    await expect(page.getByRole("heading", { name: "Mazmur 23 (TB)", level: 1 })).toBeVisible();
+    await expectAccessible(page);
+
+    await page.getByRole("button", { name: "Edit" }).click();
+    await expect(page.getByLabel("Text of the reading")).toBeVisible();
+    await expectAccessible(page);
+
+    await page.goto("/library/readings/new");
+    await page.getByLabel("Bible reference").fill("Foo 1");
+    await expect(page.getByText(/I don't know this book/)).toBeVisible();
+    await page.getByRole("button", { name: "Save reading" }).click();
+    await expect(page.getByText("Enter the text of the reading.")).toBeVisible();
     await expectAccessible(page);
   });
 });

@@ -9,6 +9,7 @@ export const errorCodes = [
   "not_found", "invalid_token", "already_set_up", "not_set_up", "already_member", "invite_exists",
   "identifier_taken", "lockout_prevented", "role_name_taken", "reset_not_allowed", "too_many_attempts",
   "version_conflict", "song_in_use", "section_in_use", "group_conflict",
+  "invalid_reference", "reading_exists", "reading_in_use",
   "internal", "unavailable",
 ] as const;
 
@@ -18,6 +19,7 @@ export type Problem = {
   code?: string;
   detail?: string;
   reason?: string;
+  reading_id?: string; // reading_exists: the reading that is already saved
   scopes?: string[];
   limit?: string;
   used?: number;
@@ -76,6 +78,10 @@ export function errorText(t: TFunction, err: unknown, scopeName: (scope: string)
     case "group_conflict": {
       const text = t(`errors.group_conflict.${p.reason ?? ""}`, { defaultValue: "" });
       return text || t("errors.group_conflict.unknown");
+    }
+    case "invalid_reference": {
+      const text = t(`errors.invalid_reference.${p.reason ?? ""}`, { defaultValue: "" });
+      return text || t("errors.invalid_reference.unknown");
     }
     case "limit_reached":
       return t("errors.limit_reached", { max: p.max ?? 0 });

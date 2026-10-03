@@ -57,8 +57,14 @@ type Notifier interface {
 	Compose(ctx context.Context, event NotifyEvent) ([]Message, error)
 }
 
-// BibleText is the text of a reading (placeholder; readings, step 2).
-type BibleText struct{}
+// BibleText is what a BibleTextProvider returns (07 §3.1). Source must be
+// the provider's own ID; MayStore says whether the app may save the text.
+type BibleText struct {
+	Text        string
+	Attribution string
+	Source      string
+	MayStore    bool
+}
 
 // ErrNotAvailable means no BibleTextProvider can supply the text.
 var ErrNotAvailable = errors.New("bible text not available")
@@ -66,6 +72,9 @@ var ErrNotAvailable = errors.New("bible text not available")
 // BibleTextProvider looks up the text of a reading. None is registered in
 // the community edition: use cases treat a nil provider as ErrNotAvailable.
 type BibleTextProvider interface {
+	// ID names the provider (1 to 40 characters). It is stored as the
+	// source of the readings saved from it.
+	ID() string
 	Lookup(ctx context.Context, ref domain.Reference, translation string) (BibleText, error)
 }
 

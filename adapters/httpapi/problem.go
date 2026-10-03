@@ -32,8 +32,10 @@ type Problem struct {
 	Used   *int     `json:"used,omitempty"`
 	Max    *int     `json:"max,omitempty"`
 	// SectionIDs lists the sections in use (section_in_use).
-	SectionIDs []string            `json:"section_ids,omitempty"`
-	Errors     []*huma.ErrorDetail `json:"errors,omitempty"`
+	SectionIDs []string `json:"section_ids,omitempty"`
+	// ReadingID is the reading that already exists (reading_exists).
+	ReadingID string              `json:"reading_id,omitempty"`
+	Errors    []*huma.ErrorDetail `json:"errors,omitempty"`
 }
 
 // Error implements error.
@@ -101,6 +103,8 @@ func MapError(ctx context.Context, err error, log *slog.Logger) error {
 		nf       *app.NotFoundError
 		inUse    *app.SectionInUseError
 		group    *app.GroupConflictError
+		badRef   *domain.ReferenceError
+		exists   *app.ReadingExistsError
 	)
 	info := RequestInfoFrom(ctx)
 	switch {
@@ -144,6 +148,14 @@ func MapError(ctx context.Context, err error, log *slog.Logger) error {
 			p.SectionIDs = append(p.SectionIDs, string(id))
 		}
 		return p
+	case errors.As(err, &badRef):
+		p := problem(http.StatusUnprocessableEntity, "invalid_reference", "This is not a Bible reference we understand.")
+		p.Reason = string(badRef.Reason)
+		return p
+	case errors.As(err, &exists):
+		p := problem(http.StatusConflict, "reading_exists", "This reading is already saved.")
+		p.ReadingID = string(exists.ID)
+		return p
 	case errors.As(err, &group):
 		p := problem(http.StatusConflict, "group_conflict", "These songs can't be linked.")
 		p.Reason = group.Reason
@@ -182,6 +194,7 @@ var conflicts = map[error]*Problem{
 	app.ErrResetNotAllowed: problem(http.StatusConflict, "reset_not_allowed", "This person also belongs to another church."),
 	app.ErrVersionConflict: problem(http.StatusConflict, "version_conflict", "This was changed by someone else. Reload to see their version."),
 	app.ErrSongInUse:       problem(http.StatusConflict, "song_in_use", "This song is used in a liturgy that isn't published yet."),
+	app.ErrReadingInUse:    problem(http.StatusConflict, "reading_in_use", "This reading is used in a liturgy that isn't published yet."),
 	app.ErrInviteMismatch: problem(http.StatusForbidden, "invite_identifier_mismatch",
 		"This invite is for another account. Log out and log in as that person."),
 }

@@ -44,6 +44,7 @@ func churchRowsIn(t *testing.T, s app.Store, db *sqlstore.DB, cid string) string
 			"SELECT * FROM song_sections WHERE church_id = ? ORDER BY song_id, position",
 			"SELECT * FROM song_arrangement_entries WHERE church_id = ? ORDER BY song_id, position",
 			"SELECT * FROM song_search WHERE church_id = ? ORDER BY song_id",
+			"SELECT * FROM readings WHERE church_id = ? ORDER BY id",
 		} {
 			rows, err := sqlstore.RawTx(s).QueryxContext(ctx, db.Dialect().Rebind(q), cid)
 			if err != nil {
@@ -261,6 +262,55 @@ func TestScopedRepositories(t *testing.T) {
 		"Songs.Reindex": func(cs app.ChurchStore, _ time.Time) error {
 			return cs.Songs().Reindex(ctx)
 		},
+		"Readings.ByID": func(cs app.ChurchStore, _ time.Time) error {
+			r, err := cs.Readings().ByID(ctx, domain.ReadingID(id("RDA1")))
+			if err != nil || r.Reference != "JHN 3:16" || r.Translation.Code != "TB" {
+				return fmt.Errorf("own reading: %+v %w", r, err)
+			}
+			_, err = cs.Readings().ByID(ctx, domain.ReadingID(id("RDB1")))
+			return notFound(err)
+		},
+		"Readings.ByReference": func(cs app.ChurchStore, _ time.Time) error {
+			r, err := cs.Readings().ByReference(ctx, "JHN 3:16", tb) // both churches saved it
+			if err != nil || r.ID != domain.ReadingID(id("RDA1")) {
+				return fmt.Errorf("got %+v %w", r, err)
+			}
+			_, err = cs.Readings().ByReference(ctx, "PSA 23", tb) // only church B did
+			return notFound(err)
+		},
+		"Readings.Create": func(cs app.ChurchStore, now time.Time) error {
+			// Church B's reference is free in church A, and the row belongs to A.
+			if err := cs.Readings().Create(ctx, testReading(id("RDX"), "PSA 23", now)); err != nil {
+				return err
+			}
+			r, err := cs.Readings().ByID(ctx, domain.ReadingID(id("RDX")))
+			if err != nil || r.ID == "" {
+				return fmt.Errorf("created reading not visible to A: %w", err)
+			}
+			return errRollback
+		},
+		"Readings.Update": func(cs app.ChurchStore, now time.Time) error {
+			r := testReading(id("RDB1"), "JHN 3:16", now)
+			r.Version = 2
+			return unchanged(cs.Readings().Update(ctx, r, 1))
+		},
+		"Readings.Delete": func(cs app.ChurchStore, _ time.Time) error {
+			return notFound(cs.Readings().Delete(ctx, domain.ReadingID(id("RDB1"))))
+		},
+		"Readings.List": func(cs app.ChurchStore, _ time.Time) error {
+			rows, err := cs.Readings().List(ctx, app.ReadingSearch{})
+			if err != nil || len(rows) != 1 || rows[0].ID != domain.ReadingID(id("RDA1")) {
+				return fmt.Errorf("list: %+v %w", rows, err)
+			}
+			return nil
+		},
+		"Readings.LatestAttribution": func(cs app.ChurchStore, _ time.Time) error {
+			a, err := cs.Readings().LatestAttribution(ctx, tb)
+			if err != nil || a != "TB A" {
+				return fmt.Errorf("attribution %q, want church A's: %w", a, err)
+			}
+			return nil
+		},
 	}
 
 	// Reflection check: the harness covers every method of every repository.
@@ -306,12 +356,24 @@ func TestScopedRepositories(t *testing.T) {
 			if err := a.Songs().Create(ctx, testSong(id("SA1"), "Cinta Tuhan", "id", f.now)); err != nil {
 				return err
 			}
+			ra := testReading(id("RDA1"), "JHN 3:16", f.now)
+			ra.Attribution = "TB A"
+			if err := a.Readings().Create(ctx, ra); err != nil {
+				return err
+			}
 			b, err := s.ForChurch(ctx, domain.ChurchID(id("CHB")))
 			if err != nil {
 				return err
 			}
 			if err := b.Songs().CreateGroup(ctx, domain.SongGroupID(id("GB")), f.now); err != nil {
 				return err
+			}
+			for rid, ref := range map[string]string{"RDB1": "JHN 3:16", "RDB2": "PSA 23"} {
+				rb := testReading(id(rid), ref, f.now.Add(time.Minute))
+				rb.Attribution = "TB B"
+				if err := b.Readings().Create(ctx, rb); err != nil {
+					return err
+				}
 			}
 			for sid, lang := range map[string]string{"SB1": "en", "SB2": "id"} {
 				song := testSong(id(sid), "Cinta Tuhan B", lang, f.now)
@@ -492,5 +554,13 @@ func testSong(songID, title, language string, now time.Time) domain.Song {
 		},
 		DefaultArrangement: []domain.SectionID{verse, chorus, verse},
 		Version:            1, CreatedAt: now, UpdatedAt: now,
+	}
+}
+
+func testReading(readingID, reference string, now time.Time) domain.Reading {
+	return domain.Reading{
+		ID: domain.ReadingID(readingID), Reference: reference, ReferenceDisplay: reference,
+		Translation: domain.Translation{ID: tb, Code: "TB", Language: "id"},
+		Text:        "Karena begitu besar kasih Allah", SourceProvider: "manual", Version: 1, CreatedAt: now, UpdatedAt: now,
 	}
 }

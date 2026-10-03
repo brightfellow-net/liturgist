@@ -16,8 +16,9 @@ import (
 // LibraryDeps are what the song library operations need. Fields may be nil
 // when only the OpenAPI document is built.
 type LibraryDeps struct {
-	Songs *app.Songs
-	Log   *slog.Logger
+	Songs    *app.Songs
+	Readings *app.Readings
+	Log      *slog.Logger
 }
 
 type songSection struct {
@@ -47,8 +48,9 @@ type songListOutput struct {
 	}
 }
 
-// RegisterLibrary registers the song library operations (06 §3).
+// RegisterLibrary registers the song library (06 §3) and readings (07 §4) operations.
 func RegisterLibrary(api huma.API, d LibraryDeps) {
+	registerReadings(api, d)
 	fail := func(ctx context.Context, err error) error { return MapError(ctx, err, d.Log) }
 	sess := func(ctx context.Context) *domain.Session { return RequestInfoFrom(ctx).Session }
 	songOp := func(id, method, path string, status int, summary string) huma.Operation {

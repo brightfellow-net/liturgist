@@ -19,6 +19,18 @@ export type SongSummaryView = Schemas["SongSummaryView"];
 export type SectionView = Schemas["SectionView"];
 export type SongSection = Schemas["SongSection"];
 export type SongRefView = Schemas["SongRefView"];
+export type ReadingView = Schemas["ReadingView"];
+export type ReadingSummaryView = Schemas["ReadingSummaryView"];
+export type TranslationRefView = Schemas["TranslationRefView"];
+export type ProviderTextView = Schemas["ProviderTextView"];
+
+// LookupView is GET /readings/lookup. Huma can't mark a nested object as
+// nullable in OpenAPI either (see Me): reading and provider are null when
+// there is none.
+export type LookupView = Omit<Schemas["LookupView"], "reading" | "provider"> & {
+  reading: ReadingView | null;
+  provider: ProviderTextView | null;
+};
 
 // Me is GET /me. Huma can't mark a nested object as nullable in OpenAPI, so
 // the generated type misses that church and membership are null before

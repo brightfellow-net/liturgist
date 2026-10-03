@@ -297,6 +297,94 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/readings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search and list readings */
+        get: operations["listReadings"];
+        put?: never;
+        /** Save a reading typed or pasted by a member */
+        post: operations["createReading"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/readings/from-provider": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save the text a registered provider returns */
+        post: operations["createReadingFromProvider"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/readings/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Find the text for a reference */
+        get: operations["lookupReading"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/readings/parse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Understand a typed Bible reference */
+        get: operations["parseReference"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/readings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A reading with its text */
+        get: operations["getReading"];
+        put?: never;
+        post?: never;
+        /** Delete a reading */
+        delete: operations["deleteReading"];
+        options?: never;
+        head?: never;
+        /** Change the text or attribution of a reading */
+        patch: operations["updateReading"];
+        trace?: never;
+    };
     "/roles": {
         parameters: {
             query?: never;
@@ -532,6 +620,30 @@ export interface components {
             phone?: string;
             role_ids?: string[] | null;
         };
+        CreateReadingFromProviderRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/CreateReadingFromProviderRequest.json
+             */
+            readonly $schema?: string;
+            provider: string;
+            reference: string;
+            translation?: string;
+        };
+        CreateReadingRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/CreateReadingRequest.json
+             */
+            readonly $schema?: string;
+            attribution?: string;
+            reference: string;
+            text: string;
+            /** @description default: the church's translation */
+            translation?: string;
+        };
         CreateRoleRequest: {
             /**
              * Format: uri
@@ -666,6 +778,25 @@ export interface components {
             identifier: string;
             password: string;
         };
+        LookupView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/LookupView.json
+             */
+            readonly $schema?: string;
+            canonical: string;
+            display: string;
+            /** @description text a registered provider offers, if no reading is saved */
+            provider: components["schemas"]["ProviderTextView"];
+            /** @description a provider could not be reached and nothing was found */
+            provider_error: boolean;
+            /** @description the church's saved reading, if any */
+            reading: components["schemas"]["ReadingView"];
+            reference: string;
+            suggested_attribution: string;
+            translation: components["schemas"]["TranslationRefView"];
+        };
         MeOutputBody: {
             /**
              * Format: uri
@@ -719,6 +850,20 @@ export interface components {
             roles: components["schemas"]["RoleRef"][] | null;
             scopes: string[] | null;
         };
+        ParsedReferenceView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/ParsedReferenceView.json
+             */
+            readonly $schema?: string;
+            /** @description with the Indonesian book name */
+            canonical: string;
+            /** @description as typed, spaces collapsed */
+            display: string;
+            /** @description standard form */
+            reference: string;
+        };
         Preferences: {
             text_size?: string;
             ui_language?: string;
@@ -740,6 +885,7 @@ export interface components {
             limit?: string;
             /** Format: int64 */
             max?: number;
+            reading_id?: string;
             reason?: string;
             scopes?: string[] | null;
             section_ids?: string[] | null;
@@ -748,6 +894,67 @@ export interface components {
             title: string;
             /** Format: int64 */
             used?: number;
+        };
+        ProviderTextView: {
+            attribution: string;
+            may_store: boolean;
+            /** @description the provider's ID, for POST /readings/from-provider */
+            source: string;
+            text: string;
+        };
+        ReadingActions: {
+            delete: boolean;
+            edit: boolean;
+        };
+        ReadingListOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/ReadingListOutputBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["ReadingSummaryView"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
+        ReadingSummaryView: {
+            actions: components["schemas"]["ReadingActions"];
+            /** @description with the Indonesian book name, e.g. Yohanes 3:16-21 */
+            canonical: string;
+            id: string;
+            /** @description standard form, e.g. JHN 3:16-21 */
+            reference: string;
+            /** @description as typed */
+            reference_display: string;
+            snippet: string;
+            translation: components["schemas"]["TranslationRefView"];
+        };
+        ReadingView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/ReadingView.json
+             */
+            readonly $schema?: string;
+            actions: components["schemas"]["ReadingActions"];
+            attribution: string;
+            canonical: string;
+            /** Format: date-time */
+            created_at: string;
+            id: string;
+            reference: string;
+            reference_display: string;
+            /** @description manual, or the ID of the provider the text came from */
+            source_provider: string;
+            text: string;
+            translation: components["schemas"]["TranslationRefView"];
+            /** Format: date-time */
+            updated_at: string;
+            /**
+             * Format: int64
+             * @description send it back with every change
+             */
+            version: number;
         };
         ResetInfoOutputBody: {
             /**
@@ -956,6 +1163,12 @@ export interface components {
             readonly $schema?: string;
             token: string;
         };
+        TranslationRefView: {
+            code: string;
+            /** @enum {string} */
+            language: "id" | "en" | "zh-Hans" | "zh-Hant";
+            name: string;
+        };
         UpdateChurchRequest: {
             /**
              * Format: uri
@@ -983,6 +1196,22 @@ export interface components {
             readonly $schema?: string;
             name?: string;
             preferences?: components["schemas"]["PreferencesStruct"];
+        };
+        UpdateReadingRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/UpdateReadingRequest.json
+             */
+            readonly $schema?: string;
+            attribution?: string;
+            reference_display?: string;
+            text?: string;
+            /**
+             * Format: int64
+             * @description the version the client loaded
+             */
+            version: number;
         };
         UpdateRoleRequest: {
             /**
@@ -1689,6 +1918,267 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LinkView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listReadings: {
+        parameters: {
+            query?: {
+                /** @description part of the reference or the text */
+                q?: string;
+                translation?: string;
+                /** @description default 50, at most 100 */
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadingListOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    createReading: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReadingRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadingView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    createReadingFromProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReadingFromProviderRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadingView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    lookupReading: {
+        parameters: {
+            query?: {
+                reference?: string;
+                /** @description default: the church's translation */
+                translation?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LookupView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    parseReference: {
+        parameters: {
+            query?: {
+                input?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParsedReferenceView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getReading: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadingView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    deleteReading: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    updateReading: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateReadingRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadingView"];
                 };
             };
             /** @description Error */

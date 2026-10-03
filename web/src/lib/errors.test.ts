@@ -51,6 +51,13 @@ describe("TC-W-002 error messages", () => {
     expect(errorText(t, apiError(409, { code: "version_conflict" }))).toBe("This song was changed by someone else. Reload to see their version.");
   });
 
+  it("explains an unreadable reference by its reason", () => {
+    expect(errorText(t, apiError(422, { code: "invalid_reference", reason: "bad_range" }))).toBe("The verses must go in order, e.g. 16-21.");
+    expect(errorText(t, apiError(422, { code: "invalid_reference" }))).toBe("This is not a reference I understand.");
+    expect(errorText(t, apiError(409, { code: "reading_exists", reading_id: "r1" }))).toBe("You already saved this reading.");
+    expect(errorText(i18n.getFixedT("id"), apiError(422, { code: "invalid_reference", reason: "empty" }))).toBe("Ketik ayatnya.");
+  });
+
   it("explains network failures", () => {
     expect(errorText(t, new NetworkError("x"))).toBe("Can't reach the server. Check your connection.");
   });

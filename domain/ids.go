@@ -24,4 +24,6 @@ type (
 	SectionID string
 	// SongGroupID identifies the group that links the language versions of a hymn.
 	SongGroupID string
+	// ReadingID identifies a stored reading of a church (07).
+	ReadingID string
 )

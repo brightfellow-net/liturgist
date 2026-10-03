@@ -111,3 +111,12 @@ const (
 type GroupConflictError struct{ Reason string }
 
 func (e *GroupConflictError) Error() string { return "group conflict: " + e.Reason }
+
+// ErrReadingInUse means unpublished liturgies still use the reading (07);
+// it maps to 409 reading_in_use.
+var ErrReadingInUse = errors.New("reading in use")
+
+// ReadingExistsError maps to 409 reading_exists with the existing reading.
+type ReadingExistsError struct{ ID domain.ReadingID }
+
+func (e *ReadingExistsError) Error() string { return "reading exists: " + string(e.ID) }

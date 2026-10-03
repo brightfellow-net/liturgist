@@ -318,6 +318,51 @@
     "removed": "{{name}} dihapus.",
     "pages": "Halaman hasil"
   },
+  "readings": {
+    "title": "Bacaan",
+    "add": "Tambah bacaan",
+    "empty_title": "Belum ada bacaan tersimpan",
+    "empty_text": "Ketik ayatnya dan tempel teksnya sekali saja. Lain kali teks terisi otomatis.",
+    "empty_viewer": "Belum ada bacaan tersimpan. Anggota yang boleh mengubah pustaka dapat menambahkannya.",
+    "search_label": "Cari bacaan",
+    "search_hint": "Ayat seperti Yoh 3:16, atau kata dari teksnya.",
+    "translation": "Terjemahan",
+    "found_other": "Ditemukan {{count}} bacaan.",
+    "no_results": "Tidak ada bacaan yang cocok. Coba kata yang lebih sedikit, atau hapus pencarian.",
+    "back": "Kembali ke daftar bacaan",
+    "not_found": "Bacaan ini tidak ada atau sudah dihapus.",
+    "new_title": "Tambah bacaan",
+    "reference": "Ayat Alkitab",
+    "reference_hint": "Contoh: Yoh 3:16-21, Mzm 23 atau 1 Kor 13.",
+    "understood": "Dibaca sebagai: {{reference}}",
+    "text": "Teks bacaan",
+    "text_hint": "Tempel teksnya di sini. Teks disimpan, jadi Anda hanya perlu melakukannya sekali.",
+    "text_required": "Isi teks bacaan.",
+    "attribution": "Keterangan sumber (opsional)",
+    "attribution_hint": "Misalnya terjemahan dan penerbitnya. Dicetak di bawah bacaan.",
+    "save": "Simpan bacaan",
+    "save_changes": "Simpan perubahan",
+    "exists": "Bacaan ini sudah Anda simpan.",
+    "open_existing": "Buka bacaan yang tersimpan",
+    "provider_error": "Sumber teks Alkitab tidak bisa dijangkau. Anda tetap bisa menempel teksnya.",
+    "provider_title": "Teks dari sumber teks Alkitab",
+    "provider_no_store": "Sumber ini tidak mengizinkan teksnya disimpan. Anda bisa menempel teksnya sendiri.",
+    "save_provider": "Simpan teks ini",
+    "source_provider": "Teks disimpan dari sumber “{{provider}}”.",
+    "delete_question": "Hapus {{reference}} ({{translation}})? Teksnya dihapus selamanya.",
+    "delete_confirm": "Hapus {{reference}}",
+    "conflict": "Bacaan ini diubah orang lain saat Anda mengeditnya. Muat ulang untuk melihat versinya. Yang sudah Anda ketik tetap ada di sini sampai Anda memuat ulang.",
+    "reasons": {
+      "empty": "Ketik ayatnya.",
+      "too_long": "Ayatnya terlalu panjang.",
+      "unknown_book": "Kitab ini tidak dikenali. Coba singkatan yang umum, misalnya Yoh atau Mzm.",
+      "missing_chapter": "Tambahkan pasal, misalnya Yoh 3.",
+      "bad_number": "Periksa nomor pasal dan ayat.",
+      "bad_range": "Ayat harus berurutan, misalnya 16-21.",
+      "unsupported": "Jenis ayat ini belum didukung. Pakai satu bagian saja, misalnya Yoh 3:16-21.",
+      "unknown": "Ayat ini tidak dikenali."
+    }
+  },
   "membership": {
     "not_member": "Anda sudah bukan anggota gereja ini."
   },
@@ -383,6 +428,18 @@
       "language_taken": "Sudah ada versi dalam bahasa ini.",
       "unknown": "Lagu-lagu ini tidak bisa ditautkan."
     },
+    "invalid_reference": {
+      "empty": "Ketik ayatnya.",
+      "too_long": "Ayatnya terlalu panjang.",
+      "unknown_book": "Kitab ini tidak dikenali. Coba singkatan yang umum, misalnya Yoh atau Mzm.",
+      "missing_chapter": "Tambahkan pasal, misalnya Yoh 3.",
+      "bad_number": "Periksa nomor pasal dan ayat.",
+      "bad_range": "Ayat harus berurutan, misalnya 16-21.",
+      "unsupported": "Jenis ayat ini belum didukung. Pakai satu bagian saja, misalnya Yoh 3:16-21.",
+      "unknown": "Ayat ini tidak dikenali."
+    },
+    "reading_exists": "Bacaan ini sudah Anda simpan.",
+    "reading_in_use": "Bacaan ini dipakai di liturgi yang belum diterbitkan, jadi tidak bisa dihapus.",
     "internal": "Terjadi kesalahan di server.",
     "unavailable": "Server sedang sibuk. Silakan coba lagi."
   }

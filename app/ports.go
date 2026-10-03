@@ -45,7 +45,8 @@ type ChurchStore interface {
 	Memberships() MembershipRepo
 	Roles() RoleRepo
 	Invites() InviteRepo
-	Songs() SongRepo // songs, sections, arrangements, groups and search (06)
+	Songs() SongRepo       // songs, sections, arrangements, groups and search (06)
+	Readings() ReadingRepo // saved Bible readings (07)
 }
 
 // Clock returns the current time in UTC, truncated to microseconds (02 §4).
@@ -275,4 +276,49 @@ func (NeverUsed) SongInUse(context.Context, domain.ChurchID, domain.SongID) (boo
 // SectionsInUse implements SongUsage.
 func (NeverUsed) SectionsInUse(context.Context, domain.ChurchID, domain.SongID, []domain.SectionID) ([]domain.SectionID, error) {
 	return nil, nil
+}
+
+// ReadingRepo stores the church's readings (07 §6). Unique on (reference,
+// translation): a second Create returns a UniqueError named readings_church_ref_key.
+type ReadingRepo interface {
+	ByID(ctx context.Context, id domain.ReadingID) (domain.Reading, error)
+	ByReference(ctx context.Context, reference string, translation domain.TranslationID) (domain.Reading, error)
+	Create(ctx context.Context, r domain.Reading) error
+	// Update writes text, attribution, display and version when the stored
+	// version is expectedVersion; false means it was not.
+	Update(ctx context.Context, r domain.Reading, expectedVersion int) (bool, error)
+	Delete(ctx context.Context, id domain.ReadingID) error
+	// List returns every reading that matches, in no particular order; the use
+	// case orders them (readings are few).
+	List(ctx context.Context, q ReadingSearch) ([]ReadingRow, error)
+	// LatestAttribution is the attribution of the most recently updated reading
+	// in a translation, or "" when there is none or it has none.
+	LatestAttribution(ctx context.Context, translation domain.TranslationID) (string, error)
+}
+
+// ReadingSearch filters a list. Fold and FoldZh are the folded query for
+// Latin and Chinese readings; both empty lists everything.
+type ReadingSearch struct {
+	Fold, FoldZh string
+	Translation  string // translation code, or ""
+}
+
+// ReadingRow is a reading in a list; TextStart is the first characters of the text.
+type ReadingRow struct {
+	ID               domain.ReadingID
+	Reference        string
+	ReferenceDisplay string
+	Translation      domain.Translation
+	TextStart        string
+}
+
+// ReadingUsage tells whether unpublished liturgies use a reading (07 §6).
+// Step 2 has no liturgies: NeverUsed answers "unused".
+type ReadingUsage interface {
+	ReadingInUse(ctx context.Context, church domain.ChurchID, reading domain.ReadingID) (bool, error)
+}
+
+// ReadingInUse implements ReadingUsage.
+func (NeverUsed) ReadingInUse(context.Context, domain.ChurchID, domain.ReadingID) (bool, error) {
+	return false, nil
 }

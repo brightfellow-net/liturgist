@@ -61,10 +61,9 @@ export function LibraryPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold">{t("library.title")}</h1>
-        {canEdit && !emptyLibrary && <Link className={buttonVariants()} to={paths.songNew}>{t("library.add_song")}</Link>}
-      </div>
+      {canEdit && !emptyLibrary && (
+        <div><Link className={buttonVariants()} to={paths.songNew}>{t("library.add_song")}</Link></div>
+      )}
 
       {emptyLibrary ? (
         <section className="space-y-3 rounded-md border border-border p-4">

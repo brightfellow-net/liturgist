@@ -321,6 +321,52 @@
     "removed": "{{name}} removed.",
     "pages": "Result pages"
   },
+  "readings": {
+    "title": "Readings",
+    "add": "Add a reading",
+    "empty_title": "No readings saved yet",
+    "empty_text": "Type a reference and paste the text once. Next time it is filled in for you.",
+    "empty_viewer": "No readings are saved yet. A member who may edit the library can add them.",
+    "search_label": "Search readings",
+    "search_hint": "A reference such as Yoh 3:16, or a word from the text.",
+    "translation": "Translation",
+    "found_one": "{{count}} reading found.",
+    "found_other": "{{count}} readings found.",
+    "no_results": "No readings match. Try fewer words, or clear the search.",
+    "back": "Back to the readings",
+    "not_found": "This reading does not exist or was deleted.",
+    "new_title": "Add a reading",
+    "reference": "Bible reference",
+    "reference_hint": "For example Yoh 3:16-21, Mzm 23 or 1 Kor 13.",
+    "understood": "Understood as: {{reference}}",
+    "text": "Text of the reading",
+    "text_hint": "Paste the text here. It is saved so you only do this once.",
+    "text_required": "Enter the text of the reading.",
+    "attribution": "Credit line (optional)",
+    "attribution_hint": "For example the translation and publisher. It is printed under the reading.",
+    "save": "Save reading",
+    "save_changes": "Save changes",
+    "exists": "You already saved this reading.",
+    "open_existing": "Open the saved reading",
+    "provider_error": "The Bible text source could not be reached. You can still paste the text.",
+    "provider_title": "Text from a Bible text source",
+    "provider_no_store": "This source does not allow saving its text. You can paste the text yourself.",
+    "save_provider": "Save this text",
+    "source_provider": "Text saved from the source “{{provider}}”.",
+    "delete_question": "Delete {{reference}} ({{translation}})? Its text is removed for good.",
+    "delete_confirm": "Delete {{reference}}",
+    "conflict": "This reading was changed by someone else while you were editing. Reload to see their version. What you typed stays here until you reload.",
+    "reasons": {
+      "empty": "Type a reference.",
+      "too_long": "That reference is too long.",
+      "unknown_book": "I don't know this book. Try the usual short name, e.g. Yoh or Mzm.",
+      "missing_chapter": "Add a chapter, e.g. Yoh 3.",
+      "bad_number": "Check the chapter and verse numbers.",
+      "bad_range": "The verses must go in order, e.g. 16-21.",
+      "unsupported": "This kind of reference isn't supported yet. Use one passage, e.g. Yoh 3:16-21.",
+      "unknown": "This is not a reference I understand."
+    }
+  },
   "membership": {
     "not_member": "You are no longer a member of this church."
   },
@@ -387,6 +433,18 @@
       "language_taken": "There is already a version in this language.",
       "unknown": "These songs can't be linked."
     },
+    "invalid_reference": {
+      "empty": "Type a reference.",
+      "too_long": "That reference is too long.",
+      "unknown_book": "I don't know this book. Try the usual short name, e.g. Yoh or Mzm.",
+      "missing_chapter": "Add a chapter, e.g. Yoh 3.",
+      "bad_number": "Check the chapter and verse numbers.",
+      "bad_range": "The verses must go in order, e.g. 16-21.",
+      "unsupported": "This kind of reference isn't supported yet. Use one passage, e.g. Yoh 3:16-21.",
+      "unknown": "This is not a reference I understand."
+    },
+    "reading_exists": "You already saved this reading.",
+    "reading_in_use": "This reading is used in a liturgy that isn't published yet, so it can't be deleted.",
     "internal": "Something went wrong on the server.",
     "unavailable": "The server is busy. Please try again."
   }

@@ -48,6 +48,8 @@ type cenv struct {
 	resets   *app.Resets
 	songs    *app.Songs
 	usage    *usageStub
+	readings *app.Readings
+	readUse  *readingUsageStub
 	operator *app.Operator
 	account  *app.Account
 	auth     *app.Auth
@@ -67,8 +69,10 @@ func wireChurch(t *testing.T, db *sqlstore.DB, ent app.Entitlements) cenv {
 		ent = unlimited.Entitlements{}
 	}
 	usage := &usageStub{}
-	return cenv{t: t, db: db, clock: c, ids: ids, auth: auth, usage: usage,
+	readUse := &readingUsageStub{}
+	return cenv{t: t, db: db, clock: c, ids: ids, auth: auth, usage: usage, readUse: readUse,
 		songs:    &app.Songs{Tx: db, Clock: c, IDs: ids, Usage: usage},
+		readings: &app.Readings{Tx: db, Clock: c, IDs: ids, Usage: readUse},
 		setup:    &app.Setup{Tx: db, Hasher: h, Clock: c, IDs: ids, Auth: auth},
 		churches: &app.Churches{Tx: db, Clock: c},
 		members:  &app.Members{Tx: db, Clock: c, Entitlements: ent},

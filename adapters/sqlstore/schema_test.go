@@ -230,6 +230,14 @@ func TestUniqueConstraintNames(t *testing.T) {
 				return f.exec(`INSERT INTO song_arrangement_entries (church_id, song_id, position, section_id) VALUES (?, ?, 0, ?)`,
 					id("CHA"), id("SA"), id("SAV1"))
 			},
+			"readings_pkey": func() error {
+				f.must(readingInsert, id("RD1"), id("CHA"), "PSA 1", "PSA 1", tb, "x", "", "manual", "x", 1, f.ts(0), f.ts(0))
+				return f.exec(readingInsert, id("RD1"), id("CHB"), "PSA 1", "PSA 1", tb, "x", "", "manual", "x", 1, f.ts(0), f.ts(0))
+			},
+			"readings_church_ref_key": func() error {
+				f.must(readingInsert, id("RD2"), id("CHA"), "PSA 2", "PSA 2", tb, "x", "", "manual", "x", 1, f.ts(0), f.ts(0))
+				return f.exec(readingInsert, id("RD3"), id("CHA"), "PSA 2", "Mzm 2", tb, "y", "", "manual", "y", 1, f.ts(0), f.ts(0))
+			},
 			"song_search_pkey": func() error {
 				if db.Dialect().Name() == "postgres" { // its tsvector columns are NOT NULL
 					return f.exec(`INSERT INTO song_search (church_id, song_id, language, head_fold, lyrics_fold, fts_head, fts_lyrics)
@@ -413,6 +421,51 @@ func TestLocksSerialise(t *testing.T) {
 			if rows != want {
 				t.Errorf("%s: %d rows, want %d", name, rows, want)
 			}
+		}
+	})
+}
+
+const readingInsert = `INSERT INTO readings (id, church_id, reference, reference_display, translation_id, text, attribution,
+	source_provider, search_fold, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+
+// IT-R-007: the database itself rejects invalid reading rows.
+func TestReadingConstraints(t *testing.T) {
+	sqlstoretest.ForEachDialect(t, func(t *testing.T, db *sqlstore.DB) {
+		f := base(t, db)
+		insert := func(rid, church, ref, translation string, version int) error {
+			return f.exec(readingInsert, id(rid), id(church), ref, ref, translation, "x", "", "manual", "x", version, f.ts(0), f.ts(0))
+		}
+		f.must(readingInsert, id("RD1"), id("CHA"), "JHN 3:16", "JHN 3:16", tb, "x", "", "manual", "x", 1, f.ts(0), f.ts(0))
+
+		for name, write := range map[string]func() error{
+			"version 0": func() error { return insert("RD2", "CHA", "PSA 1", string(tb), 0) },
+			"short ID": func() error {
+				return f.exec(readingInsert, "short", id("CHA"), "PSA 1", "PSA 1", tb, "x", "", "manual", "x", 1, f.ts(0), f.ts(0))
+			},
+		} {
+			if err := write(); !errors.Is(err, app.ErrInvalid) {
+				t.Errorf("%s: want ErrInvalid, got %v", name, err)
+			}
+		}
+		for name, write := range map[string]func() error{
+			"unknown translation": func() error { return insert("RD3", "CHA", "PSA 1", "01M3XY2HBEKN8PETK6KXXXXXXX", 1) },
+			"unknown church":      func() error { return insert("RD4", "NOPE", "PSA 1", string(tb), 1) },
+		} {
+			if err := write(); !errors.Is(err, app.ErrReferenced) {
+				t.Errorf("%s: want ErrReferenced, got %v", name, err)
+			}
+		}
+		// The same passage in another church, and in another translation, is fine.
+		if err := insert("RD5", "CHB", "JHN 3:16", string(tb), 1); err != nil {
+			t.Errorf("another church: %v", err)
+		}
+		if err := insert("RD6", "CHA", "JHN 3:16", "01M3XY2HBEKN8PETK6KHCT82HX", 1); err != nil {
+			t.Errorf("another translation: %v", err)
+		}
+		// Deleting a church removes its readings.
+		f.must(`DELETE FROM churches WHERE id = ?`, id("CHB"))
+		if n := count(t, db, "SELECT count(*) FROM readings WHERE church_id = ?", id("CHB")); n != 0 {
+			t.Errorf("%d readings left after deleting their church", n)
 		}
 	})
 }

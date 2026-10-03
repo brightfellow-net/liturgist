@@ -17,6 +17,9 @@ export const paths = {
   songNew: "/library/songs/new",
   song: "/library/songs/:id",
   songEdit: "/library/songs/:id/edit",
+  readings: "/library/readings",
+  readingNew: "/library/readings/new",
+  reading: "/library/readings/:id",
 } as const;
 
 // songPath and songEditPath fill in a song's ID.
@@ -32,3 +35,6 @@ export function loginWithNext(next: string): string {
 export function safeNext(next: string | null): string {
   return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : paths.home;
 }
+
+// readingPath fills in a reading's ID.
+export const readingPath = (id: string) => paths.reading.replace(":id", encodeURIComponent(id));

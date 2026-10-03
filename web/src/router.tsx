@@ -5,7 +5,11 @@ import { AppLayout } from "./routes/AppLayout";
 import { HomePage } from "./routes/HomePage";
 import { InvitePage } from "./routes/InvitePage";
 import { LoginPage } from "./routes/LoginPage";
+import { LibraryLayout } from "./routes/library/LibraryLayout";
 import { LibraryPage } from "./routes/library/LibraryPage";
+import { ReadingFormPage } from "./routes/library/ReadingFormPage";
+import { ReadingPage } from "./routes/library/ReadingPage";
+import { ReadingsPage } from "./routes/library/ReadingsPage";
 import { SongFormPage } from "./routes/library/SongFormPage";
 import { SongPage } from "./routes/library/SongPage";
 import { NotFoundPage } from "./routes/NotFoundPage";
@@ -29,7 +33,15 @@ export const router = createBrowserRouter([
     element: <AppLayout />,
     children: [
       { path: paths.home, element: <HomePage /> },
-      { path: paths.library, element: <LibraryPage /> },
+      {
+        element: <LibraryLayout />,
+        children: [
+          { path: paths.library, element: <LibraryPage /> },
+          { path: paths.readings, element: <ReadingsPage /> },
+        ],
+      },
+      { path: paths.readingNew, element: <ReadingFormPage /> },
+      { path: paths.reading, element: <ReadingPage /> },
       { path: paths.songNew, element: <SongFormPage /> },
       { path: paths.song, element: <SongPage /> },
       { path: paths.songEdit, element: <SongFormPage /> },
