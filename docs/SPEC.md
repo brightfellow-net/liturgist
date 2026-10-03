@@ -57,7 +57,7 @@ What a member may do is decided by **roles**, which each church defines itself. 
 | Role | Scopes | Matches today's job at GKY |
 |---|---|---|
 | Church admin | All ten scopes | Whoever manages the app for the church; holding every scope lets them give every role (safeguard 2) |
-| Liturgist | `members.view`, `liturgy.edit`, `liturgy.comment`, `liturgy.approve`, `liturgy.manage` | The liturgist |
+| Liturgist | `members.view`, `templates.edit`, `liturgy.edit`, `liturgy.comment`, `liturgy.approve`, `liturgy.manage` | The liturgist |
 | Editor | `members.view`, `library.edit`, `liturgy.edit`, `liturgy.comment` | The administrator who drafts the document |
 
 **Safeguards:**
@@ -555,6 +555,7 @@ Record resolved decisions here (date, decision, reason). Move items from section
 | 2026-10-02 | Login throttling uses three counters (identifier + IP: 5 failures/15 min; identifier: 50/hour; IP: 100/15 min) and trusts client IPs only from configured reverse proxies, both in build step 1 | Most installs sit behind a proxy or tunnel; Indonesian mobile carriers and church Wi-Fi share IP addresses; counting per identifier + IP stops one person locking another out |
 | 2026-10-02 | The ready-made Church admin role holds all ten scopes (amends P-15) | With the earlier six scopes, safeguard 2 meant nobody in a new church could ever give the Liturgist or Editor role or any `library.*`/`liturgy.*` scope; found while testing the members page in build step 1 |
 | 2026-10-03 | The setup wizard does not ask for regular services; a church adds them on the Services page, which explains what a service is when empty (amends §5.7) | The wizard of step 1 is approved and merged, and services are a two-minute task with a helpful empty state; a wizard step can be added with the onboarding checklist later |
+| 2026-10-03 | The ready-made Liturgist role also holds `templates.edit` (amends the scope table in 4) | The liturgist plans the weekly structure, so they need to maintain templates, services, duties and singing parts without asking a Church admin. Churches that already exist keep the scopes of their current roles; only roles created from now on get it |
 
 ## 12. References
 

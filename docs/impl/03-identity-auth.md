@@ -179,7 +179,7 @@ Both accept pages show a confirmation before the final step: "You are joining {c
 | `origin` | Default name (en / id) | Scopes |
 |---|---|---|
 | `church_admin` | Church admin / Admin gereja | All scopes (`domain.AllScopes`), so the admin can give every role under rule 2 below |
-| `liturgist` | Liturgist / Liturgis | `members.view`, `liturgy.edit`, `liturgy.comment`, `liturgy.approve`, `liturgy.manage` |
+| `liturgist` | Liturgist / Liturgis | `members.view`, `templates.edit`, `liturgy.edit`, `liturgy.comment`, `liturgy.approve`, `liturgy.manage` |
 | `editor` | Editor / Editor | `members.view`, `library.edit`, `liturgy.edit`, `liturgy.comment` |
 
 Names are created in the church's default UI language; churches can rename them. The first admin gets the Church admin role.

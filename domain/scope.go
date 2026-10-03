@@ -141,7 +141,7 @@ var ReadyMadeRoles = []ReadyMadeRole{
 	// Church admin holds every scope, so it can give every role (03 §8 rule 2).
 	{OriginChurchAdmin, map[string]string{"en": "Church admin", "id": "Admin gereja"}, AllScopes},
 	{OriginLiturgist, map[string]string{"en": "Liturgist", "id": "Liturgis"},
-		[]Scope{ScopeMembersView, ScopeLiturgyEdit, ScopeLiturgyComment, ScopeLiturgyApprove, ScopeLiturgyManage}},
+		[]Scope{ScopeMembersView, ScopeTemplatesEdit, ScopeLiturgyEdit, ScopeLiturgyComment, ScopeLiturgyApprove, ScopeLiturgyManage}},
 	{OriginEditor, map[string]string{"en": "Editor", "id": "Editor"},
 		[]Scope{ScopeMembersView, ScopeLibraryEdit, ScopeLiturgyEdit, ScopeLiturgyComment}},
 }
