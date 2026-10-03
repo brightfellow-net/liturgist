@@ -1,7 +1,7 @@
 # Database Schema (Reference)
 
 > **Document type: Reference.** Tables that exist after each build step. The step-1 tables are: translations, churches, users, memberships, roles, role_scopes, membership_roles, invites, invite_roles, sessions, password_resets, auth_throttle, setup_tokens. Conceptual model: [SPEC.md §7](../SPEC.md#7-data-model-sketch). Type mapping, migrations and error mapping: [02-persistence.md](../impl/02-persistence.md).
-> Status: **Approved** 2026-10-02 for step 1, including the round-2 review fixes. Proposal markers refer to the [index](../impl/README.md#4-proposed-decisions).
+> Status: **Approved** for steps 1 and 2 (2026-10-02, 2026-10-03); the step 3 tables follow the decisions P-54 to P-67 (**Approved** 2026-10-03) and are confirmed when each migration is written. Proposal markers refer to the [index](../impl/README.md#4-proposed-decisions).
 
 ## Conventions
 
@@ -414,9 +414,113 @@ Church-owned.
 
 `songs_group_language_key`, `song_sections_verse_key`, `readings_church_ref_key`, `import_batches_pkey`, `import_candidates_pkey`.
 
+## Step 3 tables
+
+> Status: follows the decisions P-54 to P-67, **Approved** 2026-10-03, with documents [09](../impl/09-planning.md), [10](../impl/10-liturgy.md) and [11](../impl/11-liturgy-editor.md). Added by two migrations after `00004_imports.sql`: `00005_planning.sql` (duties, singing_parts, templates, template_items, services, service_times, church_seeds) and `00006_liturgies.sql` (liturgies, liturgy_items, liturgy_item_songs, sequence_entries, assignments, liturgy_edits), each in both dialect folders. All are church-owned with composite foreign keys and church-leading indexes.
+
+**Clearing references instead of `SET NULL`:** a composite foreign key `(church_id, x_id)` with `ON DELETE SET NULL` would also null `church_id`, which is `NOT NULL`. Where a reference must become null when its target is deleted (marked "cleared" below), the foreign key is `ON DELETE RESTRICT` and the application sets the column to null **in the same transaction, before the delete**, exactly as for `songs.song_group_id`. Each such delete goes through one repository method that does both, and a repository test deletes the target directly in SQL to prove the database would refuse otherwise.
+
+Every table has `UNIQUE <table>_church_id_key (church_id, id)` (target for composite keys; church-leading) unless it is a child with no children of its own. Dates are text `YYYY-MM-DD` and times text `HH:MM` (never a timestamp type), checked by `GLOB` (SQLite) or `~` (PostgreSQL) on shape; real calendar validity is **(app)**.
+
+### duties, singing_parts
+
+| Column | Type | Null | Constraint |
+|---|---|---|---|
+| `id` | id | no | PK `<table>_pkey` |
+| `church_id` | id | no | FK → `churches(id)` ON DELETE CASCADE `<table>_church_fkey` |
+| `name` | text | no | Duty 1–60, part 1–40 chars (app) |
+| `name_key` | text | no | `Fold(name)` (app); UNIQUE `<table>_church_name_key` (`church_id`, `name_key`) |
+| `position` | int | no | `CHECK (position >= 0)` `<table>_position_check`; dense 0..n-1 (app); not unique, so a reorder can be written row by row |
+| `created_at` | ts | no | |
+
+- Index `<table>_church_position_idx` (`church_id`, `position`, `id`).
+
+### templates and template_items
+
+`templates`: `id` (PK `templates_pkey`), `church_id` (FK, cascade), `name` (1–100, app), `name_key` (UNIQUE `templates_church_name_key` (`church_id`, `name_key`)), `language` (`CHECK (language IN ('id','en','zh-Hans','zh-Hant'))` `templates_language_check`), `version` (`CHECK (version >= 1)` `templates_version_check`), `created_at`, `updated_at`.
+
+`template_items`: `id` (PK `template_items_pkey`), `church_id`, `template_id` (FK (`church_id`, `template_id`) → `templates` ON DELETE CASCADE `template_items_template_fkey`), `position` (`CHECK (position >= 0 AND position < 60)` `template_items_position_check`), `title` (1–200, app), `item_type` (`CHECK (item_type IN ('song','reading','prayer','sermon','free_text','other'))` `template_items_type_check`), `default_text` (text, empty when none; `CHECK (item_type IN ('prayer','sermon','free_text','other') OR default_text = '')` `template_items_text_check`), `default_duty_id` (nullable; FK (`church_id`, `default_duty_id`) → `duties` ON DELETE RESTRICT `template_items_duty_fkey`; **cleared**).
+
+- UNIQUE `template_items_position_key`? **No**: positions are rewritten with the whole list. Index `template_items_church_template_idx` (`church_id`, `template_id`, `position`).
+
+### services and service_times
+
+`services`: `id`, `church_id`, `name` (1–100), `name_key` (UNIQUE `services_church_name_key`), `language` (check `services_language_check`), `default_template_id` (nullable; FK (`church_id`, `default_template_id`) → `templates` ON DELETE RESTRICT `services_template_fkey`; the application refuses deleting a template in use, 409 `template_in_use`), `version` (`services_version_check`), `created_at`, `updated_at`.
+
+`service_times`: `id`, `church_id`, `service_id` (FK (`church_id`, `service_id`) → `services` ON DELETE CASCADE `service_times_service_fkey`), `weekday` (`CHECK (weekday BETWEEN 1 AND 7)` `service_times_weekday_check`), `time` (shape check `service_times_time_check`; 00:00–23:59 **(app)**). UNIQUE `service_times_slot_key` (`service_id`, `weekday`, `time`). Index `service_times_church_service_idx` (`church_id`, `service_id`).
+
+### church_seeds
+
+| Column | Type | Null | Constraint |
+|---|---|---|---|
+| `church_id` | id | no | FK → `churches(id)` ON DELETE CASCADE `church_seeds_church_fkey` |
+| `seed_key` | text | no | 1–40 chars (app); `step3` |
+| `applied_at` | ts | no | |
+
+PK `church_seeds_pkey` (`church_id`, `seed_key`) — church-leading. Written only by `app.Seed` / `Setup` in the same transaction as the rows they create ([09 §3](../impl/09-planning.md#3-seeded-defaults-p-56)).
+
+### liturgies
+
+| Column | Type | Null | Constraint |
+|---|---|---|---|
+| `id` | id | no | PK `liturgies_pkey` |
+| `church_id` | id | no | FK → `churches(id)` ON DELETE CASCADE `liturgies_church_fkey` |
+| `date` | text | no | Shape check `liturgies_date_check` |
+| `time` | text | no | Empty or `HH:MM` (shape check `liturgies_time_check`) |
+| `service_id` | id | yes | FK (`church_id`, `service_id`) → `services` ON DELETE RESTRICT `liturgies_service_fkey`; **cleared** when the service is deleted |
+| `service_name` | text | no | 1–100 chars (app) |
+| `language` | text | no | `liturgies_language_check` |
+| `template_id` | id | yes | FK (`church_id`, `template_id`) → `templates` ON DELETE RESTRICT `liturgies_template_fkey`; **cleared** |
+| `state` | text | no | `CHECK (state IN ('draft','in_review','needs_revision','approved','published'))` `liturgies_state_check` |
+| `version` | int | no | `CHECK (version >= 1)` `liturgies_version_check` |
+| `archived_at`, `archived_by` | ts, id | yes | `CHECK ((archived_at IS NULL) = (archived_by IS NULL))` `liturgies_archived_check`; `archived_by` FK → `users(id)` ON DELETE RESTRICT `liturgies_archived_by_fkey` |
+| `created_by` | id | no | FK → `users(id)` ON DELETE RESTRICT `liturgies_created_by_fkey` |
+| `edit_seq` | int | no | Default 0. Counter of the liturgy's history rows: every history row takes `edit_seq + 1` by an update of this row, so the order of `liturgy_edits.seq` is the commit order (10 §5, 10 §7) |
+| `created_at`, `updated_at` | ts | no | |
+
+- `CHECK (service_id IS NULL OR time <> '')` `liturgies_slot_check`.
+- UNIQUE partial index `liturgies_service_slot_key` (`church_id`, `service_id`, `date`, `time`) `WHERE service_id IS NOT NULL` [P-58].
+- Index `liturgies_church_date_idx` (`church_id`, `date`, `time`, `id`); index `liturgies_church_state_idx` (`church_id`, `state`, `archived_at`) — the limit counts.
+
+### liturgy_items
+
+`id` (PK `liturgy_items_pkey`), `church_id`, `liturgy_id` (FK (`church_id`, `liturgy_id`) → `liturgies` ON DELETE CASCADE `liturgy_items_liturgy_fkey`), `position` (`CHECK (position >= 0 AND position < 60)` `liturgy_items_position_check`; dense 0..n-1 **(app)**, not unique), `title` (1–200, app), `item_type` (check `liturgy_items_type_check`), `duty_id` (nullable; FK (`church_id`, `duty_id`) → `duties` ON DELETE RESTRICT `liturgy_items_duty_fkey`; deleting a used duty is refused, 409 `duty_in_use`), `text` (text, empty when none; `CHECK (item_type IN ('prayer','sermon','free_text','other') OR text = '')` `liturgy_items_text_check`), `reading_id` (nullable; FK (`church_id`, `reading_id`) → `readings` ON DELETE RESTRICT `liturgy_items_reading_fkey`; **cleared**), `reading_label` (text, empty when none), `version` (`liturgy_items_version_check`), `created_at`, `updated_at`.
+
+- `CHECK (item_type = 'reading' OR (reading_id IS NULL AND reading_label = ''))` `liturgy_items_reading_check`.
+- Index `liturgy_items_church_liturgy_idx` (`church_id`, `liturgy_id`, `position`); index `liturgy_items_church_duty_idx` (`church_id`, `duty_id`); partial index `liturgy_items_church_reading_idx` (`church_id`, `reading_id`) `WHERE reading_id IS NOT NULL`.
+
+### liturgy_item_songs
+
+`id`, `church_id`, `item_id` (FK (`church_id`, `item_id`) → `liturgy_items` ON DELETE CASCADE `liturgy_item_songs_item_fkey`), `position` (`CHECK (position >= 0 AND position < 10)` `liturgy_item_songs_position_check`), `song_id` (nullable; FK (`church_id`, `song_id`) → `songs` ON DELETE RESTRICT `liturgy_item_songs_song_fkey`; **cleared**), `song_title` (text, snapshot), `key` (text; empty or `^[A-G][#b]?m?$` (app)), `note` (0–200, app).
+
+- Partial index `liturgy_item_songs_church_song_idx` (`church_id`, `song_id`) `WHERE song_id IS NOT NULL` — `SongUsage`. Index `liturgy_item_songs_church_item_idx` (`church_id`, `item_id`, `position`).
+
+### sequence_entries
+
+`id`, `church_id`, `item_song_id` (FK (`church_id`, `item_song_id`) → `liturgy_item_songs` ON DELETE CASCADE `sequence_entries_song_fkey`), `position` (`CHECK (position >= 0 AND position < 100)` `sequence_entries_position_check`), `kind` (`CHECK (kind IN ('section'))` `sequence_entries_kind_check`), `song_section_id` (nullable; FK (`church_id`, `song_section_id`) → `song_sections` ON DELETE RESTRICT `sequence_entries_section_fkey`; **cleared**; that the section belongs to the item song's song is **(app)** with a repository test), `singing_part_id` (nullable; FK (`church_id`, `singing_part_id`) → `singing_parts` ON DELETE RESTRICT `sequence_entries_part_fkey`; deleting a used part is refused), `key_change` (key shape, app), `section_label` (text; snapshot of the section's display text, set with `song_section_id`, **kept** when the section is deleted), `note` (0–100, app).
+
+- Partial index `sequence_entries_church_section_idx` (`church_id`, `song_section_id`) `WHERE song_section_id IS NOT NULL` — `SongUsage.SectionsInUse`. Index `sequence_entries_church_song_idx` (`church_id`, `item_song_id`, `position`); partial index `sequence_entries_church_part_idx` (`church_id`, `singing_part_id`) `WHERE singing_part_id IS NOT NULL`.
+
+### assignments
+
+`id`, `church_id`, `liturgy_id` (FK cascade `assignments_liturgy_fkey`), `duty_id` (FK (`church_id`, `duty_id`) → `duties` ON DELETE RESTRICT `assignments_duty_fkey`), `user_id` (nullable; FK → `users(id)` ON DELETE RESTRICT `assignments_user_fkey`; membership at assignment time is **(app)**), `name` (nullable; 1–100, app), `name_key` (nullable; `Fold(name)`), `created_at`.
+
+- `CHECK ((user_id IS NULL) <> (name IS NULL) AND (name IS NULL) = (name_key IS NULL))` `assignments_person_check`.
+- UNIQUE partial `assignments_user_key` (`liturgy_id`, `duty_id`, `user_id`) `WHERE user_id IS NOT NULL`; UNIQUE partial `assignments_name_key` (`liturgy_id`, `duty_id`, `name_key`) `WHERE name IS NOT NULL`. Index `assignments_church_liturgy_idx` (`church_id`, `liturgy_id`).
+
+### liturgy_edits
+
+`id`, `church_id`, `liturgy_id` (FK cascade `liturgy_edits_liturgy_fkey`), `user_id` (FK → `users(id)` ON DELETE RESTRICT), `seq` (int; from `liturgies.edit_seq`; UNIQUE (`liturgy_id`, `seq`) `liturgy_edits_seq_key`), `command` (`CHECK (command IN ('liturgy.create','liturgy.update','item.add','item.remove','item.update','item.songs','items.reorder','assignment.add','assignment.remove','undo','redo'))` `liturgy_edits_command_check`), `target_edit_id` (id, nullable; for `undo` and `redo` rows the edit they act on; not a foreign key), `item_id` (id, nullable, **not** a foreign key: the item may be deleted), `before`, `after` (json, nullable; **no size cap**: the largest legal image is about 300 KB, 10 §7), `liturgy_version_after` (int), `item_version_after` (int, nullable; both informational, never compared by undo), `status` (`CHECK (status IN ('done','undone','dropped'))` `liturgy_edits_status_check`; always `done` for `undo` and `redo` rows), `undo_seq` (int, nullable; the `seq` of the `undo` row, set while `status = 'undone'`), `created_at`.
+
+- Index `liturgy_edits_church_liturgy_idx` (`church_id`, `liturgy_id`, `seq`); index `liturgy_edits_church_user_idx` (`church_id`, `liturgy_id`, `user_id`, `status`, `seq`).
+
+### Unique constraints added to the SQLite name mapping (step 3)
+
+`duties_church_name_key`, `singing_parts_church_name_key`, `templates_church_name_key`, `services_church_name_key`, `service_times_slot_key`, `liturgies_service_slot_key`, `assignments_user_key`, `assignments_name_key`, `church_seeds_pkey`, plus the `<table>_pkey` of every new table.
+
 ## Later steps
 
-Tables for templates, services, liturgies, comments, edits and published versions are added in the steps that build them, following [SPEC.md §7](../SPEC.md#7-data-model-sketch) and the conventions above.
+Tables for comments, state changes and published versions are added in the steps that build them, following [SPEC.md §7](../SPEC.md#7-data-model-sketch) and the conventions above.
 
 ## References
 

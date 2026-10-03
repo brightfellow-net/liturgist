@@ -27,6 +27,17 @@
 | [08-import.md](08-import.md) | Paste and split, OpenLyrics, ChordPro, batches and candidate review, `Importer` (slice 2C) |
 | [../reference/schema.md](../reference/schema.md#step-2-tables) | Step 2 tables (Reference) |
 
+## 1b. Documents for step 3
+
+[SPEC.md §10](../SPEC.md#10-suggested-build-order), step 3: templates and the weekly liturgy editor (items, reorder, songs, readings, assignments). **Status: decisions Approved** 2026-10-03 (Spec Gate and an adversarial review have run; conditions in §4b). Spec Gate score stays below 9 until Q-3.3 is closed. Built in four slices: 3A planning setup, 3B liturgies, 3C liturgy pages, 3D live updates and undo.
+
+| Document | Covers |
+|---|---|
+| [09-planning.md](09-planning.md) | Duties, singing parts, templates, services, seeded defaults, their pages (slice 3A) |
+| [10-liturgy.md](10-liturgy.md) | Liturgies, creating and preparing a week, items, songs and sequences, readings, assignments, versions, history, usage ports, limits (slice 3B) |
+| [11-liturgy-editor.md](11-liturgy-editor.md) | Liturgy pages and the editor (slice 3C); live updates, presence, undo and redo (slice 3D) |
+| [../reference/schema.md](../reference/schema.md#step-3-tables) | Step 3 tables (Reference) |
+
 ## 2. How to use these documents
 
 - **Required reading before writing any step-1 code:** [SPEC.md](../SPEC.md) and **every** document in the table above. This index alone is not a specification.
@@ -101,6 +112,43 @@
 | P-51 | Import goes through batches and candidates with explicit decision/outcome states (a failed candidate is retryable; a batch closes when every candidate is terminal); text is sent as JSON with stated per-file, aggregate and complexity limits; Apply runs one transaction per candidate under the church lock through the song use cases; merge shows a preview, matches sections deterministically, keeps unmatched sections unless the member ticks removal, and refuses a target that changed after the decision; batches expire after 7 days | [08 §2–§5](08-import.md#2-flow-p-51) | **Approved** 2026-10-03 (the merge rule, as changed after the adversarial review, re-confirmed by the owner) |
 | P-52 | Sections and arrangements are reordered with Move up / Move down buttons, not drag-and-drop alone | [06 §4](06-song-library.md#4-pages) | **Approved** 2026-10-03 |
 | P-53 | Hymnal numbers are not unique; the form warns about duplicates | [06 §2.1](06-song-library.md#21-song) | **Approved** 2026-10-03 |
+
+## 4b. Proposed decisions (step 3)
+
+**Approved** by the owner on 2026-10-03, after the adversarial review of the step 3 documents and the owner's answers in §4c. P-56, P-61, P-65 and P-66 carry the conditions written in their rows.
+
+| ID | Proposal | Where | Status |
+|---|---|---|---|
+| P-54 | Step 3 is built in four slices: 3A planning setup (duties, singing parts, templates, services), 3B liturgies (backend), 3C liturgy pages, 3D live updates, presence and per-person undo. Review states, comments, publishing and the archive button of "Prepare next week" wait for steps 4–5 | [09 §1](09-planning.md#1-scope), [10 §1](10-liturgy.md#1-scope), [11 §1](11-liturgy-editor.md#1-scope) | **Approved** 2026-10-03 |
+| P-55 | Duties, singing parts, templates and services are edited with `templates.edit`; every member can read duties and singing parts; templates and services are readable by `templates.edit` or `liturgy.edit` (403 otherwise). Names are unique per church by folded key; a duty or part in use cannot be deleted | [09 §2](09-planning.md#2-data-model), [§4](09-planning.md#4-api) | **Approved** 2026-10-03 |
+| P-56 | Defaults (duties, singing parts, a starter template) are seeded in the church's content language at setup and, for existing churches, once at start-up by `app.Seed` guarded by a marker table; a church that deletes a default never gets it back. Replaces "the migration seeds the defaults" of P-24 for these rows | [09 §3](09-planning.md#3-seeded-defaults-p-56) | **Approved** 2026-10-03 — mechanism only; the seeded words stay Proposed until the Q-3.3 gate is closed |
+| P-57 | Templates and services are replaced as whole lists (items, times) with a `version`; template items have no stable IDs and nothing refers to them | [09 §2](09-planning.md#2-data-model) | **Approved** 2026-10-03 |
+| P-58 | A liturgy is created from a service and/or template by copying; its language is fixed at creation and its template must have the same language; it keeps a copy of the service name; at most one liturgy per service, date and time (two services may share a slot: owner decision Q-3.7) | [10 §2.1](10-liturgy.md#21-liturgy), [§3](10-liturgy.md#3-creating-a-liturgy) | **Approved** 2026-10-03 |
+| P-59 | "Prepare next week": the week is Monday to Sunday in the church's time zone; occurrences come from the services' weekly times; creation is all-or-nothing and checks the limits once for the batch | [10 §3.1](10-liturgy.md#31-prepare-next-week-p-59) | **Approved** 2026-10-03 |
+| P-60 | Two counters: the liturgy `version` guards structure (which items, their order, the liturgy's fields), each item's `version` guards that item's content; assignments are unversioned; conflicts are 409 `version_conflict` with a `scope` | [10 §5](10-liturgy.md#5-versions-and-conflicts-p-60) | **Approved** 2026-10-03 |
+| P-61 | An item's type cannot be changed after creation; references to songs, readings and sections are cleared (with title snapshots) when a song, reading or section that only published liturgies use is deleted; `problems` are computed, not enforced, in step 3 | [10 §2.2](10-liturgy.md#22-item), [§6](10-liturgy.md#6-usage-ports-and-deleted-songs-readings-sections) | **Approved** 2026-10-03 — the rule for reopening a liturgy with cleared references is decided in step 4 |
+| P-62 | Adding a song fills its sequence on the server from the default arrangement, else all sections in order (not only verses); the songs of an item are replaced as one list | [10 §2.3](10-liturgy.md#23-item-song-and-sequence) | **Approved** 2026-10-03 |
+| P-63 | Assignments are a member or a free-text name per duty, several per duty, unique per duty and person, kept (flagged, computed from current membership) after a member leaves; `GET /liturgies/assignable` lists every member's id and display name only, for `liturgy.edit` (owner decision Q-3.8) | [10 §2.4](10-liturgy.md#24-assignment-p-63) | **Approved** 2026-10-03 |
+| P-64 | Unpublished liturgies are visible only to members holding `liturgy.edit`, `liturgy.comment`, `liturgy.approve` or `liturgy.manage`; others get 404 | [10 §2.1](10-liturgy.md#21-liturgy) | **Approved** 2026-10-03 |
+| P-65 | Every change writes a history row with before and after images in the same transaction (slice 3B); undo and redo are per person, refused when **another person's** history row touched the item or structure since (not by comparing version numbers), are history rows themselves and never targets, with a 50-edit window (slice 3D); history images have no size cap | [10 §7](10-liturgy.md#7-history), [11 §7.2](11-liturgy-editor.md#72-undo-and-redo-p-65) | **Approved** 2026-10-03 — condition: 11 §7.2 gets a second review, or a spike test on both dialects, before slice 3D is coded; a finding reopens this row only |
+| P-66 | Live updates are server-sent events carrying IDs and versions only; presence is tracked per connection from heartbeats on the event bus and expires after 60 seconds; the stream re-checks authorization every 60 seconds (a stated bound); a sixth stream of one member is refused with 429, not served by closing another | [11 §7.1](11-liturgy-editor.md#71-server-sent-events-p-66) | **Approved** 2026-10-03 — condition: slice 3D starts with a throwaway spike holding a stream open behind the expected proxies; a finding reopens this row only |
+| P-67 | Keys are stored as letters; the web app shows "Do = G" or "G" by the church setting, and "La = Em" for minor keys in "Do" mode | [11 §2](11-liturgy-editor.md#2-key-display-p-67) | **Approved** 2026-10-03 |
+
+## 4c. Questions for the owner (step 3)
+
+These need an answer, not just an approval; the draft shows the assumed default.
+
+| ID | Question | Draft assumes |
+|---|---|---|
+| Q-3.1 | Are live updates, presence and undo (slice 3D) part of step 3, or do they wait until after the pilot starts? SPEC §5.2 lists them in the MVP | In step 3, as the last slice; the earlier slices work without it. **Decided 2026-10-03 (owner):** yes, as drafted. If slice 3D grows, presence is cut before undo |
+| Q-3.2 | Should the setup wizard also ask for regular services? SPEC §5.7 says yes; the wizard built in step 1 does not | No: the Services page has a helpful empty state. **Decided 2026-10-03 (owner):** no wizard step; this deviates from SPEC §5.7 and is logged in the SPEC decisions log (2026-10-03) |
+| Q-3.3 | What is GKY Citragarden's real order of service, and who checks the English and Chinese words of the seeded duties, parts and starter template? | The draft's generic order and words ([09 §3](09-planning.md#3-seeded-defaults-p-56)) **Decided 2026-10-03 (owner):** coding is not blocked; the generic seed stays. **Open gate before the pilot:** the real order of service of GKY Citragarden and a native reader for each of the English and two Chinese word sets. Until both are given, the Spec Gate stays below 9. |
+| Q-3.4 | Which scope edits duties and singing parts: `templates.edit` or `church.settings`? | `templates.edit`, so a liturgist-type role can add a duty without being a settings admin. **Decided 2026-10-03 (owner):** `templates.edit`, as drafted |
+| Q-3.5 | May an assigned team member see an unpublished liturgy they are assigned to? | No, only members with a `liturgy.*` scope (P-64). **Decided 2026-10-03 (owner):** no, as drafted. Team members see liturgies only once published; "my assignments" is built on published liturgies in step 5. Showing a member their own assignment in a draft (read-only) may be added later and changes no stored data |
+| Q-3.6 | Is "La = Em" the right way to show a minor key in "Do" mode for your churches? | Yes. **Decided 2026-10-03 (owner):** yes, as drafted, to be checked by one musician at the pilot church; a different convention is a display change only (keys are stored as letters) |
+| Q-3.7 | May two different services share the same date and time (for example two rooms)? A manual time that is not one of the service's times counts as a separate slot | Yes: the slot key is (service, date, time) and only the same service is limited ([10 §2.1](10-liturgy.md#21-liturgy)). **Decided 2026-10-03 (owner):** yes, as drafted. A manual time that is not one of the service's times is a separate slot; a typo can therefore make a near-duplicate, which is accepted |
+| Q-3.8 | May every holder of `liturgy.edit` see the names of all church members (to assign them), even without `members.view`? Only the display name is returned | Yes ([10 §4](10-liturgy.md#4-editing-items-songs-and-assignments)). **Decided 2026-10-03 (owner):** yes, as drafted: id and display name of every member, nothing else. No opt-out for now |
+| Q-3.9 | Should renaming a duty change the wording of drafts at once (published versions stay as published)? | Yes, live names; the published copy freezes them ([09 §2.1](09-planning.md#21-duties-and-singing-parts-p-55)). **Decided 2026-10-03 (owner):** yes, as drafted. **Requirement for step 5:** a published version stores the displayed duty names, not only the IDs |
 
 ## 5. Process
 

@@ -240,7 +240,7 @@ RFC 9457 problem details (`application/problem+json`, Huma's default) extended w
 
 | Code | HTTP | When |
 |---|---|---|
-| `validation_failed` | 422 | Body fails schema or field validation; `errors` lists fields |
+| `validation_failed` | 422 | Body fails schema or field validation; `errors` lists fields. A field may carry a `reason`: `limit` (with `max`, `used`: a fixed count such as 50 duties, [09 §2.1](09-planning.md#21-duties-and-singing-parts-p-55)), `required`, `language_mismatch` (a template whose language is not the liturgy's, [10 §3](10-liturgy.md#3-creating-a-liturgy)) |
 | `weak_password` | 422 | Password rule broken; `reason`: `too_short`, `too_long`, `common`, `matches_identity` |
 | `invalid_identifier` | 422 | Email/phone cannot be parsed or normalised |
 | `unauthenticated` | 401 | No valid session |
@@ -261,17 +261,27 @@ RFC 9457 problem details (`application/problem+json`, Huma's default) extended w
 | `identifier_taken` | 409 | Email/phone belongs to another user |
 | `lockout_prevented` | 409 | Change would leave nobody holding both `roles.manage` and `members.manage` |
 | `role_name_taken` | 409 | Another role in the church has the same name |
-| `version_conflict` | 409 | The song or reading was changed since the client loaded it ([06 §2.4](06-song-library.md#24-editing-sections-and-concurrency-p-46)) |
+| `version_conflict` | 409 | The song, reading, template, service, liturgy or liturgy item was changed since the client loaded it ([06 §2.4](06-song-library.md#24-editing-sections-and-concurrency-p-46)); for liturgies `scope`: `liturgy` or `item`, and `item_id` ([10 §5](10-liturgy.md#5-versions-and-conflicts-p-60)); also a reorder list that is not the current set |
 | `section_in_use` | 409 | A song section is used by an unpublished liturgy; `section_ids` |
 | `song_in_use` | 409 | The song is used by an unpublished liturgy |
 | `reading_in_use` | 409 | The reading is used by an unpublished liturgy |
 | `reading_exists` | 409 | The church already has this reference in this translation; `reading_id` |
 | `group_conflict` | 409 | Linking song versions failed; `reason`: `already_grouped`, `language_taken` |
 | `import_conflict` | 409 | An import candidate cannot be changed or applied; `reason`: `already_applied`, `target_changed` ([08 §2.1](08-import.md#21-states)) |
+| `name_taken` | 409 | A duty, singing part, template or service with the same folded name exists; `reason`: `duty`, `singing_part`, `template`, `service` ([09 §2](09-planning.md#2-data-model)) |
+| `duty_in_use` | 409 | A liturgy item or assignment uses the duty |
+| `singing_part_in_use` | 409 | A sequence entry uses the singing part |
+| `template_in_use` | 409 | A service has the template as its default; `service_ids` |
+| `liturgy_locked` | 409 | The liturgy's state does not allow editing ([10 §2.1](10-liturgy.md#21-liturgy)) |
+| `liturgy_exists` | 409 | A liturgy for this service, date and time exists; `liturgy_id` |
+| `liturgy_not_deletable` | 409 | A published liturgy can only be archived |
+| `assignment_exists` | 409 | The person already has this duty in the liturgy |
+| `undo_refused` | 409 | Undo or redo not possible; `reason`: `nothing_to_undo`, `changed_since`, `reference_gone` ([11 §7.2](11-liturgy-editor.md#72-undo-and-redo-p-65)) |
 | `reset_not_allowed` | 409 | Admin reset for a user who belongs to another church |
 | `too_many_attempts` | 429 | Login throttled; `Retry-After` header in seconds |
+| `too_many_streams` | 429 | The member already has 5 live-update streams open on this liturgy; `Retry-After` (seconds) ([11 §7.1](11-liturgy-editor.md#71-server-sent-events-p-66)) |
 | `internal` | 500 | Unexpected error; details only in the log |
-| `unavailable` | 503 | Database unreachable |
+| `unavailable` | 503 | Database unreachable; also the live-update stream cap of the server (with `Retry-After`) |
 
 ## 11. CI (GitHub Actions)
 
