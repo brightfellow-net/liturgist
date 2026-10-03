@@ -128,3 +128,35 @@ test.describe("E2E-W-005 accessibility of readings", () => {
     await expectAccessible(page);
   });
 });
+
+test.describe("E2E-W-005 accessibility of the import pages", () => {
+  test("import and review", async ({ browser }) => {
+    const page = await adminPage(browser);
+    await page.goto("/library/import");
+    await expect(page.getByRole("heading", { name: "Import songs", level: 1 })).toBeVisible();
+    await page.getByRole("button", { name: "Read the lyrics" }).click(); // shows the errors
+    await expect(page.getByText("This field is required.").first()).toBeVisible();
+    await expectAccessible(page);
+
+    await page.getByLabel("Title", { exact: true }).fill("Lagu impor aksesibel");
+    await page.getByLabel("Lyrics", { exact: true }).fill("Satu dua\n\nSatu dua\n\nTiga empat");
+    await page.getByRole("button", { name: "Read the lyrics" }).click();
+    await expect(page.getByRole("heading", { name: "Check the songs", level: 1 })).toBeVisible();
+    await expect(page.getByText("A part that comes back several times was taken to be the chorus.")).toBeVisible();
+    await expectAccessible(page);
+
+    await page.getByRole("button", { name: "Edit this song" }).click();
+    await expect(page.getByRole("heading", { name: "Edit before importing" })).toBeVisible();
+    await expectAccessible(page);
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+
+    // Leave the batch unfinished: the library then points to it.
+    await page.goto("/library");
+    await expect(page.getByText("You have an unfinished import.")).toBeVisible();
+    await expectAccessible(page);
+    await page.getByRole("link", { name: "Continue the import" }).click();
+    await page.getByRole("button", { name: "Cancel this import" }).click();
+    await page.getByRole("button", { name: "Cancel the import" }).click();
+    await expect(page.getByRole("heading", { name: "Songs", level: 1 }).or(page.getByRole("heading", { name: "Library", level: 1 }))).toBeVisible();
+  });
+});

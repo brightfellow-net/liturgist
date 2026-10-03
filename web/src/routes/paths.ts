@@ -20,6 +20,8 @@ export const paths = {
   readings: "/library/readings",
   readingNew: "/library/readings/new",
   reading: "/library/readings/:id",
+  import: "/library/import",
+  importReview: "/library/import/:id",
 } as const;
 
 // songPath and songEditPath fill in a song's ID.
@@ -38,3 +40,6 @@ export function safeNext(next: string | null): string {
 
 // readingPath fills in a reading's ID.
 export const readingPath = (id: string) => paths.reading.replace(":id", encodeURIComponent(id));
+
+// importPath fills in an import batch's ID.
+export const importPath = (id: string) => paths.importReview.replace(":id", encodeURIComponent(id));

@@ -20,7 +20,27 @@ describe("LibraryPage", () => {
     open();
     expect(await screen.findByRole("heading", { name: "Your library is empty" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Add a song" })).toHaveAttribute("href", "/library/songs/new");
+    expect(screen.getByRole("link", { name: "Paste lyrics" })).toHaveAttribute("href", "/library/import");
+    expect(screen.getByRole("link", { name: "Import a file" })).toHaveAttribute("href", "/library/import");
     expect(screen.queryByRole("search")).toBeNull();
+  });
+
+  it("points to an unfinished import", async () => {
+    mockApi({
+      "GET /songs": { status: 200, body: { items: [summary("s1", "A")], total: 1 } },
+      "GET /imports": { status: 200, body: { items: [{ id: "b1", source_format: "paste", created_at: "2026-10-01T00:00:00Z", updated_at: "2026-10-01T00:00:00Z" }] } },
+    });
+    open();
+    expect(await screen.findByText("You have an unfinished import.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Continue the import" })).toHaveAttribute("href", "/library/import/b1");
+    expect(screen.getByRole("link", { name: "Import songs" })).toHaveAttribute("href", "/library/import");
+  });
+
+  it("does not ask about imports for a member who cannot edit", async () => {
+    const calls = mockApi({ "GET /songs": { status: 200, body: { items: [summary("s1", "A")], total: 1 } } });
+    open("/library", viewer);
+    await screen.findByRole("link", { name: /A/ });
+    expect(calls.some((c) => c.route === "GET /imports")).toBe(false);
   });
 
   it("tells a member who cannot edit to ask for help, without actions", async () => {

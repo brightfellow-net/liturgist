@@ -39,3 +39,15 @@ export type Me = Omit<Schemas["MeOutputBody"], "church" | "membership"> & {
   church: ChurchView | null;
   membership: MembershipView | null;
 };
+
+// Import types. Huma can't mark a reference as nullable, so the server leaves
+// these fields out when they have no value (08 §5); the generated types
+// already show them as optional.
+export type ImportBatchView = Schemas["ImportBatchView"];
+export type ImportCandidateView = Schemas["ImportCandidateView"];
+export type ImportSummaryView = Schemas["ImportSummaryView"];
+export type ImportRejectedView = Schemas["ImportRejectedView"];
+export type SongDraft = Schemas["SongDraftBody"];
+export type DraftSection = Schemas["DraftSectionBody"];
+export type MergePreviewView = Schemas["MergePreviewView"];
+export type ApplyResultView = Schemas["ApplyResultView"];

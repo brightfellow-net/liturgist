@@ -1,6 +1,6 @@
 // Copyright 2026 Brightfellow contributors
 // SPDX-License-Identifier: Apache-2.0
-import type { LookupView, Me, ReadingView, SongSummaryView, SongView } from "@liturgist/api-client";
+import type { ImportBatchView, ImportCandidateView, LookupView, Me, ReadingView, SongSummaryView, SongView } from "@liturgist/api-client";
 
 export function meWith(scopes: string[]): Me {
   return {
@@ -66,3 +66,19 @@ export const editorTB = (() => {
   const me = meWith(["library.edit"]);
   return { ...me, church: { ...me.church, default_translation_code: "TB" } } as Me;
 })();
+
+// candidate is an import candidate with a verse and a chorus.
+export function candidate(id: string, title: string, changes: Partial<ImportCandidateView> = {}): ImportCandidateView {
+  return {
+    id, decision: "pending", remove_unmatched: false, warnings: [],
+    draft: {
+      language: "id", title, alt_titles: [], default_arrangement: [0, 1, 0],
+      sections: [{ kind: "verse", number: 1, text: "Besar setia-Mu" }, { kind: "chorus", text: "Setiap pagi" }],
+    },
+    ...changes,
+  };
+}
+
+export function batch(candidates: ImportCandidateView[], changes: Partial<ImportBatchView> = {}): ImportBatchView {
+  return { id: "b1", source_format: "paste", status: "open", created_at: "2026-10-01T00:00:00Z", updated_at: "2026-10-01T00:00:00Z", candidates, rejected: [], ...changes };
+}

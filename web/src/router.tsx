@@ -5,6 +5,8 @@ import { AppLayout } from "./routes/AppLayout";
 import { HomePage } from "./routes/HomePage";
 import { InvitePage } from "./routes/InvitePage";
 import { LoginPage } from "./routes/LoginPage";
+import { ImportPage } from "./routes/library/ImportPage";
+import { ImportReviewPage } from "./routes/library/ImportReviewPage";
 import { LibraryLayout } from "./routes/library/LibraryLayout";
 import { LibraryPage } from "./routes/library/LibraryPage";
 import { ReadingFormPage } from "./routes/library/ReadingFormPage";
@@ -42,6 +44,8 @@ export const router = createBrowserRouter([
       },
       { path: paths.readingNew, element: <ReadingFormPage /> },
       { path: paths.reading, element: <ReadingPage /> },
+      { path: paths.import, element: <ImportPage /> },
+      { path: paths.importReview, element: <ImportReviewPage /> },
       { path: paths.songNew, element: <SongFormPage /> },
       { path: paths.song, element: <SongPage /> },
       { path: paths.songEdit, element: <SongFormPage /> },

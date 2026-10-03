@@ -58,6 +58,14 @@ describe("TC-W-002 error messages", () => {
     expect(errorText(i18n.getFixedT("id"), apiError(422, { code: "invalid_reference", reason: "empty" }))).toBe("Ketik ayatnya.");
   });
 
+  it("explains an import problem by its reason, and a body that is too large", () => {
+    expect(errorText(t, apiError(422, { code: "import_unreadable", reason: "not_xml" }))).toBe("This doesn't look like an OpenLyrics file.");
+    expect(errorText(t, apiError(422, { code: "import_unreadable" }))).toBe("This can't be read as a song.");
+    expect(errorText(t, apiError(409, { code: "import_conflict", reason: "target_changed" }))).toBe("The song to merge into was changed after you chose. Check the preview again.");
+    expect(errorText(t, apiError(413, { code: "validation_failed" }))).toBe("That is too much at once. Import fewer files.");
+    expect(errorText(i18n.getFixedT("id"), apiError(422, { code: "import_unreadable", reason: "no_song" }))).toBe("Tidak ada lagu yang ditemukan.");
+  });
+
   it("explains network failures", () => {
     expect(errorText(t, new NetworkError("x"))).toBe("Can't reach the server. Check your connection.");
   });
