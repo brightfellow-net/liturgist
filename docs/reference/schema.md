@@ -520,6 +520,15 @@ PK `church_seeds_pkey` (`church_id`, `seed_key`) — church-leading. Written onl
 
 `duties_church_name_key`, `singing_parts_church_name_key`, `templates_church_name_key`, `services_church_name_key`, `service_times_slot_key`, `liturgies_service_slot_key`, `assignments_user_key`, `assignments_name_key`, `church_seeds_pkey`, plus the `<table>_pkey` of every new table, plus `readings_church_id_key` and `song_sections_church_id_key`. SQLite names the failing index by columns, so a repeated section ID can report `song_sections_church_id_key` instead of `song_sections_pkey`; both mean a duplicate ID.
 
+### Slice 3D additions (migration `00007_undo.sql`, both dialects) [P-65]
+
+Written by slice 3D, from the second review of the undo rules ([11 §7.2](../impl/11-liturgy-editor.md#72-undo-and-redo-p-65)); existing rows need a value, so these two columns have a migration default (the only database defaults in the step 3 tables).
+
+| Table | Column | Type | Null | Constraint |
+|---|---|---|---|---|
+| `liturgies` | `undo_floor_seq` | int | no | Default 0; `CHECK (undo_floor_seq >= 0)` `liturgies_undo_floor_check`. History rows with `seq` at or below it are no undo or redo targets. Set by step 4's state changes, read by slice 3D |
+| `liturgy_edits` | `skipped` | bool | no | Default false. A `done` edit whose undo was refused and that is no longer offered as a target (non-structural edits only) |
+
 ## Later steps
 
 Tables for comments, state changes and published versions are added in the steps that build them, following [SPEC.md §7](../SPEC.md#7-data-model-sketch) and the conventions above.

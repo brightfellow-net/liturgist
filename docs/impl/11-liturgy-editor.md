@@ -71,7 +71,7 @@ New files under `web/src/routes/liturgy/` (pages and editor parts), `web/src/lib
 | Port | Methods | Implemented by |
 |---|---|---|
 | `EventBus` | As step 1 ([04 §7](04-tenancy-extensions.md#7-extension-points)); topic `liturgy:<church_id>:<liturgy_id>` | In-memory (community) |
-| `ChurchStore.Edits()` | `NextSeq(liturgy)`, `Append`, `Newest(user, liturgy, status, window)`, `ForeignTouches(liturgy, afterSeq, user, target)`, `SetStatus` (conditional), `DropUndone(user, liturgy)` | `adapters/sqlstore` |
+| `ChurchStore.Edits()` | `NextSeq(liturgy)`, `Append`, `Newest(user, liturgy, floor, window)`, `ForeignTouches(liturgy, afterSeq, user, target)` (joins an undo/redo row to its target through `target_edit_id`), `SetStatus` (conditional), `MarkSkipped(edit)`, `DropUndone(user, liturgy)` | `adapters/sqlstore` |
 | Presence registry | In-memory map, no port: derived from `EventBus` messages | `server` |
 
 ## 7. Live updates and undo (slice 3D)
@@ -98,7 +98,7 @@ New files under `web/src/routes/liturgy/` (pages and editor parts), `web/src/lib
 
 ### 7.2 Undo and redo [P-65]
 
-Per person, per liturgy, on the history rows of [10 §7](10-liturgy.md#7-history). Rows of editing commands have a `status`: `done`, `undone` (with `undo_seq`, the `seq` of the `undo` row that undid it), or `dropped` (an undone edit that can no longer be redone). Undo and redo are themselves history rows (`undo`, `redo`, with `target_edit_id`), never targets, never part of the window.
+Per person, per liturgy, on the history rows of [10 §7](10-liturgy.md#7-history). Rows of editing commands have a `status`: `done`, `undone` (with `undo_seq`, the `seq` of the `undo` row that undid it), or `dropped` (an undone edit that can no longer be redone), and a flag `skipped` (a `done` edit whose undo was refused and that is no longer offered, below). Undo and redo are themselves history rows (`undo`, `redo`, with `target_edit_id` and the `item_id` of their target), never targets, never part of the window. The touch test needs the *command* of the edit an undo or redo row acted on: it reads it through `target_edit_id` (one join inside the same liturgy), so no column repeats it.
 
 | Method & path | Request | Response |
 |---|---|---|
@@ -107,7 +107,8 @@ Per person, per liturgy, on the history rows of [10 §7](10-liturgy.md#7-history
 
 Both need `liturgy.edit` and an editable state, and run in one `Tx.Write` that takes the history counter first ([10 §5](10-liturgy.md#5-versions-and-conflicts-p-60)), so the test below sees every committed edit.
 
-- **Undo target:** among the caller's last 50 *editing* rows in this liturgy (`undo` and `redo` rows do not count), the newest with `status = 'done'`. None → 409 `undo_refused`, `reason: "nothing_to_undo"`. `liturgy.create` is never a target.
+- **Undo target:** among the caller's last 50 *editing* rows in this liturgy with `seq` above the liturgy's `undo_floor_seq` (`undo` and `redo` rows do not count), the newest with `status = 'done'` that is not `skipped`. None → 409 `undo_refused`, `reason: "nothing_to_undo"`. `liturgy.create` is never a target.
+- **Floor [P-65, review 2026-10-03]:** `liturgies.undo_floor_seq` (default 0) is set by every state change of the review workflow (step 4: submit, approve, send back, publish, reopen) to the liturgy's `edit_seq` at that moment. Rows at or below the floor are neither undo nor redo targets and do not count in the window, so nobody undoes an edit a reviewer has already read. Slice 3D only reads the column; step 4 writes it.
 - **Condition ("nobody else changed it since"):** the test is on **other people's rows**, not on version numbers, because the caller's own undos and redos raise the versions. The target is refused with `reason: "changed_since"` (and nothing changes) when a row exists in this liturgy with `seq` greater than the target's, written by **another user**, that *touches* the target:
 
 | Target command | A foreign row touches it when |
@@ -117,9 +118,12 @@ Both need `liturgy.edit` and an editable state, and run in one `Tx.Write` that t
 | `items.reorder`, `liturgy.update` | it is structural |
 | `assignment.add`, `assignment.remove` | it is an assignment row (or its undo/redo) for the same duty and the same person |
 
+  **A refused undo does not trap the older edits [P-65, review 2026-10-03].** If the refused target is *not structural* (`item.update`, `item.songs`, `assignment.add`, `assignment.remove`), the use case, after rolling back its own transaction (so `seq` has no gap), sets `skipped = true` on that row in a second short `Tx.Write` and then answers 409 `changed_since`; the next undo takes the next older `done` edit. The flag is safe to keep because a touch only ever grows: the edit could never become undoable again. A refused **structural** edit (`item.add`, `item.remove`, `items.reorder`, `liturgy.update`) is *not* skipped and keeps blocking: restoring a removed item by its old position is exact only when every later structural edit of the same person has been reversed first (a model of these rules found position errors when such an edit was skipped).
+
   The caller's *own* later rows never refuse: the target is their newest `done` edit, and their later undone or dropped edits have already been reversed. This is what lets a person undo several steps in a row: after two edits A1, A2 of one item, undoing A2 and then A1 both pass (the version of the item has long passed `A1`'s, which is why versions are not the test), while a colleague's save of that item between A1 and A2 refuses the undo of A1. You can undo your move of an item after someone else edited another item's text, but not after someone edited that item. The test is the same on both dialects: one read of the history rows with `seq` above the target's.
-- **Effect:** the `before` image is applied through the same repository calls as a normal write (versions rise as for any change, from their current values; the conditional update on the version just read means that a concurrent writer who got in is reported as `changed_since`, not overwritten), the edit becomes `undone` with `undo_seq` = the new `undo` row's `seq`, an `undo` row is appended, and `changed` events are published. An item removal is undone by re-creating the item with its **old ID**, `version = image.version + 1` and its position ([10 §7](10-liturgy.md#7-history)); if the image refers to a duty, reading, song, section or part that no longer exists → `reason: "reference_gone"`, nothing changes.
-- **Redo target:** among the caller's `undone` edits, the one with the highest `undo_seq` (the most recently undone, so a stack of undos is redone in reverse order). The same condition as above, with foreign rows counted after the target's `undo_seq` — an edit by someone else made since the undo refuses the redo. Effect: the `after` image is applied; a `redo` row is appended; the edit becomes `done` again and `undo_seq` is cleared.
+- **Effect:** the `before` image is applied through the same repository calls as a normal write (versions rise as for any change, from their current values; the conditional update on the version just read means that a concurrent writer who got in is reported as `changed_since`, not overwritten), the edit becomes `undone` with `undo_seq` = the new `undo` row's `seq`, an `undo` row is appended, and `changed` events are published. An item removal is undone by re-creating the item with its **old ID**, `version = image.version + 1` and its position ([10 §7](10-liturgy.md#7-history)); if the image refers to a duty, reading, song, section or part that no longer exists, or (assignments) to a member who has left the church → `reason: "reference_gone"`, nothing changes.
+- **Versions never go back [P-65, review 2026-10-03].** An item that is re-created (undo of a removal, redo of an add) gets `version` = the version the item had in the image of the row that removed it, plus 1: for an `item.remove` row that is its `before` image; for an `undo` or `redo` row that removed it, its `before` image (which therefore holds the complete item). Using the `after` image of the original `item.add` would give version 2 to an item that had reached 3 through undone edits, and a stale tab could then save over it.
+- **Redo target:** among the caller's `undone` edits, the one with the highest `undo_seq` (the most recently undone, so a stack of undos is redone in reverse order). The same condition as above, with foreign rows counted after the target's `undo_seq` — an edit by someone else made since the undo refuses the redo. A refused redo makes the caller's whole undone stack useless (the top can never become valid again, and redoing older ones around it is not safe), so after rolling back, a second `Tx.Write` sets all of the caller's `undone` edits in this liturgy to `dropped`, and the answer is 409 `changed_since`. Effect: the `after` image is applied; a `redo` row is appended; the edit becomes `done` again and `undo_seq` is cleared.
 - **Any new editing command** by a person (not undo or redo) turns all of their `undone` edits in that liturgy into `dropped`, inside the new edit's transaction, as in an ordinary editor.
 - A locked liturgy → 409 `liturgy_locked`.
 
@@ -143,7 +147,9 @@ The web app shows **Undo** and **Redo** buttons with text in "Recent changes", d
 | TC-U-002 | Undo stacks (Go) | Two users alternating edits; one user makes A1, A2, A3 on one item and undoes three times | Each undoes only their own newest edit; **three undos in a row pass** although each raised the versions; a new edit drops redo | 50-edit window counts editing rows only |
 | TC-U-003 | Redo conditions (Go) | Undo, undo, redo, redo; undo then foreign edit then redo | Redone in reverse order (highest `undo_seq` first); `changed_since` | Item removal redo after the duty was deleted → `reference_gone` |
 | TC-U-004 | Touch table (Go) | Every row of the table in §7.2 with a foreign row that does and does not touch, before and after the target | Refused exactly when the table says | Foreign undo/redo rows count; the caller's own rows never do |
-| TC-U-005 | Restoring a removed item | Remove an item with songs, undo, redo, undo | Same ID, `version` = old + 1 and rising, position clamped, the `undo` and `redo` rows are not targets | Liturgy shrank meanwhile |
+| TC-U-005 | Restoring a removed item | Remove an item with songs, undo, redo, undo; add an item, edit it, undo the edit, undo the add, redo the add | Same ID, `version` = the version it had when removed + 1 and rising (never a value it had before), position clamped, the `undo` and `redo` rows are not targets | Liturgy shrank meanwhile |
+| TC-U-007 | Undo model (Go) | Random histories of two users over the full command set, with undo and redo, replayed through the real use cases on both dialects; the oracle is the model of the 2026-10-03 review (state = replay of the `done` edits only) | After every step the state equals the replay; refusals are only `changed_since` / `nothing_to_undo` / `reference_gone`; no version repeats | Seeds fixed in the test; a failure prints the history |
+| TC-U-008 | Skips and floor | A non-structural refusal then an older undo; a structural refusal then an older undo; a redo refusal; a state change that sets the floor | The older edit is offered after a non-structural refusal; a structural refusal keeps blocking; a refused redo drops the stack; rows at or below the floor are no targets | The skip survives a reload (it is stored) |
 | TC-U-006 | Presence (Go) | Two connections of one user; `bye` of one; `hello` twice; `bye` before `hello`; expiry | The user stays until the last connection goes; duplicates harmless | Reordered messages |
 
 ### Integration tests (HTTP through `httptest`; repository contract tests run on both dialects)
@@ -152,7 +158,7 @@ The web app shows **Undo** and **Redo** buttons with text in "Recent changes", d
 |---|---|---|---|---|
 | IT-E-001 | Undo over HTTP | Liturgy with items; two sessions | Undo/redo for add, remove, move, edit, songs, assignment; the other session's change to the same item → 409 `undo_refused`; to another item → allowed | — |
 | IT-E-002 | Events | Two sessions on one liturgy | The second receives `changed` with IDs and versions only (no text), then `presence` listing both; a member who loses `liturgy.edit`'s visibility gets `closed` within 60 s; the 6th stream of a member → 429 `too_many_streams` with `Retry-After`, and the first five stay open | — |
-| IT-E-003 | Race | Parallel undo and edit of one item (race harness) | Exactly one wins; no lost update; versions consistent on both dialects | — |
+| IT-E-003 | Race | Parallel undo and edit of one item (race harness), repeated at least 100 times on PostgreSQL | Exactly one wins; no lost update; versions consistent on both dialects; a PostgreSQL deadlock is absorbed by the retry of [02 §3](02-persistence.md#3-connections-and-transactions), never a 500. Undo locks the liturgy row first and then the item row, an item edit the other way round ([10 §5](10-liturgy.md#5-versions-and-conflicts-p-60)); this is why the test must run there | — |
 | IT-E-004 | Locked and gone | Liturgy set to `in_review`; item deleted by another user | Undo → `liturgy_locked`; redo/undo of a deleted item → `changed_since` or `reference_gone`, never a 500 | — |
 
 ### Web end-to-end
@@ -180,6 +186,9 @@ The web app shows **Undo** and **Redo** buttons with text in "Recent changes", d
 | Reorder with drag and drop only | Buttons with text (P-52) | Older users, keyboards, screen readers |
 | Use colour only for "unsaved" or "locked" | Text as well | WCAG 1.4.1 |
 | Cut the event stream with the server's global write timeout | Per-write deadlines through `ResponseController` | Otherwise every stream dies after the timeout |
+| Skip a refused *structural* edit so that older ones can be undone | Skip only non-structural edits | A removed item comes back at the wrong place when a later add of the same person stays |
+| Re-create an item with the version of its original `item.add` | The version it had when removed, plus 1 | Versions must never go back (stale tabs) |
+| Let an undo reach back past a review round | `undo_floor_seq` | Undoing an edit a reviewer has read |
 | Show the viewer's own name as "also editing" | Exclude the viewer | Confusing, especially with two tabs |
 
 ## 10. Error handling matrix
