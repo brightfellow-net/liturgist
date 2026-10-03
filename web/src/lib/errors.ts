@@ -11,6 +11,7 @@ export const errorCodes = [
   "version_conflict", "song_in_use", "section_in_use", "group_conflict",
   "name_taken", "duty_in_use", "singing_part_in_use", "template_in_use",
   "invalid_reference", "reading_exists", "reading_in_use", "import_unreadable", "import_conflict",
+  "liturgy_exists", "liturgy_locked", "liturgy_not_deletable", "assignment_exists",
   "internal", "unavailable",
 ] as const;
 
@@ -21,6 +22,9 @@ export type Problem = {
   detail?: string;
   reason?: string;
   reading_id?: string; // reading_exists: the reading that is already saved
+  scope?: string; // version_conflict: "item" or "liturgy" (10 §5)
+  item_id?: string;
+  liturgy_id?: string; // liturgy_exists: the liturgy that holds the slot
   scopes?: string[];
   limit?: string;
   used?: number;
@@ -90,13 +94,15 @@ export function errorText(t: TFunction, err: unknown, scopeName: (scope: string)
     }
     case "validation_failed":
       // A fixed count such as 50 duties (09 §2.1): say how many are allowed.
-      return p.reason === "limit" ? t("errors.limit", { max: p.max ?? 0 }) : t("errors.validation_failed");
+      if (p.reason === "limit") return t("errors.limit", { max: p.max ?? 0 });
+      return p.reason === "language_mismatch" ? t("errors.language_mismatch") : t("errors.validation_failed");
     case "name_taken": {
       const text = t(`errors.name_taken.${p.reason ?? ""}`, { defaultValue: "" });
       return text || t("errors.name_taken.unknown");
     }
     case "limit_reached":
-      return t("errors.limit_reached", { max: p.max ?? 0 });
+      // The liturgy limits name which count was reached (10 §8).
+      return p.limit?.includes("liturgies") ? t("errors.liturgy_limit", { max: p.max ?? 0 }) : t("errors.limit_reached", { max: p.max ?? 0 });
     case "scope_not_held":
       return t("errors.scope_not_held", { scopes: (p.scopes ?? []).map(scopeName).join("; ") });
   }

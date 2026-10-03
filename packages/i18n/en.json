@@ -399,7 +399,8 @@
       "templates": "Templates",
       "services": "Services",
       "duties": "Duties",
-      "parts": "Singing parts"
+      "parts": "Singing parts",
+      "liturgies": "Liturgies"
     },
     "read_only": "You can look at this, but only members who may edit templates can change it.",
     "name": "Name",
@@ -596,7 +597,13 @@
     "duty_in_use": "This duty is used in a liturgy, so it can't be deleted.",
     "singing_part_in_use": "This singing part is used in a liturgy, so it can't be deleted.",
     "template_in_use": "A service uses this template as its default. Change that service first.",
-    "limit": "You can have at most {{max}} of these."
+    "limit": "You can have at most {{max}} of these.",
+    "liturgy_exists": "A liturgy already exists for this service, date and time.",
+    "liturgy_locked": "This liturgy can't be edited now. Reload the page.",
+    "liturgy_not_deletable": "A published liturgy can't be deleted. Archive it instead.",
+    "assignment_exists": "This person already has this duty.",
+    "language_mismatch": "The template and the liturgy must be in the same language.",
+    "liturgy_limit": "Your church has reached its limit of {{max}} liturgies."
   },
   "import": {
     "title": "Import songs",
@@ -709,5 +716,193 @@
     },
     "ol_files": "Choose OpenLyrics files",
     "cp_files": "Choose ChordPro files"
+  },
+  "liturgy": {
+    "back": "Back to the liturgies",
+    "date": "Date",
+    "time": "Time",
+    "not_found": "This liturgy does not exist or was deleted.",
+    "key_change_to": "change to {{key}}",
+    "moved": "{{title}} moved to place {{n}} of {{total}}.",
+    "removed": "{{title}} removed.",
+    "list_conflict": "The items were changed by someone else. The list was reloaded; try again.",
+    "locked": "Locked: this liturgy is {{state}}. It can't be edited now.",
+    "locked_final": "This liturgy is final and can't be edited.",
+    "delete": "Delete this liturgy",
+    "delete_question": "Delete the liturgy “{{name}}” of {{date}} with all its items and history? This cannot be undone.",
+    "delete_confirm": "Yes, delete it",
+    "states": {
+      "draft": "Draft",
+      "in_review": "In review",
+      "needs_revision": "Needs changes",
+      "approved": "Approved",
+      "published": "Published",
+      "archived": "Archived"
+    },
+    "list": {
+      "title": "Liturgies",
+      "intro": "One liturgy for each service: its items, songs, readings and who does what.",
+      "upcoming": "Upcoming",
+      "past": "Past",
+      "prepare": "Prepare next week",
+      "new": "New liturgy",
+      "empty_title": "No liturgies yet",
+      "empty_text": "A liturgy is the order of one service. Prepare next week to make them from your regular services, or start one by hand.",
+      "empty_viewer": "Liturgies appear here once they are published.",
+      "no_services": "You have no regular services yet.",
+      "to_services": "Go to the services",
+      "none_upcoming": "There are no upcoming liturgies.",
+      "none_past": "There are no past liturgies.",
+      "items_one": "{{count}} item",
+      "items_other": "{{count}} items",
+      "previous": "Previous page",
+      "next": "Next page"
+    },
+    "prepare": {
+      "title": "Prepare next week",
+      "intro": "Tick the services you want a liturgy for. Each one starts from the service's template.",
+      "previous": "Previous week",
+      "next": "Next week",
+      "pick": "Pick a day of the week",
+      "week_of": "Week of {{date}}",
+      "occurrences": "Services this week",
+      "no_services": "You have no regular services yet. Add them first, then come back here.",
+      "template": "Template: {{name}}",
+      "no_template": "No template",
+      "exists": "A liturgy already exists.",
+      "open": "Open",
+      "exists_now": "One of these already has a liturgy.",
+      "slots": "{{free}} of {{max}} liturgy places free.",
+      "too_many": "You ticked {{n}}; only {{free}} can be created.",
+      "create_one": "Create {{count}} liturgy",
+      "create_other": "Create {{count}} liturgies"
+    },
+    "new": {
+      "title": "New liturgy",
+      "kind": "Kind of service",
+      "regular": "Regular service",
+      "oneoff": "One-off service",
+      "service": "Service",
+      "no_services": "There are no regular services yet. Choose “One-off service” or add a service first.",
+      "name": "Name of the service",
+      "template": "Template",
+      "create": "Create liturgy"
+    },
+    "details": {
+      "edit": "Edit details",
+      "save": "Save details",
+      "saved": "Details saved.",
+      "conflict": "The details were changed by someone else. Reload the page to see them."
+    },
+    "items": {
+      "title": "Items",
+      "none": "This liturgy has no items yet.",
+      "added": "{{title}} added.",
+      "max": "A liturgy can have at most {{max}} items."
+    },
+    "item": {
+      "n": "Item {{n}}",
+      "title": "Title",
+      "duty": "Duty",
+      "text": "Text",
+      "save": "Save item",
+      "saved": "Saved",
+      "unsaved": "Unsaved changes",
+      "remove_question": "Remove the item “{{title}}” with its songs?",
+      "remove_confirm": "Remove {{title}}",
+      "conflict": "This item was changed by someone else. What you typed is still here.",
+      "show_theirs": "Show their version",
+      "their_version": "Their version",
+      "use_theirs": "Use their version instead",
+      "keep_mine": "Keep mine and save again"
+    },
+    "add_item": {
+      "title": "Add an item",
+      "type_hint": "The kind cannot be changed later.",
+      "add": "Add item"
+    },
+    "reading": {
+      "title": "Reading",
+      "none": "No reading chosen yet.",
+      "removed": "The reading “{{label}}” was deleted. Choose another.",
+      "clear": "Clear the reading",
+      "search": "Search the saved readings",
+      "search_hint": "Type a reference such as John 3:16.",
+      "no_results": "No saved reading matches.",
+      "add_new": "Add a new reading",
+      "choose_this": "Choose"
+    },
+    "song": {
+      "title": "Songs",
+      "n": "Song {{n}}",
+      "none": "No song yet.",
+      "key": "Key",
+      "note": "Note",
+      "removed": "This song was deleted from the library. Remove it or keep its name.",
+      "removed_title": "Deleted song",
+      "search": "Search the library",
+      "search_hint": "A title, or a hymnal number such as KJ 12.",
+      "no_results": "No song matches.",
+      "add_new": "Add a new song",
+      "add": "Add",
+      "max": "An item can have at most {{max}} songs.",
+      "save_first": "Save the item to add another song."
+    },
+    "sequence": {
+      "title": "Sequence",
+      "none": "No entries yet.",
+      "add": "Add an entry",
+      "fill": "Fill from the default order",
+      "entry_n": "Entry {{n}}",
+      "section": "Section",
+      "part": "Sung by",
+      "key_change": "Key change",
+      "show_lyrics": "Show lyrics",
+      "hide_lyrics": "Hide lyrics",
+      "removed_section": "Deleted section",
+      "choose_section": "Choose a section.",
+      "missing_one": "{{count}} entry has no section. Choose one before saving.",
+      "missing_other": "{{count}} entries have no section. Choose one before saving."
+    },
+    "problems": {
+      "title": "To fix",
+      "song_missing": "Item {{n}} ({{title}}) has no song yet.",
+      "reading_missing": "Item {{n}} ({{title}}) has no reading yet.",
+      "song_removed": "A song of item {{n}} ({{title}}) was deleted from the library.",
+      "reading_removed": "The reading of item {{n}} ({{title}}) was deleted.",
+      "section_removed": "A section in item {{n}} ({{title}}) was deleted from its song.",
+      "unknown": "Item {{n}} ({{title}}) needs attention."
+    },
+    "team": {
+      "title": "Team",
+      "none": "Nobody is assigned yet.",
+      "nobody": "Nobody yet.",
+      "other_duties": "Other duties",
+      "person": "Person",
+      "someone_else": "Someone without an account",
+      "name": "Name",
+      "add": "Add person",
+      "former": "(no longer a member)"
+    },
+    "history": {
+      "title": "Recent changes",
+      "none": "No changes yet."
+    },
+    "edits": {
+      "liturgy_create": "{{who}} created this liturgy",
+      "liturgy_update": "{{who}} changed the details",
+      "item_add": "{{who}} added {{title}}",
+      "item_remove": "{{who}} removed {{title}}",
+      "item_update": "{{who}} changed {{title}}",
+      "item_songs": "{{who}} changed the songs of {{title}}",
+      "item_key": "{{who}} changed the key of {{title}} to {{key}}",
+      "items_reorder": "{{who}} reordered the items",
+      "assignment_add": "{{who}} assigned {{name}}",
+      "assignment_remove": "{{who}} removed {{name}} from a duty",
+      "undo": "{{who}} undid a change",
+      "redo": "{{who}} redid a change",
+      "other": "{{who}} changed the liturgy",
+      "someone": "someone"
+    }
   }
 }

@@ -12,7 +12,8 @@ test("E2E-W-012 duties, singing parts, a template and a service", async ({ brows
   await page.getByRole("navigation", { name: "Main menu" }).getByRole("link", { name: "Liturgies" }).click();
   await expect(page.getByRole("heading", { name: "Liturgies", level: 1 })).toBeVisible();
 
-  // The seeded defaults are there and editable.
+  // The seeded defaults are there and editable. The first tab lists liturgies; the templates are one tab over.
+  await page.getByRole("link", { name: "Templates" }).click();
   await expect(page.getByRole("link", { name: "Ibadah Minggu" })).toBeVisible();
   await page.getByRole("link", { name: "Duties" }).click();
   await expect(page.getByRole("listitem").first()).toContainText("Liturgis");

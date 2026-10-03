@@ -27,6 +27,18 @@ export type TemplateView = Schemas["TemplateView"];
 export type TemplateSummaryView = Schemas["TemplateSummaryView"];
 export type ServiceView = Schemas["ServiceView"];
 
+// Liturgies (10 §4).
+export type LiturgyView = Schemas["LiturgyView"];
+export type LiturgySummaryView = Schemas["LiturgySummaryView"];
+export type LiturgyItemView = Schemas["LiturgyItemView"];
+export type ItemSongView = Schemas["ItemSongView"];
+export type EntryView = Schemas["EntryView"];
+export type AssignmentView = Schemas["AssignmentView"];
+export type EditView = Schemas["EditView"];
+export type OccurrenceView = Schemas["OccurrenceView"];
+export type PrepareWeekView = Schemas["PrepareWeekView"];
+export type PreparedView = Schemas["PreparedView"];
+
 // LookupView is GET /readings/lookup. Huma can't mark a nested object as
 // nullable in OpenAPI either (see Me): reading and provider are null when
 // there is none.

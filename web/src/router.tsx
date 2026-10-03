@@ -14,9 +14,13 @@ import { ReadingPage } from "./routes/library/ReadingPage";
 import { ReadingsPage } from "./routes/library/ReadingsPage";
 import { SongFormPage } from "./routes/library/SongFormPage";
 import { SongPage } from "./routes/library/SongPage";
+import { LiturgiesPage } from "./routes/liturgy/LiturgiesPage";
+import { LiturgyPage } from "./routes/liturgy/LiturgyPage";
+import { NewLiturgyPage } from "./routes/liturgy/NewLiturgyPage";
+import { PreparePage } from "./routes/liturgy/PreparePage";
 import { NotFoundPage } from "./routes/NotFoundPage";
 import { NameListPage } from "./routes/planning/NameListPage";
-import { PlanningIndex, PlanningLayout } from "./routes/planning/PlanningLayout";
+import { PlanningLayout } from "./routes/planning/PlanningLayout";
 import { ServiceFormPage } from "./routes/planning/ServiceFormPage";
 import { ServicesPage } from "./routes/planning/ServicesPage";
 import { TemplateFormPage } from "./routes/planning/TemplateFormPage";
@@ -56,16 +60,19 @@ export const router = createBrowserRouter([
       { path: paths.songNew, element: <SongFormPage /> },
       { path: paths.song, element: <SongPage /> },
       { path: paths.songEdit, element: <SongFormPage /> },
-      { path: paths.planning, element: <PlanningIndex /> },
       {
         element: <PlanningLayout />,
         children: [
+          { path: paths.planning, element: <LiturgiesPage /> },
           { path: paths.templates, element: <TemplatesPage /> },
           { path: paths.services, element: <ServicesPage /> },
           { path: paths.duties, element: <NameListPage list={dutyList} /> },
           { path: paths.singingParts, element: <NameListPage list={partList} /> },
         ],
       },
+      { path: paths.liturgyPrepare, element: <PreparePage /> },
+      { path: paths.liturgyNew, element: <NewLiturgyPage /> },
+      { path: paths.liturgy, element: <LiturgyPage /> },
       { path: paths.templateNew, element: <TemplateFormPage /> },
       { path: paths.template, element: <TemplateFormPage /> },
       { path: paths.serviceNew, element: <ServiceFormPage /> },

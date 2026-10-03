@@ -22,6 +22,9 @@ export const paths = {
   reading: "/library/readings/:id",
   import: "/library/import",
   planning: "/liturgies",
+  liturgyPrepare: "/liturgies/prepare",
+  liturgyNew: "/liturgies/new",
+  liturgy: "/liturgies/:id",
   templates: "/liturgies/templates",
   templateNew: "/liturgies/templates/new",
   template: "/liturgies/templates/:id",
@@ -56,3 +59,6 @@ export const servicePath = (id: string) => paths.service.replace(":id", encodeUR
 
 // importPath fills in an import batch's ID.
 export const importPath = (id: string) => paths.importReview.replace(":id", encodeURIComponent(id));
+
+// liturgyPath fills in a liturgy's ID.
+export const liturgyPath = (id: string) => paths.liturgy.replace(":id", encodeURIComponent(id));

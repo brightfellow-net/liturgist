@@ -7,8 +7,7 @@ import { showPlanning } from "@/lib/scopes";
 import { paths } from "../paths";
 
 // PlanningLayout is the frame of the "Liturgies" section (09 §5): tabs for the
-// templates, services, duties and singing parts. The liturgy list joins the
-// tabs with slice 3C.
+// liturgies, templates, services, duties and singing parts.
 export function PlanningLayout() {
   const { t } = useTranslation();
   const me = useOutletContext<Me>();
@@ -19,6 +18,7 @@ export function PlanningLayout() {
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">{t("planning.title")}</h1>
       <nav aria-label={t("planning.title")} className="flex flex-wrap gap-2 border-b border-border">
+        <NavLink to={paths.planning} end className={tab}>{t("planning.tabs.liturgies")}</NavLink>
         <NavLink to={paths.templates} className={tab}>{t("planning.tabs.templates")}</NavLink>
         <NavLink to={paths.services} className={tab}>{t("planning.tabs.services")}</NavLink>
         <NavLink to={paths.duties} className={tab}>{t("planning.tabs.duties")}</NavLink>
@@ -27,9 +27,4 @@ export function PlanningLayout() {
       <Outlet context={me} />
     </div>
   );
-}
-
-// PlanningIndex sends /liturgies to the first tab until the liturgy list exists.
-export function PlanningIndex() {
-  return <Navigate to={paths.templates} replace />;
 }

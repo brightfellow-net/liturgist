@@ -198,3 +198,69 @@ test.describe("E2E-W-005 accessibility of the planning pages", () => {
     await expectAccessible(page);
   });
 });
+
+test.describe("E2E-W-005 accessibility of the liturgy pages", () => {
+  test("list, prepare, new and the editor with a conflict", async ({ browser }) => {
+    const page = await adminPage(browser);
+    await page.goto("/liturgies");
+    await expect(page.getByRole("heading", { name: "No liturgies yet" })).toBeVisible();
+    await expectAccessible(page);
+
+    await page.goto("/liturgies/prepare");
+    await expect(page.getByText(/^Week of /)).toBeVisible();
+    await expectAccessible(page);
+
+    await page.goto("/liturgies/new");
+    await expect(page.getByRole("heading", { name: "New liturgy", level: 2 })).toBeVisible();
+    await expectAccessible(page);
+
+    // An editor with a text item, a song item with a sequence, and a reading item.
+    const songId = await createSong({ title: "Lagu editor aksesibel", sections: [{ kind: "verse", number: 1, text: "Satu" }, { kind: "chorus", text: "Reff" }] });
+    const api = await adminApi();
+    const date = new Date(Date.now() + 50 * 86_400_000).toISOString().slice(0, 10);
+    const created = await api.post("/api/v1/liturgies", { data: { service_name: "Ibadah aksesibel", date, time: "09:00", template_id: "", language: "id" } });
+    expect(created.status(), await created.text()).toBe(201);
+    const { id, version } = (await created.json()) as { id: string; version: number };
+    let v = version;
+    const add = async (title: string, item_type: string) => {
+      const res = await api.post(`/api/v1/liturgies/${id}/items`, { data: { liturgy_version: v, title, item_type } });
+      expect(res.status(), await res.text()).toBe(201);
+      const body = (await res.json()) as { item: { id: string; version: number }; liturgy_version: number };
+      v = body.liturgy_version;
+      return body.item;
+    };
+    await add("Votum", "free_text");
+    const song = await add("Pujian", "song");
+    await add("Bacaan", "reading");
+    const res = await api.post(`/api/v1/liturgies/${id}/items/${song.id}/songs`, { data: { version: song.version, song_id: songId } });
+    expect(res.status(), await res.text()).toBe(201);
+
+    await page.goto(`/liturgies/${id}`);
+    await expect(page.getByRole("heading", { name: "Ibadah aksesibel", level: 2 })).toBeVisible();
+    await expect(page.getByText(/^Entry 1:/)).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "Loading" })).toHaveCount(0);
+    await expectAccessible(page);
+
+    // The conflict state: another session saves the text first.
+    const other = await adminPage(browser);
+    await other.goto(`/liturgies/${id}`);
+    await other.getByRole("form", { name: /^Item 1:/ }).getByLabel("Text").fill("Dari sesi lain");
+    await other.getByRole("button", { name: "Save item" }).first().click();
+    await expect(other.getByText("Saved", { exact: true })).toBeVisible();
+    await page.getByRole("form", { name: /^Item 1:/ }).getByLabel("Text").fill("Dari sesi ini");
+    await page.getByRole("button", { name: "Save item" }).first().click();
+    await page.getByRole("button", { name: "Show their version" }).click();
+    await expect(page.getByText("Dari sesi lain")).toBeVisible();
+    await expectAccessible(page);
+
+    // It fits a phone without sideways scrolling.
+    await page.setViewportSize({ width: 320, height: 800 });
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+    await page.setViewportSize({ width: 1280, height: 720 });
+
+    expect((await api.delete(`/api/v1/liturgies/${id}`, { data: {} })).status()).toBe(204);
+    expect((await api.delete(`/api/v1/songs/${songId}`, { data: {} })).status()).toBe(204);
+    await api.dispose();
+  });
+});

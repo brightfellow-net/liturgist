@@ -395,7 +395,8 @@
       "templates": "Templat",
       "services": "Ibadah",
       "duties": "Tugas",
-      "parts": "Bagian nyanyian"
+      "parts": "Bagian nyanyian",
+      "liturgies": "Liturgi"
     },
     "read_only": "Anda dapat melihat ini, tetapi hanya anggota yang boleh mengelola templat yang dapat mengubahnya.",
     "name": "Nama",
@@ -591,7 +592,13 @@
     "duty_in_use": "Tugas ini dipakai dalam sebuah liturgi, jadi tidak dapat dihapus.",
     "singing_part_in_use": "Bagian nyanyian ini dipakai dalam sebuah liturgi, jadi tidak dapat dihapus.",
     "template_in_use": "Sebuah ibadah memakai templat ini sebagai bawaannya. Ubah ibadah itu terlebih dahulu.",
-    "limit": "Anda dapat memiliki paling banyak {{max}}."
+    "limit": "Anda dapat memiliki paling banyak {{max}}.",
+    "liturgy_exists": "Sudah ada liturgi untuk ibadah, tanggal, dan jam ini.",
+    "liturgy_locked": "Liturgi ini tidak bisa diubah sekarang. Muat ulang halaman.",
+    "liturgy_not_deletable": "Liturgi yang sudah diterbitkan tidak bisa dihapus. Arsipkan saja.",
+    "assignment_exists": "Orang ini sudah punya tugas ini.",
+    "language_mismatch": "Templat dan liturgi harus berbahasa sama.",
+    "liturgy_limit": "Gereja Anda sudah mencapai batas {{max}} liturgi."
   },
   "import": {
     "title": "Impor lagu",
@@ -699,5 +706,190 @@
     },
     "ol_files": "Pilih berkas OpenLyrics",
     "cp_files": "Pilih berkas ChordPro"
+  },
+  "liturgy": {
+    "back": "Kembali ke daftar liturgi",
+    "date": "Tanggal",
+    "time": "Jam",
+    "not_found": "Liturgi ini tidak ada atau sudah dihapus.",
+    "key_change_to": "ganti ke {{key}}",
+    "moved": "{{title}} dipindah ke urutan {{n}} dari {{total}}.",
+    "removed": "{{title}} dihapus.",
+    "list_conflict": "Daftar butir diubah orang lain. Daftar sudah dimuat ulang; coba lagi.",
+    "locked": "Terkunci: liturgi ini berstatus {{state}}. Saat ini tidak bisa diubah.",
+    "locked_final": "Liturgi ini sudah final dan tidak bisa diubah.",
+    "delete": "Hapus liturgi ini",
+    "delete_question": "Hapus liturgi “{{name}}” tanggal {{date}} beserta semua butir dan riwayatnya? Ini tidak bisa dibatalkan.",
+    "delete_confirm": "Ya, hapus",
+    "states": {
+      "draft": "Draf",
+      "in_review": "Sedang ditinjau",
+      "needs_revision": "Perlu diperbaiki",
+      "approved": "Disetujui",
+      "published": "Diterbitkan",
+      "archived": "Diarsipkan"
+    },
+    "list": {
+      "title": "Liturgi",
+      "intro": "Satu liturgi untuk setiap ibadah: butir, lagu, bacaan, dan siapa bertugas apa.",
+      "upcoming": "Akan datang",
+      "past": "Sudah lewat",
+      "prepare": "Siapkan minggu depan",
+      "new": "Liturgi baru",
+      "empty_title": "Belum ada liturgi",
+      "empty_text": "Liturgi adalah susunan satu ibadah. Pakai “Siapkan minggu depan” untuk membuatnya dari ibadah rutin, atau mulai sendiri.",
+      "empty_viewer": "Liturgi akan tampil di sini setelah diterbitkan.",
+      "no_services": "Anda belum punya ibadah rutin.",
+      "to_services": "Buka daftar ibadah",
+      "none_upcoming": "Belum ada liturgi yang akan datang.",
+      "none_past": "Belum ada liturgi yang sudah lewat.",
+      "items_other": "{{count}} butir",
+      "previous": "Halaman sebelumnya",
+      "next": "Halaman berikutnya"
+    },
+    "prepare": {
+      "title": "Siapkan minggu depan",
+      "intro": "Centang ibadah yang ingin dibuatkan liturginya. Masing-masing dimulai dari templat ibadahnya.",
+      "previous": "Minggu sebelumnya",
+      "next": "Minggu berikutnya",
+      "pick": "Pilih satu hari dalam minggu itu",
+      "week_of": "Minggu {{date}}",
+      "occurrences": "Ibadah minggu ini",
+      "no_services": "Anda belum punya ibadah rutin. Tambahkan dulu, lalu kembali ke sini.",
+      "template": "Templat: {{name}}",
+      "no_template": "Tanpa templat",
+      "exists": "Liturgi sudah ada.",
+      "open": "Buka",
+      "exists_now": "Salah satunya sudah punya liturgi.",
+      "slots": "{{free}} dari {{max}} tempat liturgi masih kosong.",
+      "too_many": "Anda mencentang {{n}}; hanya {{free}} yang bisa dibuat.",
+      "create_other": "Buat {{count}} liturgi"
+    },
+    "new": {
+      "title": "Liturgi baru",
+      "kind": "Jenis ibadah",
+      "regular": "Ibadah rutin",
+      "oneoff": "Ibadah khusus",
+      "service": "Ibadah",
+      "no_services": "Belum ada ibadah rutin. Pilih “Ibadah khusus” atau tambahkan ibadah dulu.",
+      "name": "Nama ibadah",
+      "template": "Templat",
+      "create": "Buat liturgi"
+    },
+    "details": {
+      "edit": "Ubah keterangan",
+      "save": "Simpan keterangan",
+      "saved": "Keterangan disimpan.",
+      "conflict": "Keterangan diubah orang lain. Muat ulang halaman untuk melihatnya."
+    },
+    "items": {
+      "title": "Butir",
+      "none": "Liturgi ini belum punya butir.",
+      "added": "{{title}} ditambahkan.",
+      "max": "Satu liturgi paling banyak {{max}} butir."
+    },
+    "item": {
+      "n": "Butir {{n}}",
+      "title": "Judul",
+      "duty": "Tugas",
+      "text": "Teks",
+      "save": "Simpan butir",
+      "saved": "Tersimpan",
+      "unsaved": "Ada perubahan belum disimpan",
+      "remove_question": "Hapus butir “{{title}}” beserta lagunya?",
+      "remove_confirm": "Hapus {{title}}",
+      "conflict": "Butir ini diubah orang lain. Yang Anda ketik masih ada di sini.",
+      "show_theirs": "Lihat versi mereka",
+      "their_version": "Versi mereka",
+      "use_theirs": "Pakai versi mereka",
+      "keep_mine": "Pertahankan punya saya dan simpan lagi"
+    },
+    "add_item": {
+      "title": "Tambah butir",
+      "type_hint": "Jenis tidak bisa diubah nanti.",
+      "add": "Tambah butir"
+    },
+    "reading": {
+      "title": "Bacaan",
+      "none": "Belum ada bacaan dipilih.",
+      "removed": "Bacaan “{{label}}” sudah dihapus. Pilih yang lain.",
+      "clear": "Kosongkan bacaan",
+      "search": "Cari bacaan tersimpan",
+      "search_hint": "Ketik rujukan, misalnya Yohanes 3:16.",
+      "no_results": "Tidak ada bacaan tersimpan yang cocok.",
+      "add_new": "Tambah bacaan baru",
+      "choose_this": "Pilih"
+    },
+    "song": {
+      "title": "Lagu",
+      "n": "Lagu {{n}}",
+      "none": "Belum ada lagu.",
+      "key": "Nada dasar",
+      "note": "Catatan",
+      "removed": "Lagu ini sudah dihapus dari pustaka. Hapus dari sini atau biarkan namanya.",
+      "removed_title": "Lagu yang dihapus",
+      "search": "Cari di pustaka",
+      "search_hint": "Judul, atau nomor buku nyanyian seperti KJ 12.",
+      "no_results": "Tidak ada lagu yang cocok.",
+      "add_new": "Tambah lagu baru",
+      "add": "Tambah",
+      "max": "Satu butir paling banyak {{max}} lagu.",
+      "save_first": "Simpan butir ini dulu untuk menambah lagu lagi."
+    },
+    "sequence": {
+      "title": "Urutan",
+      "none": "Belum ada isi urutan.",
+      "add": "Tambah baris",
+      "fill": "Isi dari urutan bawaan",
+      "entry_n": "Baris {{n}}",
+      "section": "Bagian",
+      "part": "Dinyanyikan oleh",
+      "key_change": "Ganti nada",
+      "show_lyrics": "Tampilkan syair",
+      "hide_lyrics": "Sembunyikan syair",
+      "removed_section": "Bagian yang dihapus",
+      "choose_section": "Pilih sebuah bagian.",
+      "missing_other": "{{count}} baris belum punya bagian. Pilih dulu sebelum menyimpan."
+    },
+    "problems": {
+      "title": "Perlu dibereskan",
+      "song_missing": "Butir {{n}} ({{title}}) belum ada lagunya.",
+      "reading_missing": "Butir {{n}} ({{title}}) belum ada bacaannya.",
+      "song_removed": "Satu lagu pada butir {{n}} ({{title}}) sudah dihapus dari pustaka.",
+      "reading_removed": "Bacaan pada butir {{n}} ({{title}}) sudah dihapus.",
+      "section_removed": "Satu bagian pada butir {{n}} ({{title}}) sudah dihapus dari lagunya.",
+      "unknown": "Butir {{n}} ({{title}}) perlu diperhatikan."
+    },
+    "team": {
+      "title": "Tim",
+      "none": "Belum ada yang ditugaskan.",
+      "nobody": "Belum ada.",
+      "other_duties": "Tugas lainnya",
+      "person": "Orang",
+      "someone_else": "Orang tanpa akun",
+      "name": "Nama",
+      "add": "Tambah orang",
+      "former": "(bukan anggota lagi)"
+    },
+    "history": {
+      "title": "Perubahan terbaru",
+      "none": "Belum ada perubahan."
+    },
+    "edits": {
+      "liturgy_create": "{{who}} membuat liturgi ini",
+      "liturgy_update": "{{who}} mengubah keterangan",
+      "item_add": "{{who}} menambah {{title}}",
+      "item_remove": "{{who}} menghapus {{title}}",
+      "item_update": "{{who}} mengubah {{title}}",
+      "item_songs": "{{who}} mengubah lagu pada {{title}}",
+      "item_key": "{{who}} mengubah nada dasar {{title}} menjadi {{key}}",
+      "items_reorder": "{{who}} mengubah urutan butir",
+      "assignment_add": "{{who}} menugaskan {{name}}",
+      "assignment_remove": "{{who}} mencabut tugas {{name}}",
+      "undo": "{{who}} membatalkan suatu perubahan",
+      "redo": "{{who}} mengulang suatu perubahan",
+      "other": "{{who}} mengubah liturgi",
+      "someone": "seseorang"
+    }
   }
 }
