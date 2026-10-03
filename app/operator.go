@@ -205,17 +205,41 @@ func (c *Cleanup) Throttle(ctx context.Context) error {
 	})
 }
 
-// Hourly deletes expired sessions, old reset links and expired setup tokens.
-// Invites are never deleted (history).
+// Hourly deletes expired sessions, old reset links, expired setup tokens and
+// import batches untouched for 7 days. Invites are never deleted (history).
 func (c *Cleanup) Hourly(ctx context.Context) error {
 	now := c.Clock.Now()
-	return c.Tx.Write(ctx, func(s Store) error {
+	var churches []domain.ChurchID
+	err := c.Tx.Write(ctx, func(s Store) (err error) {
 		if err := s.Sessions().DeleteExpired(ctx, now); err != nil {
 			return err
 		}
 		if err := s.PasswordResets().DeleteOld(ctx, now.Add(-7*24*time.Hour)); err != nil {
 			return err
 		}
-		return s.SetupTokens().DeleteExpired(ctx, now)
+		if err := s.SetupTokens().DeleteExpired(ctx, now); err != nil {
+			return err
+		}
+		churches, err = s.Churches().IDs(ctx, maxReindexChurches)
+		return err
 	})
+	if err != nil {
+		return err
+	}
+	// Batches belong to a church, so each church is visited under its own
+	// transaction; a failure in one does not stop the others.
+	var first error
+	for _, id := range churches {
+		err := c.Tx.Write(ctx, func(s Store) error {
+			cs, err := s.ForChurch(ctx, id)
+			if err != nil {
+				return err
+			}
+			return cs.Imports().DeleteOlderThan(ctx, now.Add(-domain.ImportBatchTTL))
+		})
+		if err != nil && first == nil {
+			first = err
+		}
+	}
+	return first
 }

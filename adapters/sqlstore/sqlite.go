@@ -125,6 +125,10 @@ var sqliteUniqueNames = map[string]string{ //nolint:gosec // constraint names, n
 	"memberships.church_id, memberships.user_id": "memberships_church_user_key",
 	"memberships.church_id, memberships.id":      "memberships_church_id_key",
 
+	"import_batches.id":                           "import_batches_pkey",
+	"import_batches.church_id, import_batches.id": "import_batches_church_id_key",
+	"import_candidates.id":                        "import_candidates_pkey",
+
 	"readings.id": "readings_pkey",
 	"readings.church_id, readings.reference, readings.translation_id": "readings_church_ref_key",
 

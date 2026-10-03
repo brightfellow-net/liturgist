@@ -86,13 +86,25 @@ type Exporter interface {
 	Export(ctx context.Context, liturgy PublishedVersion, format string, w io.Writer) error
 }
 
-// ImportHint says what kind of document is imported (placeholder; step 2).
-type ImportHint struct{}
+// ImportHint says what kind of document is imported (08 §4).
+type ImportHint struct {
+	Format   domain.ImportFormat
+	Language string // BCP 47, one of domain.ContentLanguages
+	Name     string // file name; for pasted lyrics, the title
+}
 
-// ImportCandidate is one item found in an imported document (placeholder; step 2).
-type ImportCandidate struct{}
+// ImportCandidate is one song found in an imported document. A song that
+// could not be read has Reject set to the reason code instead of a draft (08
+// §4.4); the other songs of the document are still returned.
+type ImportCandidate struct {
+	Draft    domain.SongDraft
+	Warnings []string
+	Reject   string
+}
 
-// Importer finds songs or readings in a document (step 2).
+// Importer finds songs in a document (08 §4). A document that cannot be read
+// at all returns an *ImportUnreadableError. An importer is a pure function of
+// its text: it never writes or fetches anything.
 type Importer interface {
 	Parse(ctx context.Context, r io.Reader, hint ImportHint) ([]ImportCandidate, error)
 }

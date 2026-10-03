@@ -45,6 +45,8 @@ func churchRowsIn(t *testing.T, s app.Store, db *sqlstore.DB, cid string) string
 			"SELECT * FROM song_arrangement_entries WHERE church_id = ? ORDER BY song_id, position",
 			"SELECT * FROM song_search WHERE church_id = ? ORDER BY song_id",
 			"SELECT * FROM readings WHERE church_id = ? ORDER BY id",
+			"SELECT * FROM import_batches WHERE church_id = ? ORDER BY id",
+			"SELECT * FROM import_candidates WHERE church_id = ? ORDER BY id",
 		} {
 			rows, err := sqlstore.RawTx(s).QueryxContext(ctx, db.Dialect().Rebind(q), cid)
 			if err != nil {
@@ -262,6 +264,90 @@ func TestScopedRepositories(t *testing.T) {
 		"Songs.Reindex": func(cs app.ChurchStore, _ time.Time) error {
 			return cs.Songs().Reindex(ctx)
 		},
+		"Songs.FindDuplicate": func(cs app.ChurchStore, _ time.Time) error {
+			d, ok, err := cs.Songs().FindDuplicate(ctx, "", domain.Fold("Cinta Tuhan"), "id")
+			if err != nil || !ok || d.ID != domain.SongID(id("SA1")) {
+				return fmt.Errorf("own song: %+v %v %w", d, ok, err)
+			}
+			if _, ok, err = cs.Songs().FindDuplicate(ctx, "", domain.Fold("Cinta Tuhan B"), "id"); err != nil || ok {
+				return fmt.Errorf("church B's song found through A: %v %w", ok, err)
+			}
+			return nil
+		},
+		"Imports.CreateBatch": func(cs app.ChurchStore, now time.Time) error {
+			b := domain.ImportBatch{ID: domain.ImportBatchID(id("BX")), Format: domain.FormatPaste, Status: domain.ImportOpen,
+				CreatedBy: domain.UserID(id("U1")), CreatedAt: now, UpdatedAt: now}
+			if err := cs.Imports().CreateBatch(ctx, b, []domain.ImportCandidate{testCandidate(id("CX"), b.ID, 0)}); err != nil {
+				return err
+			}
+			// A candidate cannot join church B's batch through church A.
+			bad := testCandidate(id("CY"), domain.ImportBatchID(id("BB1")), 0)
+			if err := cs.Imports().CreateBatch(ctx, domain.ImportBatch{ID: domain.ImportBatchID(id("BY")), Format: domain.FormatPaste,
+				Status: domain.ImportOpen, CreatedBy: domain.UserID(id("U1")), CreatedAt: now, UpdatedAt: now}, []domain.ImportCandidate{bad}); err == nil {
+				return errors.New("a candidate of church A joined church B's batch")
+			}
+			return errRollback
+		},
+		"Imports.Batch": func(cs app.ChurchStore, _ time.Time) error {
+			if b, err := cs.Imports().Batch(ctx, domain.ImportBatchID(id("BA1"))); err != nil || b.Format != domain.FormatPaste {
+				return fmt.Errorf("own batch: %+v %w", b, err)
+			}
+			_, err := cs.Imports().Batch(ctx, domain.ImportBatchID(id("BB1")))
+			return notFound(err)
+		},
+		"Imports.OpenBatches": func(cs app.ChurchStore, _ time.Time) error {
+			list, err := cs.Imports().OpenBatches(ctx)
+			if err != nil || len(list) != 1 || list[0].ID != domain.ImportBatchID(id("BA1")) {
+				return fmt.Errorf("open batches: %+v %w", list, err)
+			}
+			return nil
+		},
+		"Imports.Candidates": func(cs app.ChurchStore, _ time.Time) error {
+			own, err := cs.Imports().Candidates(ctx, domain.ImportBatchID(id("BA1")))
+			if err != nil || len(own) != 1 || own[0].Draft.Title != "Cinta Tuhan" {
+				return fmt.Errorf("own candidates: %+v %w", own, err)
+			}
+			other, err := cs.Imports().Candidates(ctx, domain.ImportBatchID(id("BB1")))
+			if err != nil || len(other) != 0 {
+				return fmt.Errorf("church B's candidates through A: %+v %w", other, err)
+			}
+			return nil
+		},
+		"Imports.Candidate": func(cs app.ChurchStore, _ time.Time) error {
+			if c, err := cs.Imports().Candidate(ctx, domain.ImportBatchID(id("BA1")), domain.ImportCandidateID(id("CA1"))); err != nil || c.Position != 0 {
+				return fmt.Errorf("own candidate: %+v %w", c, err)
+			}
+			_, err := cs.Imports().Candidate(ctx, domain.ImportBatchID(id("BB1")), domain.ImportCandidateID(id("CB1")))
+			return notFound(err)
+		},
+		"Imports.UpdateCandidate": func(cs app.ChurchStore, _ time.Time) error {
+			c := testCandidate(id("CB1"), domain.ImportBatchID(id("BB1")), 0)
+			c.Decision = domain.DecisionSkip
+			return cs.Imports().UpdateCandidate(ctx, c) // matches no row of church A
+		},
+		"Imports.SetBatch": func(cs app.ChurchStore, now time.Time) error {
+			return cs.Imports().SetBatch(ctx, domain.ImportBatchID(id("BB1")), domain.ImportClosed, now.Add(time.Hour))
+		},
+		"Imports.Unfinished": func(cs app.ChurchStore, _ time.Time) error {
+			n, err := cs.Imports().Unfinished(ctx, domain.ImportBatchID(id("BB1")))
+			if err == nil && n != 0 {
+				err = fmt.Errorf("church B's candidates counted through A: %d", n)
+			}
+			return err
+		},
+		"Imports.DeleteBatch": func(cs app.ChurchStore, _ time.Time) error {
+			return notFound(cs.Imports().DeleteBatch(ctx, domain.ImportBatchID(id("BB1"))))
+		},
+		"Imports.DeleteOlderThan": func(cs app.ChurchStore, now time.Time) error {
+			if err := cs.Imports().DeleteOlderThan(ctx, now.Add(24*time.Hour)); err != nil {
+				return err
+			}
+			list, err := cs.Imports().OpenBatches(ctx)
+			if err == nil && len(list) != 0 {
+				err = fmt.Errorf("own old batch kept: %+v", list)
+			}
+			return err
+		},
 		"Readings.ByID": func(cs app.ChurchStore, _ time.Time) error {
 			r, err := cs.Readings().ByID(ctx, domain.ReadingID(id("RDA1")))
 			if err != nil || r.Reference != "JHN 3:16" || r.Translation.Code != "TB" {
@@ -361,8 +447,18 @@ func TestScopedRepositories(t *testing.T) {
 			if err := a.Readings().Create(ctx, ra); err != nil {
 				return err
 			}
+			ba := domain.ImportBatch{ID: domain.ImportBatchID(id("BA1")), Format: domain.FormatPaste, Status: domain.ImportOpen,
+				CreatedBy: domain.UserID(id("U1")), CreatedAt: f.now, UpdatedAt: f.now}
+			if err := a.Imports().CreateBatch(ctx, ba, []domain.ImportCandidate{testCandidate(id("CA1"), ba.ID, 0)}); err != nil {
+				return err
+			}
 			b, err := s.ForChurch(ctx, domain.ChurchID(id("CHB")))
 			if err != nil {
+				return err
+			}
+			bb := domain.ImportBatch{ID: domain.ImportBatchID(id("BB1")), Format: domain.FormatPaste, Status: domain.ImportOpen,
+				CreatedBy: domain.UserID(id("U1")), CreatedAt: f.now, UpdatedAt: f.now}
+			if err := b.Imports().CreateBatch(ctx, bb, []domain.ImportCandidate{testCandidate(id("CB1"), bb.ID, 0), testCandidate(id("CB2"), bb.ID, 1)}); err != nil {
 				return err
 			}
 			if err := b.Songs().CreateGroup(ctx, domain.SongGroupID(id("GB")), f.now); err != nil {
@@ -563,4 +659,11 @@ func testReading(readingID, reference string, now time.Time) domain.Reading {
 		Translation: domain.Translation{ID: tb, Code: "TB", Language: "id"},
 		Text:        "Karena begitu besar kasih Allah", SourceProvider: "manual", Version: 1, CreatedAt: now, UpdatedAt: now,
 	}
+}
+
+func testCandidate(candidateID string, batch domain.ImportBatchID, position int) domain.ImportCandidate {
+	return domain.ImportCandidate{ID: domain.ImportCandidateID(candidateID), BatchID: batch, Position: position,
+		Draft: domain.SongDraft{Language: "id", Title: "Cinta Tuhan", AltTitles: []string{},
+			Sections: []domain.DraftSection{{Kind: domain.SectionVerse, Number: 1, Text: "baris"}}, DefaultArrangement: []int{}},
+		Decision: domain.DecisionPending, Warnings: []string{}}
 }

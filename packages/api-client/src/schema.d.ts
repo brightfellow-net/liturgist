@@ -90,6 +90,110 @@ export interface paths {
         patch: operations["updateChurch"];
         trace?: never;
     };
+    "/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Imports that are not finished */
+        get: operations["listImports"];
+        put?: never;
+        /** Parse files into an import batch */
+        post: operations["createImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/imports/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An import batch with its candidates */
+        get: operations["getImport"];
+        put?: never;
+        post?: never;
+        /** Discard an import batch */
+        delete: operations["deleteImport"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/imports/{id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create or merge the chosen songs */
+        post: operations["applyImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/imports/{id}/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Accept, merge or skip candidates */
+        patch: operations["decideImportCandidates"];
+        trace?: never;
+    };
+    "/imports/{id}/candidates/{cid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change a candidate's draft */
+        patch: operations["updateImportCandidate"];
+        trace?: never;
+    };
+    "/imports/{id}/candidates/{cid}/merge-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What merging a candidate would change */
+        get: operations["previewImportMerge"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/invites": {
         parameters: {
             query?: never;
@@ -566,6 +670,27 @@ export interface components {
             name: string;
             password: string;
         };
+        ApplyFailureView: {
+            candidate_id: string;
+            code: string;
+        };
+        ApplyResultView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/ApplyResultView.json
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            created: number;
+            failed: components["schemas"]["ApplyFailureView"][] | null;
+            /** Format: int64 */
+            merged: number;
+            /** Format: int64 */
+            skipped: number;
+            /** @enum {string} */
+            status: "open" | "closed";
+        };
         ChangePasswordRequest: {
             /**
              * Format: uri
@@ -607,6 +732,23 @@ export interface components {
             name: string;
             privacy_contact: string | null;
             time_zone: string;
+        };
+        CreateImportRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/CreateImportRequest.json
+             */
+            readonly $schema?: string;
+            /** @description at most 200; pasted lyrics: exactly one */
+            files: components["schemas"]["Item2"][] | null;
+            /** @enum {string} */
+            format: "paste" | "openlyrics" | "chordpro";
+            /**
+             * @description default: the church's content language
+             * @enum {string}
+             */
+            language?: "id" | "en" | "zh-Hans" | "zh-Hant";
         };
         CreateInviteRequest: {
             /**
@@ -695,6 +837,32 @@ export interface components {
             /** @description Shown only now and after regenerating */
             link: string;
         };
+        DecideImportCandidatesRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/DecideImportCandidatesRequest.json
+             */
+            readonly $schema?: string;
+            decisions: components["schemas"]["Item3"][] | null;
+        };
+        DraftSectionBody: {
+            /** @enum {string} */
+            kind: "verse" | "pre_chorus" | "chorus" | "bridge" | "tag" | "intro" | "ending" | "other";
+            label?: string;
+            /**
+             * Format: int64
+             * @description verses only (1-99)
+             */
+            number?: number;
+            text: string;
+        };
+        DuplicateView: {
+            hymnal_number: string;
+            hymnal_source: string;
+            id: string;
+            title: string;
+        };
         ErrorDetail: {
             /** @description Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id' */
             location?: string;
@@ -702,6 +870,63 @@ export interface components {
             message?: string;
             /** @description The value at the given location */
             value?: unknown;
+        };
+        ImportBatchView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/ImportBatchView.json
+             */
+            readonly $schema?: string;
+            candidates: components["schemas"]["ImportCandidateView"][] | null;
+            /** Format: date-time */
+            created_at: string;
+            id: string;
+            rejected: components["schemas"]["ImportRejectedView"][] | null;
+            /** @enum {string} */
+            source_format: "paste" | "openlyrics" | "chordpro";
+            /** @enum {string} */
+            status: "open" | "closed";
+            /** Format: date-time */
+            updated_at: string;
+        };
+        ImportCandidateView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/ImportCandidateView.json
+             */
+            readonly $schema?: string;
+            applied_song_id?: string;
+            /** @enum {string} */
+            decision: "pending" | "accept" | "merge" | "skip";
+            draft: components["schemas"]["SongDraftBody"];
+            /** @description absent when there is none */
+            duplicate_of?: components["schemas"]["DuplicateView"];
+            error_code?: string;
+            id: string;
+            merge_into?: string;
+            /** Format: int64 */
+            merge_target_version?: number;
+            /** @enum {string} */
+            outcome?: "applied" | "failed";
+            remove_unmatched: boolean;
+            warnings: string[] | null;
+        };
+        ImportRejectedView: {
+            name: string;
+            reason: string;
+            /** Format: int64 */
+            song_index: number;
+        };
+        ImportSummaryView: {
+            /** Format: date-time */
+            created_at: string;
+            id: string;
+            /** @enum {string} */
+            source_format: "paste" | "openlyrics" | "chordpro";
+            /** Format: date-time */
+            updated_at: string;
         };
         InviteActions: {
             cancel: boolean;
@@ -747,6 +972,23 @@ export interface components {
             description: string;
             scope: string;
         };
+        Item2: {
+            /** @description the file name; for pasted lyrics, the title */
+            name: string;
+            text: string;
+        };
+        Item3: {
+            /** @enum {string} */
+            decision: "pending" | "accept" | "merge" | "skip";
+            id: string;
+            merge_into?: string;
+            /**
+             * Format: int64
+             * @description the target_version of the merge preview
+             */
+            merge_target_version?: number;
+            remove_unmatched?: boolean;
+        };
         LinkSongRequest: {
             /**
              * Format: uri
@@ -766,6 +1008,15 @@ export interface components {
             /** Format: date-time */
             expires_at: string;
             link: string;
+        };
+        ListImportsResponse: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/ListImportsResponse.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["ImportSummaryView"][] | null;
         };
         LoginRequest: {
             /**
@@ -849,6 +1100,24 @@ export interface components {
             id: string;
             roles: components["schemas"]["RoleRef"][] | null;
             scopes: string[] | null;
+        };
+        MergePreviewView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/MergePreviewView.json
+             */
+            readonly $schema?: string;
+            sections: components["schemas"]["MergeSectionView"][] | null;
+            /** Format: int64 */
+            target_version: number;
+        };
+        MergeSectionView: {
+            label: string;
+            new_text?: string;
+            old_text?: string;
+            /** @enum {string} */
+            status: "updated" | "new" | "kept" | "removed";
         };
         ParsedReferenceView: {
             /**
@@ -1051,6 +1320,27 @@ export interface components {
             delete: boolean;
             edit: boolean;
         };
+        SongDraftBody: {
+            alt_titles: string[] | null;
+            ccli_song_number?: string;
+            composer?: string;
+            copyright_holder?: string;
+            copyright_line?: string;
+            /** @description indexes into sections */
+            default_arrangement: number[] | null;
+            default_key?: string;
+            hymnal_number?: string;
+            hymnal_source?: string;
+            /** @enum {string} */
+            language: "id" | "en" | "zh-Hans" | "zh-Hant";
+            licence_notes?: string;
+            /** @enum {string} */
+            licence_status?: "unknown" | "public_domain" | "church_licence" | "permission_obtained";
+            lyricist?: string;
+            sections: components["schemas"]["DraftSectionBody"][] | null;
+            title: string;
+            translator?: string;
+        };
         SongListOutputBody: {
             /**
              * Format: uri
@@ -1186,6 +1476,15 @@ export interface components {
             /** @description null or "" clears */
             privacy_contact?: string | null;
             time_zone?: string;
+        };
+        UpdateImportCandidateRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/UpdateImportCandidateRequest.json
+             */
+            readonly $schema?: string;
+            draft: components["schemas"]["SongDraftBody"];
         };
         UpdateMeRequest: {
             /**
@@ -1456,6 +1755,266 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChurchView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listImports: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListImportsResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    createImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportBatchView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportBatchView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    deleteImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    applyImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplyResultView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    decideImportCandidates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecideImportCandidatesRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportBatchView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    updateImportCandidate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                cid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateImportCandidateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportCandidateView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    previewImportMerge: {
+        parameters: {
+            query?: {
+                /** @description the song to merge into */
+                merge_into?: string;
+                remove_unmatched?: boolean;
+            };
+            header?: never;
+            path: {
+                id: string;
+                cid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MergePreviewView"];
                 };
             };
             /** @description Error */

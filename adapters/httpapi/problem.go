@@ -105,6 +105,8 @@ func MapError(ctx context.Context, err error, log *slog.Logger) error {
 		group    *app.GroupConflictError
 		badRef   *domain.ReferenceError
 		exists   *app.ReadingExistsError
+		unread   *app.ImportUnreadableError
+		impConf  *app.ImportConflictError
 	)
 	info := RequestInfoFrom(ctx)
 	switch {
@@ -156,6 +158,16 @@ func MapError(ctx context.Context, err error, log *slog.Logger) error {
 		p := problem(http.StatusConflict, "reading_exists", "This reading is already saved.")
 		p.ReadingID = string(exists.ID)
 		return p
+	case errors.As(err, &unread):
+		p := problem(http.StatusUnprocessableEntity, "import_unreadable", "This file can't be imported.")
+		p.Reason = unread.Reason
+		return p
+	case errors.As(err, &impConf):
+		p := problem(http.StatusConflict, "import_conflict", "This import can't be changed that way.")
+		p.Reason = impConf.Reason
+		return p
+	case errors.Is(err, app.ErrImportTooLarge):
+		return problem(http.StatusRequestEntityTooLarge, "validation_failed", "That is too much at once.")
 	case errors.As(err, &group):
 		p := problem(http.StatusConflict, "group_conflict", "These songs can't be linked.")
 		p.Reason = group.Reason

@@ -15,6 +15,9 @@ import (
 
 	"github.com/brightfellow-net/liturgist/adapters/argon2pw"
 	"github.com/brightfellow-net/liturgist/adapters/entitlements/unlimited"
+	"github.com/brightfellow-net/liturgist/adapters/importers/chordpro"
+	"github.com/brightfellow-net/liturgist/adapters/importers/openlyrics"
+	"github.com/brightfellow-net/liturgist/adapters/importers/paste"
 	"github.com/brightfellow-net/liturgist/adapters/sqlstore"
 	"github.com/brightfellow-net/liturgist/adapters/sqlstore/sqlstoretest"
 	"github.com/brightfellow-net/liturgist/adapters/tenancy"
@@ -50,6 +53,7 @@ type cenv struct {
 	usage    *usageStub
 	readings *app.Readings
 	readUse  *readingUsageStub
+	imports  *app.Imports
 	operator *app.Operator
 	account  *app.Account
 	auth     *app.Auth
@@ -70,8 +74,11 @@ func wireChurch(t *testing.T, db *sqlstore.DB, ent app.Entitlements) cenv {
 	}
 	usage := &usageStub{}
 	readUse := &readingUsageStub{}
+	songs := &app.Songs{Tx: db, Clock: c, IDs: ids, Usage: usage}
 	return cenv{t: t, db: db, clock: c, ids: ids, auth: auth, usage: usage, readUse: readUse,
-		songs:    &app.Songs{Tx: db, Clock: c, IDs: ids, Usage: usage},
+		songs: songs,
+		imports: &app.Imports{Tx: db, Clock: c, IDs: ids, Songs: songs, Importers: map[domain.ImportFormat]app.Importer{
+			domain.FormatPaste: paste.Importer{}, domain.FormatChordPro: chordpro.Importer{}, domain.FormatOpenLyrics: openlyrics.Importer{}}},
 		readings: &app.Readings{Tx: db, Clock: c, IDs: ids, Usage: readUse},
 		setup:    &app.Setup{Tx: db, Hasher: h, Clock: c, IDs: ids, Auth: auth},
 		churches: &app.Churches{Tx: db, Clock: c},

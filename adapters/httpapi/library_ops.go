@@ -18,6 +18,7 @@ import (
 type LibraryDeps struct {
 	Songs    *app.Songs
 	Readings *app.Readings
+	Imports  *app.Imports
 	Log      *slog.Logger
 }
 
@@ -51,6 +52,7 @@ type songListOutput struct {
 // RegisterLibrary registers the song library (06 §3) and readings (07 §4) operations.
 func RegisterLibrary(api huma.API, d LibraryDeps) {
 	registerReadings(api, d)
+	registerImports(api, d)
 	fail := func(ctx context.Context, err error) error { return MapError(ctx, err, d.Log) }
 	sess := func(ctx context.Context) *domain.Session { return RequestInfoFrom(ctx).Session }
 	songOp := func(id, method, path string, status int, summary string) huma.Operation {

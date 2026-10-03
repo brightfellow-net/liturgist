@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io/fs"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -238,6 +239,15 @@ func TestUniqueConstraintNames(t *testing.T) {
 				f.must(readingInsert, id("RD2"), id("CHA"), "PSA 2", "PSA 2", tb, "x", "", "manual", "x", 1, f.ts(0), f.ts(0))
 				return f.exec(readingInsert, id("RD3"), id("CHA"), "PSA 2", "Mzm 2", tb, "y", "", "manual", "y", 1, f.ts(0), f.ts(0))
 			},
+			"import_batches_pkey": func() error {
+				f.must(batchInsert, id("BT1"), id("CHA"), "paste", "open", id("U1"), f.ts(0), f.ts(0))
+				return f.exec(batchInsert, id("BT1"), id("CHB"), "paste", "open", id("U1"), f.ts(0), f.ts(0))
+			},
+			"import_candidates_pkey": func() error {
+				f.must(batchInsert, id("BT2"), id("CHA"), "paste", "open", id("U1"), f.ts(0), f.ts(0))
+				f.must(candInsert, id("CN1"), id("CHA"), id("BT2"), 0, "pending", nil, nil, false, nil, nil, nil)
+				return f.exec(candInsert, id("CN1"), id("CHA"), id("BT2"), 1, "pending", nil, nil, false, nil, nil, nil)
+			},
 			"song_search_pkey": func() error {
 				if db.Dialect().Name() == "postgres" { // its tsvector columns are NOT NULL
 					return f.exec(`INSERT INTO song_search (church_id, song_id, language, head_fold, lyrics_fold, fts_head, fts_lyrics)
@@ -466,6 +476,93 @@ func TestReadingConstraints(t *testing.T) {
 		f.must(`DELETE FROM churches WHERE id = ?`, id("CHB"))
 		if n := count(t, db, "SELECT count(*) FROM readings WHERE church_id = ?", id("CHB")); n != 0 {
 			t.Errorf("%d readings left after deleting their church", n)
+		}
+	})
+}
+
+const (
+	batchInsert = `INSERT INTO import_batches (id, church_id, source_format, status, created_by, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`
+	candInsert = `INSERT INTO import_candidates (id, church_id, batch_id, position, kind, draft, decision, merge_into,
+		merge_target_version, remove_unmatched, warnings, outcome, applied_song_id, error_code)
+		VALUES (?, ?, ?, ?, 'song', '{}', ?, ?, ?, ?, '[]', ?, ?, ?)`
+)
+
+// IT-I constraints: the import tables reject rows the application never writes (08 §2.1, schema.md).
+func TestImportConstraints(t *testing.T) {
+	sqlstoretest.ForEachDialect(t, func(t *testing.T, db *sqlstore.DB) {
+		f := base(t, db)
+		f.must(batchInsert, id("BT1"), id("CHA"), "paste", "open", id("U1"), f.ts(0), f.ts(0))
+		n := 0
+		cand := func(decision string, mergeInto any, version any, outcome, song, code any) error {
+			n++
+			return f.exec(candInsert, id("CN"+strconv.Itoa(n)), id("CHA"), id("BT1"), n, decision, mergeInto, version, false, outcome, song, code)
+		}
+		for name, write := range map[string]func() error{
+			"unknown format": func() error {
+				return f.exec(batchInsert, id("BT2"), id("CHA"), "docx", "open", id("U1"), f.ts(0), f.ts(0))
+			},
+			"unknown status": func() error {
+				return f.exec(batchInsert, id("BT2"), id("CHA"), "paste", "done", id("U1"), f.ts(0), f.ts(0))
+			},
+			"short ID": func() error {
+				return f.exec(batchInsert, "short", id("CHA"), "paste", "open", id("U1"), f.ts(0), f.ts(0))
+			},
+			"unknown decision":               func() error { return cand("maybe", nil, nil, nil, nil, nil) },
+			"merge without target":           func() error { return cand("merge", nil, 1, nil, nil, nil) },
+			"merge without version":          func() error { return cand("merge", id("S1"), nil, nil, nil, nil) },
+			"target without merge":           func() error { return cand("accept", id("S1"), 1, nil, nil, nil) },
+			"unknown outcome":                func() error { return cand("accept", nil, nil, "done", nil, nil) },
+			"outcome of a pending candidate": func() error { return cand("pending", nil, nil, "failed", nil, "x") },
+			"outcome of a skipped candidate": func() error { return cand("skip", nil, nil, "applied", id("S1"), nil) },
+			"applied without a song":         func() error { return cand("accept", nil, nil, "applied", nil, nil) },
+			"song without applied":           func() error { return cand("accept", nil, nil, nil, id("S1"), nil) },
+			"failed without a code":          func() error { return cand("accept", nil, nil, "failed", nil, nil) },
+			"code without failed":            func() error { return cand("accept", nil, nil, nil, nil, "x") },
+			"negative position": func() error {
+				return f.exec(candInsert, id("CNZ"), id("CHA"), id("BT1"), -1, "pending", nil, nil, false, nil, nil, nil)
+			},
+		} {
+			if err := write(); !errors.Is(err, app.ErrInvalid) {
+				t.Errorf("%s: want ErrInvalid, got %v", name, err)
+			}
+		}
+		for name, write := range map[string]func() error{
+			"unknown church": func() error {
+				return f.exec(batchInsert, id("BT3"), "NOPE", "paste", "open", id("U1"), f.ts(0), f.ts(0))
+			},
+			"unknown user": func() error {
+				return f.exec(batchInsert, id("BT3"), id("CHA"), "paste", "open", "NOPE", f.ts(0), f.ts(0))
+			},
+			"batch of another church": func() error {
+				return f.exec(candInsert, id("CNQ"), id("CHB"), id("BT1"), 0, "pending", nil, nil, false, nil, nil, nil)
+			},
+		} {
+			if err := write(); !errors.Is(err, app.ErrReferenced) {
+				t.Errorf("%s: want ErrReferenced, got %v", name, err)
+			}
+		}
+		// Rows the application writes are accepted.
+		for name, write := range map[string]func() error{
+			"pending":       func() error { return cand("pending", nil, nil, nil, nil, nil) },
+			"merge":         func() error { return cand("merge", id("S1"), 2, nil, nil, nil) },
+			"failed accept": func() error { return cand("accept", nil, nil, "failed", nil, "validation_failed") },
+			"applied merge": func() error { return cand("merge", id("S1"), 2, "applied", id("S1"), nil) },
+			"skip":          func() error { return cand("skip", nil, nil, nil, nil, nil) },
+		} {
+			if err := write(); err != nil {
+				t.Errorf("%s: %v", name, err)
+			}
+		}
+		// Deleting a church or a batch removes the candidates.
+		f.must(`DELETE FROM import_batches WHERE id = ?`, id("BT1"))
+		if c := count(t, db, "SELECT count(*) FROM import_candidates WHERE church_id = ?", id("CHA")); c != 0 {
+			t.Errorf("%d candidates left after deleting their batch", c)
+		}
+		f.must(batchInsert, id("BT4"), id("CHB"), "chordpro", "closed", id("U1"), f.ts(0), f.ts(0))
+		f.must(`DELETE FROM churches WHERE id = ?`, id("CHB"))
+		if c := count(t, db, "SELECT count(*) FROM import_batches WHERE church_id = ?", id("CHB")); c != 0 {
+			t.Errorf("%d batches left after deleting their church", c)
 		}
 	})
 }

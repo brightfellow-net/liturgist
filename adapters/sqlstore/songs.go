@@ -6,6 +6,7 @@ package sqlstore
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"strings"
 	"time"
 
@@ -380,4 +381,27 @@ func (r songRepo) Reindex(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+func (r songRepo) FindDuplicate(ctx context.Context, hymnalKey, titleKey, language string) (app.DuplicateRef, bool, error) {
+	var d app.DuplicateRef
+	find := func(where string, args ...any) (bool, error) {
+		err := r.tx.QueryRowContext(ctx, r.d.Rebind(`SELECT id, title, hymnal_source, hymnal_number FROM songs
+			WHERE church_id = ? AND `+where+` ORDER BY created_at, id LIMIT 1`), append([]any{r.churchID}, args...)...).
+			Scan(&d.ID, &d.Title, &d.HymnalSource, &d.HymnalNumber)
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return err == nil, r.d.MapError(err)
+	}
+	if hymnalKey != "" {
+		if ok, err := find("hymnal_key = ?", hymnalKey); ok || err != nil {
+			return d, ok, err
+		}
+	}
+	if titleKey == "" {
+		return d, false, nil
+	}
+	ok, err := find("title_key = ? AND language = ?", titleKey, language)
+	return d, ok, err
 }

@@ -342,6 +342,8 @@ func TestTenancyDeclarations(t *testing.T) {
 		"linkSong": "church", "unlinkSong": "church",
 		"parseReference": "church", "lookupReading": "church", "listReadings": "church", "getReading": "church",
 		"createReading": "church", "createReadingFromProvider": "church", "updateReading": "church", "deleteReading": "church",
+		"createImport": "church", "listImports": "church", "getImport": "church", "updateImportCandidate": "church",
+		"decideImportCandidates": "church", "previewImportMerge": "church", "applyImport": "church", "deleteImport": "church",
 		"saasExtra": "church", // added through WithRoutes without a declaration
 	}
 	extra := WithRoutes(func(api huma.API) {
