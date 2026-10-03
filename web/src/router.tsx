@@ -5,6 +5,9 @@ import { AppLayout } from "./routes/AppLayout";
 import { HomePage } from "./routes/HomePage";
 import { InvitePage } from "./routes/InvitePage";
 import { LoginPage } from "./routes/LoginPage";
+import { LibraryPage } from "./routes/library/LibraryPage";
+import { SongFormPage } from "./routes/library/SongFormPage";
+import { SongPage } from "./routes/library/SongPage";
 import { NotFoundPage } from "./routes/NotFoundPage";
 import { PrivacyPage } from "./routes/PrivacyPage";
 import { ProfilePage } from "./routes/ProfilePage";
@@ -26,6 +29,10 @@ export const router = createBrowserRouter([
     element: <AppLayout />,
     children: [
       { path: paths.home, element: <HomePage /> },
+      { path: paths.library, element: <LibraryPage /> },
+      { path: paths.songNew, element: <SongFormPage /> },
+      { path: paths.song, element: <SongPage /> },
+      { path: paths.songEdit, element: <SongFormPage /> },
       { path: paths.profile, element: <ProfilePage /> },
       {
         element: <SettingsLayout />,

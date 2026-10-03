@@ -14,6 +14,11 @@ export type MemberView = Schemas["MemberView"];
 export type InviteView = Schemas["InviteView"];
 export type RoleView = Schemas["RoleView"];
 export type ScopeInfo = Schemas["Item1"]; // GET /scopes item
+export type SongView = Schemas["SongView"];
+export type SongSummaryView = Schemas["SongSummaryView"];
+export type SectionView = Schemas["SectionView"];
+export type SongSection = Schemas["SongSection"];
+export type SongRefView = Schemas["SongRefView"];
 
 // Me is GET /me. Huma can't mark a nested object as nullable in OpenAPI, so
 // the generated type misses that church and membership are null before

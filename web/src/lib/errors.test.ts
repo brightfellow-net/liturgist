@@ -42,6 +42,15 @@ describe("TC-W-002 error messages", () => {
     );
   });
 
+  it("explains why songs cannot be linked, by reason", () => {
+    expect(errorText(t, apiError(409, { code: "group_conflict", reason: "language_taken" }))).toBe("There is already a version in this language.");
+    expect(errorText(t, apiError(409, { code: "group_conflict", reason: "already_grouped" }))).toBe(
+      "One of these songs is already linked to other versions. Unlink it first.",
+    );
+    expect(errorText(t, apiError(409, { code: "group_conflict" }))).toBe("These songs can't be linked.");
+    expect(errorText(t, apiError(409, { code: "version_conflict" }))).toBe("This song was changed by someone else. Reload to see their version.");
+  });
+
   it("explains network failures", () => {
     expect(errorText(t, new NetworkError("x"))).toBe("Can't reach the server. Check your connection.");
   });

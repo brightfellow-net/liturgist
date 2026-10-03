@@ -73,6 +73,7 @@ export function AppLayout() {
           <p className="mr-4 font-semibold">{me.data.church?.name ?? t("app.name")}</p>
           <nav aria-label={t("nav.label")} className="flex flex-1 flex-wrap gap-1">
             <NavLink to={paths.home} end className={link}>{t("nav.home")}</NavLink>
+            <NavLink to={paths.library} className={link}>{t("nav.library")}</NavLink>
             <NavLink to={paths.profile} className={link}>{t("nav.profile")}</NavLink>
             {showSettings(me.data) && (
               <NavLink to={paths.churchSettings} className={(s) => link({ isActive: s.isActive || settingsPaths.includes(location.pathname) })}>

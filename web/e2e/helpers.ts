@@ -65,3 +65,15 @@ export async function expectAccessible(page: Page): Promise<void> {
   }
   await page.emulateMedia({ colorScheme: null });
 }
+
+// createSong adds a song through the API as the church admin and returns its ID.
+export async function createSong(song: { title: string; language?: string; hymnal_source?: string; hymnal_number?: string; sections: { kind: string; number?: number; text: string }[] }): Promise<string> {
+  const api = await adminApi();
+  const res = await api.post("/api/v1/songs", {
+    data: { language: "id", ...song, sections: song.sections.map((s, i) => ({ key: "k" + i, ...s })) },
+  });
+  expect(res.status(), await res.text()).toBe(201);
+  const { id } = (await res.json()) as { id: string };
+  await api.dispose();
+  return id;
+}
