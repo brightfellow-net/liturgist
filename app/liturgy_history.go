@@ -98,20 +98,32 @@ func imageOfAssignment(a domain.Assignment) assignmentImage {
 	return assignmentImage{ID: string(a.ID), DutyID: string(a.DutyID), UserID: string(a.UserID), Name: a.Name}
 }
 
-// record writes the history row of a change (10 §7): the number from
+// record writes the history row of an editing change (10 §7): the number from
 // edit_seq, taken last so the row lock of the liturgy is held to the commit
 // (10 §5), then the row, in the caller's transaction. before and after are
 // nil or a value that marshals to a JSON image. itemVersion is 0 when the
-// change is not about one item.
+// change is not about one item. Like any new editing command it turns the
+// caller's undone edits into dropped (11 §7.2).
 func (u *Liturgies) record(ctx context.Context, sc churchScope, id domain.LiturgyID, cmd string, item domain.ItemID,
 	liturgyVersion, itemVersion int, before, after any) error {
 	seq, err := sc.cs.Liturgies().NextSeq(ctx, id)
 	if err != nil {
 		return err
 	}
-	e := domain.Edit{ID: domain.EditID(u.IDs.NewID()), LiturgyID: id, Seq: seq, UserID: sc.actor.UserID, Command: cmd,
-		ItemID: item, LiturgyVersionAfter: liturgyVersion, ItemVersionAfter: itemVersion, Status: domain.EditDone,
-		CreatedAt: u.Clock.Now()}
+	e := domain.Edit{Seq: seq, Command: cmd, ItemID: item, LiturgyVersionAfter: liturgyVersion, ItemVersionAfter: itemVersion}
+	if err := u.append(ctx, sc, id, e, before, after); err != nil {
+		return err
+	}
+	if domain.Editing(cmd) {
+		return sc.cs.Edits().DropUndone(ctx, sc.actor.UserID, id)
+	}
+	return nil
+}
+
+// append fills the common fields of e, marshals the images and stores the row.
+func (u *Liturgies) append(ctx context.Context, sc churchScope, id domain.LiturgyID, e domain.Edit, before, after any) error {
+	var err error
+	e.ID, e.LiturgyID, e.UserID, e.Status, e.CreatedAt = domain.EditID(u.IDs.NewID()), id, sc.actor.UserID, domain.EditDone, u.Clock.Now()
 	if before != nil {
 		if e.Before, err = json.Marshal(before); err != nil {
 			return err

@@ -156,6 +156,33 @@ type EditView struct {
 	CreatedAt           time.Time       `json:"created_at"`
 }
 
+// UndoResultView is the answer of an undo or redo.
+type UndoResultView struct {
+	Edit           UndoneEditView `json:"edit" doc:"the edit that was undone or redone, with its new status"`
+	LiturgyVersion int            `json:"liturgy_version"`
+	ItemID         *string        `json:"item_id" doc:"the item the change was about, null when none" nullable:"true"`
+	ItemVersion    *int           `json:"item_version" doc:"its version after the change, null when none" nullable:"true"`
+}
+
+// UndoneEditView names the edit an undo or redo acted on.
+type UndoneEditView struct {
+	ID      string  `json:"id"`
+	Seq     int     `json:"seq"`
+	Command string  `json:"command"`
+	ItemID  *string `json:"item_id" nullable:"true"`
+	Status  string  `json:"status" enum:"done,undone,dropped"`
+}
+
+func undoResultView(r app.UndoResult) UndoResultView {
+	out := UndoResultView{Edit: UndoneEditView{ID: string(r.Edit.ID), Seq: r.Edit.Seq, Command: r.Edit.Command,
+		ItemID: optional(string(r.Edit.ItemID)), Status: r.Edit.Status}, LiturgyVersion: r.LiturgyVersion, ItemID: optional(string(r.ItemID))}
+	if r.ItemVersion != 0 {
+		n := r.ItemVersion
+		out.ItemVersion = &n
+	}
+	return out
+}
+
 // OccurrenceView is one service time in a week.
 type OccurrenceView struct {
 	ServiceID    string  `json:"service_id"`

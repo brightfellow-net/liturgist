@@ -543,6 +543,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/liturgies/{id}/redo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply again the edit the caller undid last */
+        post: operations["redoLiturgyEdit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/liturgies/{id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Undo the caller's newest edit that nobody else has touched since */
+        post: operations["undoLiturgyEdit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me": {
         parameters: {
             query?: never;
@@ -2445,6 +2479,34 @@ export interface components {
             language: "id" | "en" | "zh-Hans" | "zh-Hant";
             name: string;
         };
+        UndoResultView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/UndoResultView.json
+             */
+            readonly $schema?: string;
+            /** @description the edit that was undone or redone, with its new status */
+            edit: components["schemas"]["UndoneEditView"];
+            /** @description the item the change was about, null when none */
+            item_id: string | null;
+            /**
+             * Format: int64
+             * @description its version after the change, null when none
+             */
+            item_version: number | null;
+            /** Format: int64 */
+            liturgy_version: number;
+        };
+        UndoneEditView: {
+            command: string;
+            id: string;
+            item_id: string | null;
+            /** Format: int64 */
+            seq: number;
+            /** @enum {string} */
+            status: "done" | "undone" | "dropped";
+        };
         UpdateChurchRequest: {
             /**
              * Format: uri
@@ -4024,6 +4086,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ItemResultView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    redoLiturgyEdit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UndoResultView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    undoLiturgyEdit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UndoResultView"];
                 };
             };
             /** @description Error */

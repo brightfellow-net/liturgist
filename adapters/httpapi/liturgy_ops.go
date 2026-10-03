@@ -421,6 +421,28 @@ func RegisterLiturgies(api huma.API, d LiturgyDeps) {
 			d.Log.Info("assignment_added", "actor", actor(ctx), "liturgy_id", in.ID, "assignment_id", string(v.Assignment.ID))
 			return &struct{ Body AssignmentView }{Body: assignmentView(v)}, nil
 		})
+	undoOut := func(id string, undo bool) func(ctx context.Context, in *struct {
+		ID string `path:"id" maxLength:"26"`
+	}) (*struct{ Body UndoResultView }, error) {
+		return func(ctx context.Context, in *struct {
+			ID string `path:"id" maxLength:"26"`
+		}) (*struct{ Body UndoResultView }, error) {
+			run := d.Liturgies.Redo
+			if undo {
+				run = d.Liturgies.Undo
+			}
+			r, err := run(ctx, sess(ctx), domain.LiturgyID(in.ID))
+			if err != nil {
+				return nil, fail(ctx, err)
+			}
+			d.Log.Info("liturgy_"+id, "actor", actor(ctx), "liturgy_id", in.ID, "edit_id", string(r.Edit.ID))
+			return &struct{ Body UndoResultView }{Body: undoResultView(r)}, nil
+		}
+	}
+	huma.Register(api, lop("undoLiturgyEdit", http.MethodPost, "/liturgies/{id}/undo", http.StatusOK,
+		"Undo the caller's newest edit that nobody else has touched since"), undoOut("undone", true))
+	huma.Register(api, lop("redoLiturgyEdit", http.MethodPost, "/liturgies/{id}/redo", http.StatusOK,
+		"Apply again the edit the caller undid last"), undoOut("redone", false))
 	huma.Register(api, lop("removeAssignment", http.MethodDelete, "/liturgies/{id}/assignments/{aid}", http.StatusNoContent, "Remove an assignment"),
 		func(ctx context.Context, in *struct {
 			ID           string `path:"id" maxLength:"26"`

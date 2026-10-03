@@ -118,6 +118,7 @@ func MapError(ctx context.Context, err error, log *slog.Logger) error {
 		tplInUse *app.TemplateInUseError
 		vconf    *app.VersionConflictError
 		lexists  *app.LiturgyExistsError
+		undoRef  *app.UndoRefusedError
 	)
 	info := RequestInfoFrom(ctx)
 	switch {
@@ -154,6 +155,10 @@ func MapError(ctx context.Context, err error, log *slog.Logger) error {
 	case errors.As(err, &vconf):
 		p := problem(http.StatusConflict, "version_conflict", "This was changed by someone else. Reload to see their version.")
 		p.Scope, p.ItemID = vconf.Scope, string(vconf.ItemID)
+		return p
+	case errors.As(err, &undoRef):
+		p := problem(http.StatusConflict, "undo_refused", "This can't be undone or redone.")
+		p.Reason = undoRef.Reason
 		return p
 	case errors.As(err, &lexists):
 		p := problem(http.StatusConflict, "liturgy_exists", "There is already a liturgy for this service at this time.")

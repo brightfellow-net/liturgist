@@ -480,6 +480,28 @@ type EditRepo interface {
 	Append(ctx context.Context, e domain.Edit) error
 	// List returns the newest rows first, at most limit.
 	List(ctx context.Context, liturgy domain.LiturgyID, limit int) ([]domain.Edit, error)
+	// BySeq returns the row with the number; ErrNotFound.
+	BySeq(ctx context.Context, liturgy domain.LiturgyID, seq int) (domain.Edit, error)
+	// LastActing returns the newest undo or redo row that acted on the edit;
+	// ErrNotFound when none did.
+	LastActing(ctx context.Context, liturgy domain.LiturgyID, target domain.EditID) (domain.Edit, error)
+	// Newest returns the undo target (11 §7.2): among the user's last window
+	// editing rows with seq above floor, the newest that is done and not
+	// skipped; ErrNotFound when there is none.
+	Newest(ctx context.Context, user domain.UserID, liturgy domain.LiturgyID, floor, window int) (domain.Edit, error)
+	// NewestUndone returns the redo target: the user's undone edit above
+	// floor with the highest undo_seq; ErrNotFound when there is none.
+	NewestUndone(ctx context.Context, user domain.UserID, liturgy domain.LiturgyID, floor int) (domain.Edit, error)
+	// Foreign returns the rows with seq above afterSeq written by anyone but
+	// user, oldest first, for the conflict test (domain.Edit.TouchedBy).
+	Foreign(ctx context.Context, liturgy domain.LiturgyID, afterSeq int, user domain.UserID) ([]domain.Foreign, error)
+	// SetStatus changes the status (and undo_seq, 0 = none) when the row has
+	// status from; false when it has not.
+	SetStatus(ctx context.Context, id domain.EditID, from, to string, undoSeq int) (bool, error)
+	// MarkSkipped sets the skipped flag of a done edit.
+	MarkSkipped(ctx context.Context, id domain.EditID) error
+	// DropUndone turns all undone edits of the user in the liturgy into dropped.
+	DropUndone(ctx context.Context, user domain.UserID, liturgy domain.LiturgyID) error
 }
 
 // UsageRepo tells what liturgies refer to. It runs in the caller's

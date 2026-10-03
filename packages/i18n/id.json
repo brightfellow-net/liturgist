@@ -598,7 +598,8 @@
     "liturgy_not_deletable": "Liturgi yang sudah diterbitkan tidak bisa dihapus. Arsipkan saja.",
     "assignment_exists": "Orang ini sudah punya tugas ini.",
     "language_mismatch": "Templat dan liturgi harus berbahasa sama.",
-    "liturgy_limit": "Gereja Anda sudah mencapai batas {{max}} liturgi."
+    "liturgy_limit": "Gereja Anda sudah mencapai batas {{max}} liturgi.",
+    "undo_refused": "Ini tidak bisa dibatalkan atau diulangi."
   },
   "import": {
     "title": "Impor lagu",
@@ -873,7 +874,8 @@
     },
     "history": {
       "title": "Perubahan terbaru",
-      "none": "Belum ada perubahan."
+      "none": "Belum ada perubahan.",
+      "undone": "dibatalkan"
     },
     "edits": {
       "liturgy_create": "{{who}} membuat liturgi ini",
@@ -890,6 +892,38 @@
       "redo": "{{who}} mengulang suatu perubahan",
       "other": "{{who}} mengubah liturgi",
       "someone": "seseorang"
+    },
+    "undo": {
+      "button": "Batalkan",
+      "redo_button": "Ulangi",
+      "undone": "Dibatalkan: {{what}}",
+      "redone": "Diulangi: {{what}}",
+      "an_item": "sebuah butir",
+      "what": {
+        "liturgy_update": "perubahan keterangan",
+        "item_add": "penambahan {{title}}",
+        "item_remove": "penghapusan {{title}}",
+        "item_update": "perubahan pada {{title}}",
+        "item_songs": "perubahan lagu pada {{title}}",
+        "items_reorder": "perubahan urutan butir",
+        "assignment_add": "sebuah penugasan",
+        "assignment_remove": "pencabutan sebuah penugasan",
+        "other": "sebuah perubahan"
+      },
+      "refused": {
+        "undo": {
+          "nothing_to_undo": "Tidak ada yang bisa dibatalkan.",
+          "nothing_to_redo": "Tidak ada yang bisa dibatalkan.",
+          "changed_since": "Orang lain sudah mengubahnya, jadi tidak bisa dibatalkan.",
+          "reference_gone": "Sesuatu yang dipakai perubahan ini sudah tidak ada, jadi tidak bisa dibatalkan."
+        },
+        "redo": {
+          "nothing_to_redo": "Tidak ada yang bisa diulangi.",
+          "nothing_to_undo": "Tidak ada yang bisa diulangi.",
+          "changed_since": "Orang lain sudah mengubahnya, jadi tidak bisa diulangi.",
+          "reference_gone": "Sesuatu yang dipakai perubahan ini sudah tidak ada, jadi tidak bisa diulangi."
+        }
+      }
     }
   }
 }

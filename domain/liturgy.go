@@ -64,8 +64,11 @@ type Liturgy struct {
 	ArchivedBy  UserID
 	CreatedBy   UserID
 	EditSeq     int
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	// UndoFloorSeq: history rows at or below it are no undo or redo targets
+	// (11 §7.2). Step 4's state changes set it; slice 3D only reads it.
+	UndoFloorSeq int
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 // Item is one item of a liturgy (10 §2.2).
@@ -129,7 +132,11 @@ const (
 	CmdItemsReorder      = "items.reorder"
 	CmdAssignmentAdd     = "assignment.add"
 	CmdAssignmentRemove  = "assignment.remove"
+	CmdUndo              = "undo"
+	CmdRedo              = "redo"
 	EditDone             = "done"
+	EditUndone           = "undone"
+	EditDropped          = "dropped"
 	maxLiturgyServiceLen = MaxPlanningName
 )
 
@@ -145,7 +152,13 @@ type Edit struct {
 	LiturgyVersionAfter int
 	ItemVersionAfter    int // 0 = none
 	Status              string
-	CreatedAt           time.Time
+	// TargetEditID names the edit an undo or redo row acted on.
+	TargetEditID EditID
+	// UndoSeq is the seq of the undo row that undid this edit (status undone).
+	UndoSeq int
+	// Skipped: a done edit whose undo was refused; no longer offered (11 §7.2).
+	Skipped   bool
+	CreatedAt time.Time
 }
 
 // ValidDate reports whether s is a real calendar date written YYYY-MM-DD.

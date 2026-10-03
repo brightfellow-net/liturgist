@@ -170,3 +170,9 @@ export function editText(t: TFunction, e: EditView): string {
   }
   return t(key, { who, title, name: str(after?.service_name) || str(before?.service_name), defaultValue: t("liturgy.edits.other", { who }) });
 }
+
+// undoWhat says what an undo or redo acted on, after "Undid: " (11 §7.2).
+export function undoWhat(t: TFunction, command: string, title: string): string {
+  const key = `liturgy.undo.what.${command.replace(".", "_")}`;
+  return t(key, { title: title || t("liturgy.undo.an_item"), defaultValue: t("liturgy.undo.what.other") });
+}

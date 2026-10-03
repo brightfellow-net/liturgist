@@ -1,7 +1,8 @@
 // Copyright 2026 Brightfellow contributors
 // SPDX-License-Identifier: Apache-2.0
-import { expect, test, type Page } from "@playwright/test";
-import { adminApi, adminPage, createReading, createSong } from "./helpers";
+import { expect, request, test, type Page } from "@playwright/test";
+import { baseURL } from "./env";
+import { adminApi, adminPage, createInvite, createReading, createSong, logIn, memberPassword, tokenOf } from "./helpers";
 
 const card = (page: Page, name: RegExp) => page.getByRole("form", { name });
 
@@ -191,5 +192,87 @@ test("E2E-W-013 a conflict on an item keeps the typed text", async ({ browser })
   await expect(card(one, /^Item 1: Votum/).getByLabel("Text")).toHaveValue("Teks dari sesi satu");
 
   await api.delete(`/api/v1/liturgies/${l.id}`, { data: {} });
+  await api.dispose();
+});
+
+// E2E-W-015: undo and redo with two people on one liturgy (11 §7.2).
+test("E2E-W-015 undo and redo, refused after a colleague's change, and with the keyboard", async ({ browser }) => {
+  const api = await adminApi();
+  const roles = (await (await api.get("/api/v1/roles")).json()) as { id: string; origin: string | null }[];
+  const editor = roles.find((r) => r.origin === "editor")!;
+  const link = await createInvite("Budi Editor", "budi.undo@example.org", [editor.id]);
+  const anon = await request.newContext({ baseURL });
+  const accepted = await anon.post("/api/v1/invites/accept", { data: { token: tokenOf(link), name: "Budi Editor", email: "budi.undo@example.org", password: memberPassword } });
+  expect(accepted.status(), await accepted.text()).toBe(201);
+  await anon.dispose();
+
+  const created = await api.post("/api/v1/liturgies", { data: { service_name: "Ibadah Batal", date: dateAhead(45), time: "09:00", template_id: "", language: "id" } });
+  expect(created.status(), await created.text()).toBe(201);
+  let { id, version } = (await created.json()) as { id: string; version: number };
+  for (const title of ["Doa Satu", "Doa Dua"]) {
+    const res = await api.post(`/api/v1/liturgies/${id}/items`, { data: { liturgy_version: version, title, item_type: "free_text" } });
+    expect(res.status(), await res.text()).toBe(201);
+    version = ((await res.json()) as { liturgy_version: number }).liturgy_version;
+  }
+
+  const ruth = await adminPage(browser);
+  const budi = await logIn(browser, "budi.undo@example.org", memberPassword);
+  await ruth.goto(`/liturgies/${id}`);
+  const one = (page: Page) => card(page, /^Item \d+: Doa Satu/);
+  const two = (page: Page) => card(page, /^Item \d+: Doa Dua/);
+  const undo = ruth.getByRole("button", { name: "Undo", exact: true });
+  const redo = ruth.getByRole("button", { name: "Redo", exact: true });
+  let undoRequests = 0;
+  ruth.on("request", (r) => { if (r.method() === "POST" && r.url().endsWith("/undo")) undoRequests++; });
+  const save = async (c: ReturnType<typeof card>, text: string) => {
+    await c.getByLabel("Text").fill(text);
+    await c.getByRole("button", { name: "Save item" }).click();
+    await expect(c.getByText("Saved", { exact: true })).toBeVisible();
+  };
+
+  // Undo and redo with the buttons.
+  await save(one(ruth), "satu");
+  await undo.click();
+  await expect(ruth.getByText(/^Undid: the change to Doa Satu/)).toBeVisible();
+  await expect(one(ruth).getByLabel("Text")).toHaveValue("");
+  await expect(redo).toBeEnabled();
+  await redo.click();
+  await expect(ruth.getByText(/^Redid: the change to Doa Satu/)).toBeVisible();
+  await expect(one(ruth).getByLabel("Text")).toHaveValue("satu");
+
+  // A colleague changes the same item: Undo says why it cannot, and keeps their text.
+  await budi.goto(`/liturgies/${id}`);
+  await save(one(budi), "dari Budi");
+  await undo.click();
+  await expect(ruth.getByText("Someone has changed this since, so it can't be undone.")).toBeVisible();
+  await ruth.reload();
+  await expect(one(ruth).getByLabel("Text")).toHaveValue("dari Budi");
+
+  // A move is undone although the colleague edited another item meanwhile.
+  await ruth.getByRole("button", { name: /^Move up Item \d+: Doa Dua/ }).click();
+  await expect(ruth.getByRole("form", { name: /^Item 1: Doa Dua/ })).toBeVisible();
+  await budi.reload();
+  await save(one(budi), "Budi lagi");
+  await undo.click();
+  await expect(ruth.getByText(/^Undid: the reordering of the items/)).toBeVisible();
+  await expect(ruth.getByRole("form", { name: /^Item 1: Doa Satu/ })).toBeVisible();
+
+  // The keyboard works outside a text field and leaves the text field alone.
+  await ruth.reload();
+  await save(two(ruth), "dua");
+  await ruth.getByRole("heading", { name: "Ibadah Batal", level: 2 }).click();
+  await ruth.keyboard.press("Control+z");
+  await expect(ruth.getByText(/^Undid: the change to Doa Dua/)).toBeVisible();
+  await expect(two(ruth).getByLabel("Text")).toHaveValue("");
+  await ruth.keyboard.press("Control+Shift+z");
+  await expect(ruth.getByText(/^Redid: the change to Doa Dua/)).toBeVisible();
+  await expect(two(ruth).getByLabel("Text")).toHaveValue("dua");
+  await two(ruth).getByLabel("Text").focus();
+  const before = undoRequests;
+  await ruth.keyboard.press("Control+z"); // the browser's own undo, not the server's
+  await ruth.waitForTimeout(300);
+  expect(undoRequests).toBe(before);
+
+  await api.delete(`/api/v1/liturgies/${id}`, { data: {} });
   await api.dispose();
 });

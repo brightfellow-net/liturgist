@@ -72,6 +72,20 @@ func seedLiturgies(a, b app.ChurchStore, now time.Time) error {
 		errs = append(errs, err, c.cs.Edits().Append(ctx, domain.Edit{ID: domain.EditID(id("ED" + c.suffix)), LiturgyID: l.ID, Seq: seq,
 			UserID: domain.UserID(id("U1")), Command: domain.CmdLiturgyCreate, After: []byte(`{}`), LiturgyVersionAfter: 1,
 			Status: domain.EditDone, CreatedAt: now}))
+		// An editing row in both churches, and in B an undone one, so that the
+		// undo queries have something of B's to leak (IT-L-008).
+		seq, err = c.cs.Liturgies().NextSeq(ctx, l.ID)
+		errs = append(errs, err, c.cs.Edits().Append(ctx, domain.Edit{ID: domain.EditID(id("ED" + c.suffix + "2")), LiturgyID: l.ID, Seq: seq,
+			UserID: domain.UserID(id("U1")), Command: domain.CmdItemUpdate, ItemID: domain.ItemID(id("ITP" + c.suffix)),
+			Before: []byte(`{"text":""}`), After: []byte(`{"text":"Doa"}`), LiturgyVersionAfter: 1, ItemVersionAfter: 2,
+			Status: domain.EditDone, CreatedAt: now}))
+		if c.suffix == "B" {
+			seq, err = c.cs.Liturgies().NextSeq(ctx, l.ID)
+			errs = append(errs, err, c.cs.Edits().Append(ctx, domain.Edit{ID: domain.EditID(id("EDB3")), LiturgyID: l.ID, Seq: seq,
+				UserID: domain.UserID(id("U1")), Command: domain.CmdItemUpdate, ItemID: domain.ItemID(id("ITPB")),
+				Before: []byte(`{"text":"Doa"}`), After: []byte(`{"text":"Amin"}`), LiturgyVersionAfter: 1, ItemVersionAfter: 3,
+				Status: domain.EditUndone, UndoSeq: seq + 1, CreatedAt: now}))
+		}
 	}
 	return errors.Join(errs...)
 }
@@ -95,7 +109,7 @@ func liturgyHarness(errRollback error, notFound func(error) error, unchanged fun
 		return errRollback
 	}
 	h["Liturgies.ByID"] = func(cs app.ChurchStore, _ time.Time) error {
-		if got, err := cs.Liturgies().ByID(ctx, lgA); err != nil || got.ServiceID != domain.ServiceID(id("SVA1")) || got.EditSeq != 1 {
+		if got, err := cs.Liturgies().ByID(ctx, lgA); err != nil || got.ServiceID != domain.ServiceID(id("SVA1")) || got.EditSeq != 2 {
 			return fmt.Errorf("own: %+v %w", got, err)
 		}
 		_, err := cs.Liturgies().ByID(ctx, lgB)
@@ -228,10 +242,49 @@ func liturgyHarness(errRollback error, notFound func(error) error, unchanged fun
 	h["Edits.List"] = func(cs app.ChurchStore, _ time.Time) error {
 		own, err := cs.Edits().List(ctx, lgA, 10)
 		other, err2 := cs.Edits().List(ctx, lgB, 10)
-		if err != nil || err2 != nil || len(own) != 1 || own[0].Command != domain.CmdLiturgyCreate || len(other) != 0 {
+		if err != nil || err2 != nil || len(own) != 2 || own[0].Command != domain.CmdItemUpdate || len(other) != 0 {
 			return fmt.Errorf("history: %+v %+v %w %w", own, other, err, err2)
 		}
 		return nil
+	}
+	h["Edits.BySeq"] = func(cs app.ChurchStore, _ time.Time) error {
+		if e, err := cs.Edits().BySeq(ctx, lgA, 2); err != nil || e.ID != domain.EditID(id("EDA2")) {
+			return fmt.Errorf("own: %+v %w", e, err)
+		}
+		_, err := cs.Edits().BySeq(ctx, lgB, 2)
+		return notFound(err)
+	}
+	h["Edits.LastActing"] = func(cs app.ChurchStore, _ time.Time) error {
+		_, err := cs.Edits().LastActing(ctx, lgB, domain.EditID(id("EDB2")))
+		return notFound(err)
+	}
+	h["Edits.Newest"] = func(cs app.ChurchStore, _ time.Time) error {
+		if e, err := cs.Edits().Newest(ctx, domain.UserID(id("U1")), lgA, 0, 50); err != nil || e.ID != domain.EditID(id("EDA2")) {
+			return fmt.Errorf("own: %+v %w", e, err)
+		}
+		_, err := cs.Edits().Newest(ctx, domain.UserID(id("U1")), lgB, 0, 50)
+		return notFound(err)
+	}
+	h["Edits.NewestUndone"] = func(cs app.ChurchStore, _ time.Time) error {
+		_, err := cs.Edits().NewestUndone(ctx, domain.UserID(id("U1")), lgB, 0)
+		return notFound(err)
+	}
+	h["Edits.Foreign"] = func(cs app.ChurchStore, _ time.Time) error {
+		own, err := cs.Edits().Foreign(ctx, lgA, 0, domain.UserID(id("U2")))
+		other, err2 := cs.Edits().Foreign(ctx, lgB, 0, domain.UserID(id("U2")))
+		if err != nil || err2 != nil || len(own) != 2 || len(other) != 0 {
+			return fmt.Errorf("foreign: %+v %+v %w %w", own, other, err, err2)
+		}
+		return nil
+	}
+	h["Edits.SetStatus"] = func(cs app.ChurchStore, _ time.Time) error {
+		return unchanged(cs.Edits().SetStatus(ctx, domain.EditID(id("EDB2")), domain.EditDone, domain.EditUndone, 9))
+	}
+	h["Edits.MarkSkipped"] = func(cs app.ChurchStore, _ time.Time) error {
+		return cs.Edits().MarkSkipped(ctx, domain.EditID(id("EDB2"))) // church B's row stays as it is, which the runner checks
+	}
+	h["Edits.DropUndone"] = func(cs app.ChurchStore, _ time.Time) error {
+		return cs.Edits().DropUndone(ctx, domain.UserID(id("U1")), lgB)
 	}
 	h["Usage.SongInUse"] = func(cs app.ChurchStore, _ time.Time) error {
 		own, err := cs.Usage().SongInUse(ctx, domain.SongID(id("SA1")))

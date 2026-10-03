@@ -603,7 +603,8 @@
     "liturgy_not_deletable": "A published liturgy can't be deleted. Archive it instead.",
     "assignment_exists": "This person already has this duty.",
     "language_mismatch": "The template and the liturgy must be in the same language.",
-    "liturgy_limit": "Your church has reached its limit of {{max}} liturgies."
+    "liturgy_limit": "Your church has reached its limit of {{max}} liturgies.",
+    "undo_refused": "This can't be undone or redone."
   },
   "import": {
     "title": "Import songs",
@@ -886,7 +887,8 @@
     },
     "history": {
       "title": "Recent changes",
-      "none": "No changes yet."
+      "none": "No changes yet.",
+      "undone": "undone"
     },
     "edits": {
       "liturgy_create": "{{who}} created this liturgy",
@@ -903,6 +905,38 @@
       "redo": "{{who}} redid a change",
       "other": "{{who}} changed the liturgy",
       "someone": "someone"
+    },
+    "undo": {
+      "button": "Undo",
+      "redo_button": "Redo",
+      "undone": "Undid: {{what}}",
+      "redone": "Redid: {{what}}",
+      "an_item": "an item",
+      "what": {
+        "liturgy_update": "the change to the details",
+        "item_add": "adding {{title}}",
+        "item_remove": "removing {{title}}",
+        "item_update": "the change to {{title}}",
+        "item_songs": "the change to the songs of {{title}}",
+        "items_reorder": "the reordering of the items",
+        "assignment_add": "an assignment",
+        "assignment_remove": "the removal of an assignment",
+        "other": "a change"
+      },
+      "refused": {
+        "undo": {
+          "nothing_to_undo": "Nothing to undo.",
+          "nothing_to_redo": "Nothing to undo.",
+          "changed_since": "Someone has changed this since, so it can't be undone.",
+          "reference_gone": "Something this change used no longer exists, so it can't be undone."
+        },
+        "redo": {
+          "nothing_to_redo": "Nothing to redo.",
+          "nothing_to_undo": "Nothing to redo.",
+          "changed_since": "Someone has changed this since, so it can't be redone.",
+          "reference_gone": "Something this change used no longer exists, so it can't be redone."
+        }
+      }
     }
   }
 }

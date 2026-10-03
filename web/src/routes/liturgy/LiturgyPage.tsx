@@ -157,7 +157,7 @@ function Editor({ liturgy, duties, parts }: { liturgy: LiturgyView; duties: Name
       {editable && items.length >= liturgyLimits.items && <p className="text-muted-foreground">{t("liturgy.items.max", { max: liturgyLimits.items })}</p>}
 
       <Team liturgy={liturgy} duties={duties} canEdit={editable} />
-      <History id={liturgy.id} />
+      <History id={liturgy.id} canEdit={editable} />
 
       {liturgy.actions.delete && (
         <div className="space-y-2 border-t border-border pt-4">

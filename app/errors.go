@@ -171,6 +171,20 @@ var (
 	ErrAssignmentExists    = errors.New("person already has this duty")           // 409 assignment_exists
 )
 
+// Reasons of UndoRefusedError (11 §7.2).
+const (
+	UndoNothingToUndo = "nothing_to_undo"
+	UndoNothingToRedo = "nothing_to_redo"
+	UndoChangedSince  = "changed_since"
+	UndoReferenceGone = "reference_gone"
+)
+
+// UndoRefusedError maps to 409 undo_refused; nothing was changed by the
+// request (the skip or drop that may follow is bookkeeping about the history).
+type UndoRefusedError struct{ Reason string }
+
+func (e *UndoRefusedError) Error() string { return "undo refused: " + e.Reason }
+
 // Scopes of a VersionConflictError.
 const (
 	ScopeLiturgy = "liturgy"

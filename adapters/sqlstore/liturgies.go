@@ -29,7 +29,7 @@ func strOf(p *string) string {
 type liturgyRepo struct{ *churchStore }
 
 const liturgyColumns = `id, date, time, service_id, service_name, language, template_id, state, version,
-	archived_at, archived_by, created_by, edit_seq, created_at, updated_at`
+	archived_at, archived_by, created_by, edit_seq, undo_floor_seq, created_at, updated_at`
 
 func scanLiturgy(scan func(...any) error) (domain.Liturgy, error) {
 	var (
@@ -40,7 +40,7 @@ func scanLiturgy(scan func(...any) error) (domain.Liturgy, error) {
 		state            string
 	)
 	if err := scan(&l.ID, &l.Date, &l.Time, &svc, &l.ServiceName, &l.Language, &tpl, &state, &l.Version,
-		&archAt, &archBy, &l.CreatedBy, &l.EditSeq, &created, &updated); err != nil {
+		&archAt, &archBy, &l.CreatedBy, &l.EditSeq, &l.UndoFloorSeq, &created, &updated); err != nil {
 		return domain.Liturgy{}, err
 	}
 	l.ServiceID, l.TemplateID, l.State = domain.ServiceID(strOf(svc)), domain.TemplateID(strOf(tpl)), domain.LiturgyState(state)
@@ -459,26 +459,62 @@ func (r assignmentRepo) Remove(ctx context.Context, liturgy domain.LiturgyID, id
 
 type editRepo struct{ *churchStore }
 
+const editColumns = `id, liturgy_id, user_id, seq, command, target_edit_id, item_id, before, after,
+	liturgy_version_after, item_version_after, status, undo_seq, skipped, created_at`
+
 func (r editRepo) Append(ctx context.Context, e domain.Edit) error {
-	var before, after, item, itemVersion any
+	var before, after any
 	if e.Before != nil {
 		before = string(e.Before)
 	}
 	if e.After != nil {
 		after = string(e.After)
 	}
-	item, itemVersion = nullString(string(e.ItemID)), nullInt(e.ItemVersionAfter)
-	_, err := r.tx.ExecContext(ctx, r.d.Rebind(`INSERT INTO liturgy_edits (id, church_id, liturgy_id, user_id, seq, command, item_id,
-		before, after, liturgy_version_after, item_version_after, status, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`),
-		e.ID, r.churchID, e.LiturgyID, e.UserID, e.Seq, e.Command, item, before, after, e.LiturgyVersionAfter, itemVersion,
-		e.Status, r.d.TimeArg(e.CreatedAt))
+	_, err := r.tx.ExecContext(ctx, r.d.Rebind(`INSERT INTO liturgy_edits (id, church_id, liturgy_id, user_id, seq, command,
+		target_edit_id, item_id, before, after, liturgy_version_after, item_version_after, status, undo_seq, skipped, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`),
+		e.ID, r.churchID, e.LiturgyID, e.UserID, e.Seq, e.Command, nullString(string(e.TargetEditID)),
+		nullString(string(e.ItemID)), before, after, e.LiturgyVersionAfter, nullInt(e.ItemVersionAfter), e.Status,
+		nullInt(e.UndoSeq), e.Skipped, r.d.TimeArg(e.CreatedAt))
 	return r.d.MapError(err)
 }
 
+func scanEdit(scan func(...any) error) (domain.Edit, error) {
+	var (
+		e             domain.Edit
+		target, item  *string
+		before, after *string
+		itemVersion   *int
+		undoSeq       *int
+		created       Time
+	)
+	if err := scan(&e.ID, &e.LiturgyID, &e.UserID, &e.Seq, &e.Command, &target, &item, &before, &after,
+		&e.LiturgyVersionAfter, &itemVersion, &e.Status, &undoSeq, &e.Skipped, &created); err != nil {
+		return domain.Edit{}, err
+	}
+	e.TargetEditID, e.ItemID, e.CreatedAt = domain.EditID(strOf(target)), domain.ItemID(strOf(item)), created.Time
+	if before != nil {
+		e.Before = []byte(*before)
+	}
+	if after != nil {
+		e.After = []byte(*after)
+	}
+	if itemVersion != nil {
+		e.ItemVersionAfter = *itemVersion
+	}
+	if undoSeq != nil {
+		e.UndoSeq = *undoSeq
+	}
+	return e, nil
+}
+
+func (r editRepo) one(ctx context.Context, query string, args ...any) (domain.Edit, error) {
+	e, err := scanEdit(r.tx.QueryRowContext(ctx, r.d.Rebind(query), args...).Scan)
+	return e, r.d.MapError(err)
+}
+
 func (r editRepo) List(ctx context.Context, liturgy domain.LiturgyID, limit int) ([]domain.Edit, error) {
-	rows, err := r.tx.QueryContext(ctx, r.d.Rebind(`SELECT id, liturgy_id, user_id, seq, command, item_id, before, after,
-		liturgy_version_after, item_version_after, status, created_at
+	rows, err := r.tx.QueryContext(ctx, r.d.Rebind(`SELECT `+editColumns+`
 		FROM liturgy_edits WHERE church_id = ? AND liturgy_id = ? ORDER BY seq DESC LIMIT ?`), r.churchID, liturgy, limit)
 	if err != nil {
 		return nil, r.d.MapError(err)
@@ -486,30 +522,93 @@ func (r editRepo) List(ctx context.Context, liturgy domain.LiturgyID, limit int)
 	defer func() { _ = rows.Close() }()
 	var out []domain.Edit
 	for rows.Next() {
-		var (
-			e             domain.Edit
-			item          *string
-			before, after *string
-			itemVersion   *int
-			created       Time
-		)
-		if err := rows.Scan(&e.ID, &e.LiturgyID, &e.UserID, &e.Seq, &e.Command, &item, &before, &after,
-			&e.LiturgyVersionAfter, &itemVersion, &e.Status, &created); err != nil {
+		e, err := scanEdit(rows.Scan)
+		if err != nil {
 			return nil, r.d.MapError(err)
-		}
-		e.ItemID, e.CreatedAt = domain.ItemID(strOf(item)), created.Time
-		if before != nil {
-			e.Before = []byte(*before)
-		}
-		if after != nil {
-			e.After = []byte(*after)
-		}
-		if itemVersion != nil {
-			e.ItemVersionAfter = *itemVersion
 		}
 		out = append(out, e)
 	}
 	return out, r.d.MapError(rows.Err())
+}
+
+func (r editRepo) BySeq(ctx context.Context, liturgy domain.LiturgyID, seq int) (domain.Edit, error) {
+	return r.one(ctx, `SELECT `+editColumns+` FROM liturgy_edits WHERE church_id = ? AND liturgy_id = ? AND seq = ?`,
+		r.churchID, liturgy, seq)
+}
+
+func (r editRepo) LastActing(ctx context.Context, liturgy domain.LiturgyID, target domain.EditID) (domain.Edit, error) {
+	return r.one(ctx, `SELECT `+editColumns+` FROM liturgy_edits
+		WHERE church_id = ? AND liturgy_id = ? AND target_edit_id = ? ORDER BY seq DESC LIMIT 1`, r.churchID, liturgy, target)
+}
+
+func (r editRepo) Newest(ctx context.Context, user domain.UserID, liturgy domain.LiturgyID, floor, window int) (domain.Edit, error) {
+	return r.one(ctx, `SELECT `+editColumns+` FROM (
+			SELECT `+editColumns+` FROM liturgy_edits
+			WHERE church_id = ? AND liturgy_id = ? AND user_id = ? AND seq > ?
+			  AND command NOT IN ('undo', 'redo', 'liturgy.create')
+			ORDER BY seq DESC LIMIT ?) w
+		WHERE status = 'done' AND skipped = ? ORDER BY seq DESC LIMIT 1`,
+		r.churchID, liturgy, user, floor, window, false)
+}
+
+func (r editRepo) NewestUndone(ctx context.Context, user domain.UserID, liturgy domain.LiturgyID, floor int) (domain.Edit, error) {
+	return r.one(ctx, `SELECT `+editColumns+` FROM liturgy_edits
+		WHERE church_id = ? AND liturgy_id = ? AND user_id = ? AND status = 'undone' AND seq > ?
+		ORDER BY undo_seq DESC LIMIT 1`, r.churchID, liturgy, user, floor)
+}
+
+func (r editRepo) Foreign(ctx context.Context, liturgy domain.LiturgyID, afterSeq int, user domain.UserID) ([]domain.Foreign, error) {
+	rows, err := r.tx.QueryContext(ctx, r.d.Rebind(`SELECT e.command, t.command, e.item_id,
+			CASE WHEN COALESCE(t.command, e.command) IN ('assignment.add', 'assignment.remove') THEN e.before END,
+			CASE WHEN COALESCE(t.command, e.command) IN ('assignment.add', 'assignment.remove') THEN e.after END
+		FROM liturgy_edits e
+		LEFT JOIN liturgy_edits t ON t.church_id = e.church_id AND t.id = e.target_edit_id
+		WHERE e.church_id = ? AND e.liturgy_id = ? AND e.seq > ? AND e.user_id <> ?
+		ORDER BY e.seq`), r.churchID, liturgy, afterSeq, user)
+	if err != nil {
+		return nil, r.d.MapError(err)
+	}
+	defer func() { _ = rows.Close() }()
+	var out []domain.Foreign
+	for rows.Next() {
+		var (
+			own, target, item *string
+			before, after     *string
+		)
+		if err := rows.Scan(&own, &target, &item, &before, &after); err != nil {
+			return nil, r.d.MapError(err)
+		}
+		f := domain.Foreign{Command: strOf(own), ItemID: domain.ItemID(strOf(item))}
+		if t := strOf(target); t != "" {
+			f.Command = t
+		}
+		if before != nil {
+			f.Before = []byte(*before)
+		}
+		if after != nil {
+			f.After = []byte(*after)
+		}
+		out = append(out, f)
+	}
+	return out, r.d.MapError(rows.Err())
+}
+
+func (r editRepo) SetStatus(ctx context.Context, id domain.EditID, from, to string, undoSeq int) (bool, error) {
+	res, err := r.tx.ExecContext(ctx, r.d.Rebind(`UPDATE liturgy_edits SET status = ?, undo_seq = ?
+		WHERE church_id = ? AND id = ? AND status = ?`), to, nullInt(undoSeq), r.churchID, id, from)
+	return changed(r.d, res, err)
+}
+
+func (r editRepo) MarkSkipped(ctx context.Context, id domain.EditID) error {
+	_, err := r.tx.ExecContext(ctx, r.d.Rebind(`UPDATE liturgy_edits SET skipped = ?
+		WHERE church_id = ? AND id = ? AND status = 'done'`), true, r.churchID, id)
+	return r.d.MapError(err)
+}
+
+func (r editRepo) DropUndone(ctx context.Context, user domain.UserID, liturgy domain.LiturgyID) error {
+	_, err := r.tx.ExecContext(ctx, r.d.Rebind(`UPDATE liturgy_edits SET status = 'dropped'
+		WHERE church_id = ? AND liturgy_id = ? AND user_id = ? AND status = 'undone'`), r.churchID, liturgy, user)
+	return r.d.MapError(err)
 }
 
 // --- usage ---

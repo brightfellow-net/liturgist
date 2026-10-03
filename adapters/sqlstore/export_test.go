@@ -4,8 +4,6 @@
 package sqlstore
 
 import (
-	"context"
-
 	"github.com/brightfellow-net/liturgist/app"
 	"github.com/jmoiron/sqlx"
 )
@@ -17,12 +15,6 @@ var (
 	SQLiteUniqueNames    = sqliteUniqueNames
 	Jitter               = jitter
 )
-
-// ExecForTest runs a statement outside any Tx (DDL in tests).
-func (db *DB) ExecForTest(ctx context.Context, q string, args ...any) error {
-	_, err := db.writer.ExecContext(ctx, db.d.Rebind(q), args...)
-	return db.d.MapError(err)
-}
 
 // RawTx exposes the transaction behind a Store.
 func RawTx(s app.Store) *sqlx.Tx {
