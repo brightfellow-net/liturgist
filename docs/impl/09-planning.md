@@ -32,7 +32,7 @@ Both are short, ordered lists of names that the church can edit.
 - **Delete** is refused while the row is used: a duty by any liturgy item or assignment (409 `duty_in_use`), a singing part by any sequence entry (409 `singing_part_in_use`). Template items that name a duty are not "use": the delete clears their `default_duty_id` (the application nulls it in the same transaction, [schema](../reference/schema.md#step-3-tables)).
 - **Rename** is allowed at any time. Liturgies refer to a duty by ID and show its **current** name (live, deliberately: a rename in the church's vocabulary should reach drafts at once). A published version freezes the names it shows in its own copy ([SPEC §5.5](../SPEC.md#55-review-workflow), step 5), so renaming never rewrites what was published. Decision [P-55]; owner decision Q-3.9 (2026-10-03). Step 5 must store the displayed duty names in the published version.
 - Duties and singing parts carry no `version`: edits are single-field. The reorder route requires exactly the current set of IDs; two people who reorder the same list from the same starting point both succeed and the last write wins (the lists have at most 50 and 30 short names, the effect is visible at once, and nothing refers to a position). The whole rewrite of positions is **one transaction**, so no reader sees a half-moved list.
-- **Limit reached** (the 51st duty, the 31st part, …): 422 `validation_failed` with `fields: [{ field: "name", reason: "limit", max, used }]` — the same shape for every fixed limit in this document (templates 50, template items 60, services 30, times 14). The count and the insert run in one `Tx.Write` under `LockChurch`, so a concurrent request that would be the 51st gets the same answer, never a 500.
+- **Limit reached** (the 51st duty, the 31st part, …): 422 `validation_failed` in the problem format of [01 §10](01-foundation.md#10-error-format-and-codes): `errors[0].location` names the field (`body.name`, `body.items`, `body.times`) and the problem carries `reason: "limit"`, `max` and `used` — the same shape for every fixed limit in this document (templates 50, template items 60, services 30, times 14). The count and the insert run in one `Tx.Write` under `LockChurch`, so a concurrent request that would be the 51st gets the same answer, never a 500.
 
 ### 2.2 Template
 
@@ -66,7 +66,7 @@ Template items have **no stable IDs and nothing refers to them**: liturgies copy
 | `version` | As for templates |
 | Limit per church | 30 services |
 
-`times` is replaced as a whole list on `PATCH` (same reason as template items); omitting `times` keeps the list, and an empty list is 422 (`fields: [{ field: "times", reason: "required" }]`): a service always has at least one time, so it always appears in "Prepare next week". Deleting a service keeps its liturgies, which hold a copy of the name ([10 §2.1](10-liturgy.md#21-liturgy)); `liturgies.service_id` becomes null.
+`times` is replaced as a whole list on `PATCH` (same reason as template items); omitting `times` keeps the list, and an empty list is 422 (`errors[0].location` `body.times`, `reason: "required"`): a service always has at least one time, so it always appears in "Prepare next week". Deleting a service keeps its liturgies, which hold a copy of the name ([10 §2.1](10-liturgy.md#21-liturgy)); `liturgies.service_id` becomes null.
 
 **Deleting a template** that is the `default_template_id` of any service → 409 `template_in_use` with `service_ids`; liturgies made from it keep working (`template_id` becomes null).
 
@@ -106,7 +106,9 @@ All paths under `/api/v1`. **View duties and parts** = any member; **view templa
 | `PATCH /services/{id}` | edit | `{ version, name?, language?, default_template_id?, times? }`; `default_template_id: ""` clears | Service; stale → 409 `version_conflict` |
 | `DELETE /services/{id}` | edit | — | 204 |
 
-Rules: every write is one `Tx.Write` under `LockChurch` where it checks a limit or a uniqueness rule that the database cannot express alone ([02 §2.1](02-persistence.md#21-atomic-operations)); `name_key` uniqueness is also a unique index, and the unique-violation maps to 409 `name_taken`. `PATCH` semantics follow [04 §6](04-tenancy-extensions.md#6-step-1-church-and-member-api) (omitted = unchanged). Logging: info lines `duty_created`, `template_updated`, `service_deleted`, … with actor and IDs; template item text is never logged.
+Rules: every write is one `Tx.Write` under `LockChurch` where it checks a limit or a uniqueness rule that the database cannot express alone ([02 §2.1](02-persistence.md#21-atomic-operations)); `name_key` uniqueness is also a unique index, and the unique-violation maps to 409 `name_taken`. `PATCH` semantics follow [04 §6](04-tenancy-extensions.md#6-step-1-church-and-member-api) (omitted = unchanged). As built (slice 3A): operation IDs are `listDuties`, `createDuty`, `reorderDuties`, `renameDuty`, `deleteDuty` (and the same for singing parts), `listTemplates`, `getTemplate`, `createTemplate`, `updateTemplate`, `deleteTemplate` and the same five for services. Deleting a duty or a singing part closes the gap in the positions, so they stay dense. A seed that fails at start-up is logged as `seeding the defaults failed` and the server still starts, without the defaults for that church; the next start-up tries again.
+
+Logging: info lines `duty_created`, `template_updated`, `service_deleted`, … with actor and IDs; template item text is never logged.
 
 ## 5. Pages
 
@@ -119,6 +121,8 @@ Menu item **Liturgies** for every member who holds `liturgy.edit`, `liturgy.comm
 | `/liturgies/services` | Service list: name, language, times in words ("Sunday 07:00; Wednesday 19:00"), default template; "Add a service". Empty state explains what a service is and offers "Add a service" |
 | `/liturgies/services/new`, `/liturgies/services/{id}` | Form: name, language, default template (a list), then the **times** editor: weekday (list) and time (`<input type="time">`) per row; "Add a time"; Remove buttons with text |
 | `/liturgies/duties`, `/liturgies/singing-parts` | One list each: inline rename, Move up / Move down, Delete (with the 409 message), and "Add" |
+
+**As built (slice 3A).** The menu item and the four tabs exist; `/liturgies` redirects to Templates until slice 3C adds the liturgy list as the first tab. Template and service forms return to their list after saving. The forms wait for the duty and template lists before they render, so a select never starts empty and saves a default away. A service in the list shows its template as "Template: …". Members who may see templates and services but not edit them get a read-only page. Add buttons follow the `templates.edit` scope (an empty list has no row to carry `actions`); every other button follows `actions`. Messages exist in English and Indonesian; the Indonesian wording is a draft for the owner's review.
 
 ## 6. Ports
 
