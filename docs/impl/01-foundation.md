@@ -276,7 +276,7 @@ RFC 9457 problem details (`application/problem+json`, Huma's default) extended w
 | `liturgy_exists` | 409 | A liturgy for this service, date and time exists; `liturgy_id` |
 | `liturgy_not_deletable` | 409 | A published liturgy can only be archived |
 | `assignment_exists` | 409 | The person already has this duty in the liturgy |
-| `undo_refused` | 409 | Undo or redo not possible; `reason`: `nothing_to_undo`, `changed_since`, `reference_gone` ([11 §7.2](11-liturgy-editor.md#72-undo-and-redo-p-65)) |
+| `undo_refused` | 409 | Undo or redo not possible; `reason`: `nothing_to_undo`, `nothing_to_redo`, `changed_since`, `reference_gone` ([11 §7.2](11-liturgy-editor.md#72-undo-and-redo-p-65)) |
 | `reset_not_allowed` | 409 | Admin reset for a user who belongs to another church |
 | `too_many_attempts` | 429 | Login throttled; `Retry-After` header in seconds |
 | `too_many_streams` | 429 | The member already has 5 live-update streams open on this liturgy; `Retry-After` (seconds) ([11 §7.1](11-liturgy-editor.md#71-server-sent-events-p-66)) |
