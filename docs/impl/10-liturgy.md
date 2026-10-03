@@ -12,7 +12,7 @@ Creating liturgies (one at a time, or a whole week), their items, the songs and 
 | Review states, submit, approve, comments | Step 4. A liturgy is created in `draft`; the schema already allows every state and the edit rules below already check the state | Step 4 |
 | Publishing, archiving, `PublishedVersion`, "my assignments", PDF | Steps 4–5 | Steps 4–5 |
 | "Archive last week's liturgies and create these" button of "Prepare next week" | Needs published liturgies; only matters with the SaaS free plan | Step 5 |
-| Live updates, presence, undo and redo | Slice 3D builds them on the records this slice writes | [11 §7](11-liturgy-editor.md#7-live-updates-and-undo-slice-3d) |
+| Undo and redo | Slice 3D builds them on the records this slice writes | [11 §7](11-liturgy-editor.md#7-undo-and-redo-slice-3d) |
 | Non-lyric sequence entries (instrumental, spoken) | SPEC §5.2 | After the MVP; `sequence_entries.kind` allows it |
 
 ## 2. Data model
@@ -206,9 +206,9 @@ The community stub answers "unlimited". Counting and creating happen in one tran
 | `ChurchStore.Assignments()` | add, remove, `ByLiturgy` | same | Assignment use cases |
 | `ChurchStore.Edits()` | `Append`, `List` | same | Every write |
 | `SongUsage`, `ReadingUsage` | as in 06 §6 / 07 §6 | `adapters/sqlstore` | Song and reading delete |
-| `EventBus` | `Publish` after commit with `{ type, liturgy_id, item_id?, version, actor }` (IDs and versions only, never content) | in-memory (community) | Slice 3D |
+| `EventBus` | Not used by step 3 while live updates are on the icebox ([11 §7.1](11-liturgy-editor.md#71-live-updates-and-presence-icebox-p-66)) | in-memory (community) | — |
 
-The use cases call `Publish` after the transaction commits; a failed publish is logged and never fails the request.
+The use cases do not publish events.
 
 ## 10. Anti-patterns (DO NOT)
 
@@ -290,4 +290,4 @@ Web tests are in [11 §8](11-liturgy-editor.md#8-test-case-specifications).
 | Songs, arrangements, usage port | [06](06-song-library.md) |
 | Readings, usage port | [07](07-readings.md) |
 | Duties, singing parts, templates, services | [09](09-planning.md) |
-| Pages, live updates, undo | [11](11-liturgy-editor.md) |
+| Pages, undo | [11](11-liturgy-editor.md) |

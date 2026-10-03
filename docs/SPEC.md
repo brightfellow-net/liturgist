@@ -95,7 +95,7 @@ The multimedia team are team members for now; dedicated slide features come afte
   - **Reading:** Bible reference (book, chapter, verse range) linked to a stored reading text.
   - **Other:** free text.
 - Assign team members to **duties** for this liturgy (e.g. liturgist, worship leader, musicians, readers, multimedia). Duty names are configurable per church. Duties are not roles and grant no permissions (see 4).
-- **Several people editing at once.** The liturgy and each item carry a version; every change states the version it was based on. The server rejects a change only when that same item (or, for reordering and state changes, the liturgy) changed in the meantime; the editor then shows "changed meanwhile", reloads that item and keeps the user's own text so it can be re-applied. Other people's changes appear live, and the editor shows who else is editing (e.g. "Budi is also editing").
+- **Several people editing at once.** The liturgy and each item carry a version; every change states the version it was based on. The server rejects a change only when that same item (or, for reordering and state changes, the liturgy) changed in the meantime; the editor then shows "changed meanwhile", reloads that item and keeps the user's own text so it can be re-applied. Other people's changes appear when the page is reloaded or when a save conflicts. *(Live updates and the "Budi is also editing" indicator are on the icebox since 2026-10-03; see the decisions log.)*
 - **Undo/redo** is per person: Ctrl+Z undoes your own latest change, and is refused with a clear message if someone has since changed that item. The history is stored per liturgy and visible to everyone editing it.
 
 ### 5.3 Song library
@@ -333,7 +333,7 @@ e.g. https://liturgist.brightfellow.net/gky-citragarden/liturgies/2026-10-11
 | `Exporter` | Render a liturgy to an output format | PDF, web view | Slides (PPTX/OpenLP/presenter), other print layouts |
 | `Storage` | Store generated files and future media | Local filesystem | Object storage (S3-compatible) |
 | `AuthProvider` | Authenticate users | Password login for invited accounts (see decisions log) | SSO / Google login, passkeys, email magic links |
-| `EventBus` | Deliver live "liturgy changed" and presence events to open editors | In-memory (one process) | PostgreSQL `LISTEN/NOTIFY` across several server instances (SaaS) |
+| `EventBus` | Deliver live "liturgy changed" and presence events to open editors *(unused while live updates are on the icebox)* | In-memory (one process) | PostgreSQL `LISTEN/NOTIFY` across several server instances (SaaS) |
 | `Importer` | Turn a file or pasted text into import candidates (songs, readings) | Paste and split, OpenLyrics, ChordPro; then EasyWorship 6/7 and `.pptx` for the pilot | `.docx`, other presentation software; AI-assisted extraction (opt-in) |
 
 Rules:
@@ -557,6 +557,7 @@ Record resolved decisions here (date, decision, reason). Move items from section
 | 2026-10-03 | The setup wizard does not ask for regular services; a church adds them on the Services page, which explains what a service is when empty (amends §5.7) | The wizard of step 1 is approved and merged, and services are a two-minute task with a helpful empty state; a wizard step can be added with the onboarding checklist later |
 | 2026-10-03 | The ready-made Liturgist role also holds `templates.edit` (amends the scope table in 4) | The liturgist plans the weekly structure, so they need to maintain templates, services, duties and singing parts without asking a Church admin. Churches that already exist keep the scopes of their current roles; only roles created from now on get it |
 | 2026-10-03 | Undo in the liturgy editor: a refused undo of a non-structural edit is skipped afterwards, and a state change of the review workflow starts a new undo window (amends the 2026-10-02 per-person undo rows) | A review of the rules on random two-user histories showed a refused edit would block every older one, and an undo reaching back past a review round could undo something the reviewer had read. Structural edits are never skipped, because restoring a removed item by position needs the later ones reversed first |
+| 2026-10-03 | Live updates and presence ("Budi is also editing") go on the icebox and are not built in step 3; slice 3D is undo and redo only. Concurrent editing stays protected by the version checks and the conflict screen. A throwaway spike had shown that an event stream with a 20-second keepalive survives nginx and Caddy. This amends the 2026-10-02 concurrent-editing row (live updates over `EventBus`) | Saves development time; the versions already prevent lost edits. The design stays in [11 §7.1](impl/11-liturgy-editor.md#71-live-updates-and-presence-icebox-p-66) |
 
 ## 12. References
 
