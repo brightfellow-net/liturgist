@@ -120,6 +120,7 @@ type useCases struct {
 	vocab     *app.Vocabulary
 	templates *app.Templates
 	services  *app.Services
+	liturgies *app.Liturgies
 	seed      *app.Seed
 	operator  *app.Operator
 	cleanup   *app.Cleanup
@@ -149,7 +150,7 @@ func wire(cfg Config, db app.Tx, o *options, refresh func()) useCases {
 	ids := ulidgen.New()
 	hasher := argon2pw.New(argon2pw.Default)
 	auth := &app.Auth{Tx: db, Hasher: hasher, Clock: clock, SessionTTL: cfg.SessionTTL, SessionMaxAge: cfg.SessionMaxAge}
-	songs := &app.Songs{Tx: db, Clock: clock, IDs: ids, Usage: app.NeverUsed{}}
+	songs := &app.Songs{Tx: db, Clock: clock, IDs: ids}
 	importers := map[domain.ImportFormat]app.Importer{
 		domain.FormatPaste: paste.Importer{}, domain.FormatOpenLyrics: openlyrics.Importer{}, domain.FormatChordPro: chordpro.Importer{},
 	}
@@ -167,10 +168,11 @@ func wire(cfg Config, db app.Tx, o *options, refresh func()) useCases {
 			Entitlements: o.entitlements, Auth: auth},
 		songs:     songs,
 		imports:   &app.Imports{Tx: db, Clock: clock, IDs: ids, Songs: songs, Importers: importers},
-		readings:  &app.Readings{Tx: db, Clock: clock, IDs: ids, Usage: app.NeverUsed{}, Providers: o.bibleProviders, Log: cfg.Logger},
-		vocab:     &app.Vocabulary{Tx: db, Clock: clock, IDs: ids, Usage: app.NeverUsed{}},
+		readings:  &app.Readings{Tx: db, Clock: clock, IDs: ids, Providers: o.bibleProviders, Log: cfg.Logger},
+		vocab:     &app.Vocabulary{Tx: db, Clock: clock, IDs: ids},
 		templates: &app.Templates{Tx: db, Clock: clock, IDs: ids},
 		services:  &app.Services{Tx: db, Clock: clock, IDs: ids},
+		liturgies: &app.Liturgies{Tx: db, Clock: clock, IDs: ids, Entitlements: o.entitlements},
 		seed:      &app.Seed{Tx: db, Clock: clock, IDs: ids},
 		resets:    &app.Resets{Tx: db, Hasher: hasher, Clock: clock, IDs: ids, URLs: o.urls, Auth: auth},
 		operator:  &app.Operator{Tx: db, Clock: clock, IDs: ids},
@@ -221,6 +223,7 @@ func New(ctx context.Context, cfg Config, opts ...Option) (*Server, error) {
 			Invites: s.uc.invites, Resets: s.uc.resets, Cookies: cookies, Clock: s.uc.auth.Clock, Log: cfg.Logger},
 		library:  httpapi.LibraryDeps{Songs: s.uc.songs, Readings: s.uc.readings, Imports: s.uc.imports, Log: cfg.Logger},
 		planning: httpapi.PlanningDeps{Vocabulary: s.uc.vocab, Templates: s.uc.templates, Services: s.uc.services, Log: cfg.Logger},
+		liturgy:  httpapi.LiturgyDeps{Liturgies: s.uc.liturgies, Log: cfg.Logger},
 		session:  httpapi.SessionMiddleware(s.uc.auth, cookies, s.uc.auth.Clock, cfg.Logger),
 		resolver: o.resolver,
 	}

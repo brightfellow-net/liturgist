@@ -22,3 +22,9 @@ Before v1.0 any port (every interface in `app`, and `httpapi.TenantResolver`) ma
 - Step 3, slice 3A:
   - planning setup: `ChurchStore.Duties()` and `.SingingParts()` (`NameListRepo`), `.Templates()` (`TemplateRepo`), `.Services()` (`ServiceRepo`) and `.Seeds()` (`SeedRepo`); `PlanningUsage` answers whether liturgies use a duty or a singing part (`NeverUsed` until slice 3B) ([09 §6](docs/impl/09-planning.md#6-ports));
   - `app.Seed` creates the editable defaults at start-up for churches without the `step3` marker; `Setup` seeds a new church in its own transaction ([09 §3](docs/impl/09-planning.md#3-seeded-defaults-p-56)).
+- Step 3, slice 3B:
+  - liturgies: `ChurchStore.Liturgies()` (`LiturgyRepo`), `.LiturgyItems()` (`ItemRepo`), `.Assignments()` (`AssignmentRepo`) and `.Edits()` (`EditRepo`) ([10 §9](docs/impl/10-liturgy.md#9-ports));
+  - **breaking:** `SongUsage`, `ReadingUsage`, `PlanningUsage` and `NeverUsed` are removed. `ChurchStore.Usage()` (`UsageRepo`) answers `SongInUse`, `SectionsInUse`, `ReadingInUse`, `DutyInUse` and `SingingPartInUse` inside the caller's transaction, so a check under `LockChurch` cannot go stale; `app.Songs`, `app.Readings` and `app.Vocabulary` lose their `Usage` field ([10 §6](docs/impl/10-liturgy.md#6-usage-ports-and-deleted-songs-readings-sections));
+  - `app.Liturgies` is new and takes `Entitlements` for `max_active_liturgies` and `max_unpublished_liturgies`;
+  - `app.VersionConflictError` (scope `liturgy` or `item`) satisfies `errors.Is(err, ErrVersionConflict)`; new errors `ErrLiturgyLocked`, `ErrLiturgyNotDeletable`, `ErrAssignmentExists`, `LiturgyExistsError`;
+  - `PATCH /songs/{id}` with a section list and `DELETE /readings/{id}` now take `LockChurch`.

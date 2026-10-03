@@ -19,7 +19,6 @@ type Songs struct {
 	Tx    Tx
 	Clock Clock
 	IDs   IDGenerator
-	Usage SongUsage
 }
 
 // SongActions are the advisory actions on a song (04 §5).
@@ -240,7 +239,7 @@ func (u *Songs) createIn(ctx context.Context, sc churchScope, song domain.Song, 
 func (u *Songs) Update(ctx context.Context, sess *domain.Session, id domain.SongID, ch SongChange) (SongView, error) {
 	var res SongView
 	err := u.Tx.Write(ctx, func(s Store) error {
-		sc, err := actorIn(ctx, s, sess, false)
+		sc, err := actorIn(ctx, s, sess, ch.Sections != nil)
 		if err != nil {
 			return err
 		}
@@ -278,7 +277,7 @@ func (u *Songs) updateIn(ctx context.Context, sc churchScope, id domain.SongID, 
 			return SongView{}, err
 		}
 		if len(removed) > 0 {
-			busy, err := u.Usage.SectionsInUse(ctx, sc.actor.ChurchID, id, removed)
+			busy, err := sc.cs.Usage().SectionsInUse(ctx, id, removed)
 			if err != nil {
 				return SongView{}, err
 			}
@@ -331,7 +330,7 @@ func (u *Songs) Delete(ctx context.Context, sess *domain.Session, id domain.Song
 		if err != nil {
 			return missing(err)
 		}
-		inUse, err := u.Usage.SongInUse(ctx, sc.actor.ChurchID, id)
+		inUse, err := sc.cs.Usage().SongInUse(ctx, id)
 		if err != nil {
 			return err
 		}

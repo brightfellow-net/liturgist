@@ -349,7 +349,12 @@ func TestTenancyDeclarations(t *testing.T) {
 		"deleteSingingPart": "church",
 		"listTemplates":     "church", "getTemplate": "church", "createTemplate": "church", "updateTemplate": "church", "deleteTemplate": "church",
 		"listServices": "church", "getService": "church", "createService": "church", "updateService": "church", "deleteService": "church",
-		"saasExtra": "church", // added through WithRoutes without a declaration
+		"getPrepareWeek": "church", "prepareLiturgies": "church", "listAssignable": "church", "listLiturgies": "church",
+		"createLiturgy": "church", "getLiturgy": "church", "updateLiturgy": "church", "deleteLiturgy": "church",
+		"listLiturgyEdits": "church", "addLiturgyItem": "church", "updateLiturgyItem": "church", "removeLiturgyItem": "church",
+		"reorderLiturgyItems": "church", "addItemSong": "church", "setItemSongs": "church", "addAssignment": "church",
+		"removeAssignment": "church",
+		"saasExtra":        "church", // added through WithRoutes without a declaration
 	}
 	extra := WithRoutes(func(api huma.API) {
 		huma.Register(api, huma.Operation{OperationID: "saasExtra", Method: http.MethodGet, Path: "/extra"},

@@ -312,7 +312,13 @@ func TestUniqueConstraintNames(t *testing.T) {
 		}
 		for want, violate := range cases {
 			var u *app.UniqueError
-			if err := violate(); !errors.As(err, &u) || u.Constraint != want {
+			err := violate()
+			// A repeated id in the same church also repeats (church_id, id); which of the
+			// two a database names first is its own choice.
+			if errors.As(err, &u) && want == "song_sections_pkey" && u.Constraint == "song_sections_church_id_key" {
+				continue
+			}
+			if !errors.As(err, &u) || u.Constraint != want {
 				t.Errorf("%s: got %v", want, err)
 			}
 		}

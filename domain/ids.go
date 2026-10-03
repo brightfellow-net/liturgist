@@ -38,4 +38,16 @@ type (
 	TemplateID string
 	// ServiceID identifies a regular service (09).
 	ServiceID string
+	// LiturgyID identifies a liturgy (10).
+	LiturgyID string
+	// ItemID identifies an item of a liturgy.
+	ItemID string
+	// ItemSongID identifies one song in a song item.
+	ItemSongID string
+	// EntryID identifies one entry of a song's sequence in a liturgy.
+	EntryID string
+	// AssignmentID identifies the assignment of a person to a duty.
+	AssignmentID string
+	// EditID identifies one row of a liturgy's history.
+	EditID string
 )

@@ -38,7 +38,6 @@ type Vocabulary struct {
 	Tx    Tx
 	Clock Clock
 	IDs   IDGenerator
-	Usage PlanningUsage
 }
 
 // NameEntryView is an entry with its actions.
@@ -219,9 +218,9 @@ func (u *Vocabulary) Delete(ctx context.Context, sess *domain.Session, kind doma
 		}
 		var inUse bool
 		if kind == domain.KindDuty {
-			inUse, err = u.Usage.DutyInUse(ctx, sc.actor.ChurchID, id)
+			inUse, err = sc.cs.Usage().DutyInUse(ctx, id)
 		} else {
-			inUse, err = u.Usage.SingingPartInUse(ctx, sc.actor.ChurchID, id)
+			inUse, err = sc.cs.Usage().SingingPartInUse(ctx, id)
 		}
 		if err != nil {
 			return err

@@ -66,6 +66,7 @@ func (a Actor) RequireHeld(want domain.ScopeSet) error {
 // churchScope is what a church-scoped use case works with inside one transaction.
 type churchScope struct {
 	cs    ChurchStore
+	users UserRepo
 	actor Actor
 	roles map[domain.RoleID]domain.Role
 }
@@ -102,7 +103,7 @@ func actorIn(ctx context.Context, s Store, sess *domain.Session, lock bool) (chu
 	if err != nil {
 		return churchScope{}, err
 	}
-	return churchScope{cs: cs, roles: roles, actor: Actor{
+	return churchScope{cs: cs, users: s.Users(), roles: roles, actor: Actor{
 		UserID: sess.UserID, ChurchID: t.ChurchID, MembershipID: m.ID, RoleIDs: m.RoleIDs,
 		Scopes: domain.EffectiveScopes(m.RoleIDs, roles),
 	}}, nil

@@ -64,6 +64,11 @@ func (r readingRepo) Update(ctx context.Context, rd domain.Reading, expectedVers
 }
 
 func (r readingRepo) Delete(ctx context.Context, id domain.ReadingID) error {
+	// Items of published liturgies lose the reference and keep reading_label.
+	if _, err := r.tx.ExecContext(ctx, r.d.Rebind("UPDATE liturgy_items SET reading_id = NULL WHERE church_id = ? AND reading_id = ?"),
+		r.churchID, id); err != nil {
+		return r.d.MapError(err)
+	}
 	res, err := r.tx.ExecContext(ctx, r.d.Rebind("DELETE FROM readings WHERE church_id = ? AND id = ?"), r.churchID, id)
 	if err != nil {
 		return r.d.MapError(err)

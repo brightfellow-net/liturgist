@@ -4,7 +4,6 @@
 package app_test
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -16,17 +15,6 @@ import (
 	"github.com/brightfellow-net/liturgist/app"
 	"github.com/brightfellow-net/liturgist/domain"
 )
-
-// planUsageStub stands in for slice 3B's check of liturgies.
-type planUsageStub struct{ duty, part bool }
-
-func (u *planUsageStub) DutyInUse(context.Context, domain.ChurchID, string) (bool, error) {
-	return u.duty, nil
-}
-
-func (u *planUsageStub) SingingPartInUse(context.Context, domain.ChurchID, string) (bool, error) {
-	return u.part, nil
-}
 
 // planner is a member who holds templates.edit (and nothing else).
 func (e cenv) planner() *domain.Session {
@@ -179,10 +167,11 @@ func TestNameLists(t *testing.T) {
 				t.Errorf("%s after delete: %+v", kind, left)
 			}
 			// A used entry cannot be deleted.
+			lid := e.draft()
 			if kind == domain.KindDuty {
-				e.planUse.duty = true
+				e.useDuty(lid, a.Entry.ID)
 			} else {
-				e.planUse.part = true
+				e.usePart(lid, a.Entry.ID)
 			}
 			want := app.ErrDutyInUse
 			if kind == domain.KindSingingPart {
@@ -191,7 +180,9 @@ func TestNameLists(t *testing.T) {
 			if err := e.vocab.Delete(e.ctx, p, kind, a.Entry.ID); !errors.Is(err, want) {
 				t.Errorf("%s delete in use: %v", kind, err)
 			}
-			e.planUse.duty, e.planUse.part = false, false
+			if err := e.liturgies.Delete(e.ctx, e.admin, lid); err != nil {
+				t.Fatal(err)
+			}
 
 			// The limit: fill up to it, the next one reports it with max and used.
 			for i := len(left); i < kind.Limit(); i++ {

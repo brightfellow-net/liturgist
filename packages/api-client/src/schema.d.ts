@@ -350,6 +350,199 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/liturgies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the liturgies the caller may see */
+        get: operations["listLiturgies"];
+        put?: never;
+        /** Create a liturgy from a service or as a one-off */
+        post: operations["createLiturgy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/liturgies/assignable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The members who can be assigned: names only */
+        get: operations["listAssignable"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/liturgies/prepare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The service times of a week and which have a liturgy */
+        get: operations["getPrepareWeek"];
+        put?: never;
+        /** Create the liturgies of the chosen service times, all or nothing */
+        post: operations["prepareLiturgies"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/liturgies/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A liturgy with its items, assignments and problems */
+        get: operations["getLiturgy"];
+        put?: never;
+        post?: never;
+        /** Delete a liturgy that is not published */
+        delete: operations["deleteLiturgy"];
+        options?: never;
+        head?: never;
+        /** Change the date, time or name of a liturgy */
+        patch: operations["updateLiturgy"];
+        trace?: never;
+    };
+    "/liturgies/{id}/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Assign a member or a named person to a duty */
+        post: operations["addAssignment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/liturgies/{id}/assignments/{aid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove an assignment */
+        delete: operations["removeAssignment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/liturgies/{id}/edits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The history of a liturgy, newest first */
+        get: operations["listLiturgyEdits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/liturgies/{id}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add an item */
+        post: operations["addLiturgyItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/liturgies/{id}/items/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set the order of the items */
+        put: operations["reorderLiturgyItems"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/liturgies/{id}/items/{iid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove an item with its songs */
+        delete: operations["removeLiturgyItem"];
+        options?: never;
+        head?: never;
+        /** Change an item */
+        patch: operations["updateLiturgyItem"];
+        trace?: never;
+    };
+    "/liturgies/{id}/items/{iid}/songs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Replace all songs of an item; every song and entry ID is new */
+        put: operations["setItemSongs"];
+        /** Add a song with its sequence filled */
+        post: operations["addItemSong"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me": {
         parameters: {
             query?: never;
@@ -845,6 +1038,54 @@ export interface components {
             phone?: string;
             token: string;
         };
+        AddAssignmentRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/AddAssignmentRequest.json
+             */
+            readonly $schema?: string;
+            duty_id: string;
+            name?: string;
+            /** @description a member of the church; exactly one of user_id and name */
+            user_id?: string;
+        };
+        AddItemSongRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/AddItemSongRequest.json
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            position?: number;
+            song_id: string;
+            /**
+             * Format: int64
+             * @description the item version the client loaded
+             */
+            version: number;
+        };
+        AddLiturgyItemRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/AddLiturgyItemRequest.json
+             */
+            readonly $schema?: string;
+            duty_id?: string;
+            /** @enum {string} */
+            item_type: "song" | "reading" | "prayer" | "sermon" | "free_text" | "other";
+            /** Format: int64 */
+            liturgy_version: number;
+            /**
+             * Format: int64
+             * @description 0 to the number of items; default: the end
+             */
+            position?: number;
+            text?: string;
+            title: string;
+        };
         AdminStruct: {
             identifier: string;
             name: string;
@@ -870,6 +1111,21 @@ export interface components {
             skipped: number;
             /** @enum {string} */
             status: "open" | "closed";
+        };
+        AssignmentView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/AssignmentView.json
+             */
+            readonly $schema?: string;
+            duty_id: string;
+            /** @description the member has left the church since; computed on every read */
+            former_member: boolean;
+            id: string;
+            /** @description the member's name, or the free-text name */
+            name: string;
+            user_id: string | null;
         };
         ChangePasswordRequest: {
             /**
@@ -950,6 +1206,27 @@ export interface components {
             name: string;
             phone?: string;
             role_ids?: string[] | null;
+        };
+        CreateLiturgyRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/CreateLiturgyRequest.json
+             */
+            readonly $schema?: string;
+            date: string;
+            /**
+             * @description default: the service's, the template's, the church's
+             * @enum {string}
+             */
+            language?: "id" | "en" | "zh-Hans" | "zh-Hant";
+            service_id?: string;
+            /** @description required for a one-off; overrides the service's name */
+            service_name?: string;
+            /** @description omitted: the service's default; empty: no template */
+            template_id?: string;
+            /** @description required with service_id; any HH:MM */
+            time?: string;
         };
         CreateReadingFromProviderRequest: {
             /**
@@ -1093,6 +1370,44 @@ export interface components {
             id: string;
             title: string;
         };
+        EditView: {
+            /** @description JSON image, null when none */
+            after: Record<string, never> | null;
+            /** @description JSON image, null when none */
+            before: Record<string, never> | null;
+            command: string;
+            /** Format: date-time */
+            created_at: string;
+            id: string;
+            item_id: string | null;
+            /** Format: int64 */
+            item_version_after: number | null;
+            /** Format: int64 */
+            liturgy_version_after: number;
+            /** Format: int64 */
+            seq: number;
+            /** @enum {string} */
+            status: "done" | "undone" | "dropped";
+            user_id: string;
+            user_name: string;
+        };
+        EntryInput: {
+            key_change?: string;
+            note?: string;
+            section_id: string;
+            singing_part_id?: string;
+        };
+        EntryView: {
+            id: string;
+            key_change: string;
+            note: string;
+            /** Format: int64 */
+            position: number;
+            /** @description null: the section was deleted; section_label keeps its name */
+            section_id: string | null;
+            section_label: string;
+            singing_part_id: string | null;
+        };
         ErrorDetail: {
             /** @description Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id' */
             location?: string;
@@ -1219,6 +1534,53 @@ export interface components {
             merge_target_version?: number;
             remove_unmatched?: boolean;
         };
+        Item4: {
+            date: string;
+            service_id: string;
+            time: string;
+        };
+        Item5: {
+            name: string;
+            user_id: string;
+        };
+        ItemResultView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/ItemResultView.json
+             */
+            readonly $schema?: string;
+            item: components["schemas"]["LiturgyItemView"];
+            /** Format: int64 */
+            liturgy_version: number;
+        };
+        ItemSongInput: {
+            /** @description the sequence: 0 to 100 entries */
+            entries: components["schemas"]["EntryInput"][] | null;
+            key?: string;
+            note?: string;
+            song_id: string;
+        };
+        ItemSongView: {
+            entries: components["schemas"]["EntryView"][] | null;
+            id: string;
+            key: string;
+            note: string;
+            /** Format: int64 */
+            position: number;
+            /** @description null when the song was deleted */
+            song: components["schemas"]["LiturgySongSummaryView"];
+            /** @description null: the song was deleted; song_title keeps its title */
+            song_id: string | null;
+            song_title: string;
+        };
+        LimitUseView: {
+            /** Format: int64 */
+            max: number;
+            unlimited: boolean;
+            /** Format: int64 */
+            used: number;
+        };
         LinkSongRequest: {
             /**
              * Format: uri
@@ -1239,6 +1601,15 @@ export interface components {
             expires_at: string;
             link: string;
         };
+        ListAssignableResponse: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/ListAssignableResponse.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["Item5"][] | null;
+        };
         ListImportsResponse: {
             /**
              * Format: uri
@@ -1247,6 +1618,26 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["ImportSummaryView"][] | null;
+        };
+        ListLiturgiesResponse: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/ListLiturgiesResponse.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["LiturgySummaryView"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
+        ListLiturgyEditsResponse: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/ListLiturgyEditsResponse.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["EditView"][] | null;
         };
         ListServicesResponse: {
             /**
@@ -1265,6 +1656,96 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["TemplateSummaryView"][] | null;
+        };
+        LiturgyActions: {
+            delete: boolean;
+            edit: boolean;
+        };
+        LiturgyItemView: {
+            duty_id: string | null;
+            id: string;
+            /** @enum {string} */
+            item_type: "song" | "reading" | "prayer" | "sermon" | "free_text" | "other";
+            /** Format: int64 */
+            position: number;
+            reading: components["schemas"]["LiturgyReadingView"];
+            /** @description null: not chosen yet, or the reading was deleted */
+            reading_id: string | null;
+            /** @description the reading's display text, kept when it is deleted */
+            reading_label: string;
+            songs: components["schemas"]["ItemSongView"][] | null;
+            text: string;
+            title: string;
+            /**
+             * Format: int64
+             * @description guards this item's content; send it back with every change of the item
+             */
+            version: number;
+        };
+        LiturgyReadingView: {
+            attribution: string;
+            id: string;
+            reference: string;
+            reference_display: string;
+            text: string;
+            translation: components["schemas"]["TranslationRefView"];
+        };
+        LiturgySongSummaryView: {
+            default_key: string;
+            hymnal_number: string;
+            hymnal_source: string;
+            /** @enum {string} */
+            language: "id" | "en" | "zh-Hans" | "zh-Hant";
+            sections: components["schemas"]["SectionRefView"][] | null;
+            title: string;
+        };
+        LiturgySummaryView: {
+            actions: components["schemas"]["LiturgyActions"];
+            date: string;
+            id: string;
+            /** Format: int64 */
+            item_count: number;
+            /** @enum {string} */
+            language: "id" | "en" | "zh-Hans" | "zh-Hant";
+            service_name: string;
+            /** @enum {string} */
+            state: "draft" | "in_review" | "needs_revision" | "approved" | "published";
+            /** @description HH:MM in the church's time zone, empty for a one-off with no time */
+            time: string;
+            /** Format: int64 */
+            version: number;
+        };
+        LiturgyView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/LiturgyView.json
+             */
+            readonly $schema?: string;
+            actions: components["schemas"]["LiturgyActions"];
+            assignments: components["schemas"]["AssignmentView"][] | null;
+            /** Format: date-time */
+            created_at: string;
+            date: string;
+            id: string;
+            items: components["schemas"]["LiturgyItemView"][] | null;
+            /** @enum {string} */
+            language: "id" | "en" | "zh-Hans" | "zh-Hant";
+            problems: components["schemas"]["ProblemView"][] | null;
+            /** @description null for a one-off, and after the service is deleted */
+            service_id: string | null;
+            service_name: string;
+            /** @enum {string} */
+            state: "draft" | "in_review" | "needs_revision" | "approved" | "published";
+            template_id: string | null;
+            time: string;
+            /** Format: date-time */
+            updated_at: string;
+            /**
+             * Format: int64
+             * @description guards the structure: the fields, and which items exist in what order
+             */
+            version: number;
         };
         LoginRequest: {
             /**
@@ -1389,6 +1870,30 @@ export interface components {
             readonly $schema?: string;
             items: components["schemas"]["NameEntryView"][] | null;
         };
+        OccurrenceView: {
+            date: string;
+            /** @enum {string} */
+            language: "id" | "en" | "zh-Hans" | "zh-Hant";
+            /** @description set when a liturgy for the slot exists */
+            liturgy_id: string | null;
+            service_id: string;
+            service_name: string;
+            template_id: string | null;
+            template_name: string | null;
+            time: string;
+        };
+        OrderResultView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/OrderResultView.json
+             */
+            readonly $schema?: string;
+            /** @description the items in order */
+            item_ids: string[] | null;
+            /** Format: int64 */
+            liturgy_version: number;
+        };
         ParsedReferenceView: {
             /**
              * Format: uri
@@ -1415,6 +1920,51 @@ export interface components {
             text_size?: string;
             ui_language?: string | null;
         };
+        PrepareLiturgiesRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/PrepareLiturgiesRequest.json
+             */
+            readonly $schema?: string;
+            /** @description 1 to 50 occurrences of services */
+            occurrences: components["schemas"]["Item4"][] | null;
+        };
+        PrepareLiturgiesResponse: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/PrepareLiturgiesResponse.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["PreparedView"][] | null;
+        };
+        PrepareWeekView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/PrepareWeekView.json
+             */
+            readonly $schema?: string;
+            limits: components["schemas"]["PrepareWeekViewLimitsStruct"];
+            occurrences: components["schemas"]["OccurrenceView"][] | null;
+            /** @description the Monday of the week */
+            week: string;
+        };
+        PrepareWeekViewLimitsStruct: {
+            max_active_liturgies: components["schemas"]["LimitUseView"];
+            max_unpublished_liturgies: components["schemas"]["LimitUseView"];
+        };
+        PreparedView: {
+            date: string;
+            /** @enum {string} */
+            language: "id" | "en" | "zh-Hans" | "zh-Hant";
+            liturgy_id: string;
+            service_name: string;
+            template_id: string | null;
+            template_name: string | null;
+            time: string;
+        };
         Problem: {
             /**
              * Format: uri
@@ -1425,11 +1975,14 @@ export interface components {
             code: string;
             detail?: string;
             errors?: components["schemas"]["ErrorDetail"][] | null;
+            item_id?: string;
             limit?: string;
+            liturgy_id?: string;
             /** Format: int64 */
             max?: number;
             reading_id?: string;
             reason?: string;
+            scope?: string;
             scopes?: string[] | null;
             section_ids?: string[] | null;
             service_ids?: string[] | null;
@@ -1438,6 +1991,13 @@ export interface components {
             title: string;
             /** Format: int64 */
             used?: number;
+        };
+        ProblemView: {
+            /** @enum {string} */
+            code: "song_missing" | "reading_missing" | "song_removed" | "reading_removed" | "section_removed";
+            entry_id?: string;
+            item_id: string;
+            item_song_id?: string;
         };
         ProviderTextView: {
             attribution: string;
@@ -1528,6 +2088,18 @@ export interface components {
             /** @description exactly the current IDs, once each */
             ids: string[] | null;
         };
+        ReorderLiturgyItemsRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/ReorderLiturgyItemsRequest.json
+             */
+            readonly $schema?: string;
+            /** @description exactly the current IDs, once each */
+            item_ids: string[] | null;
+            /** Format: int64 */
+            liturgy_version: number;
+        };
         ReorderSingingPartsRequest: {
             /**
              * Format: uri
@@ -1596,6 +2168,17 @@ export interface components {
             origin: string | null;
             scopes: string[] | null;
         };
+        SectionRefView: {
+            id: string;
+            kind: string;
+            /** @description null: derive from kind and number */
+            label: string | null;
+            /**
+             * Format: int64
+             * @description verses only; 0 otherwise
+             */
+            number: number;
+        };
         SectionView: {
             id: string;
             /** @enum {string} */
@@ -1636,6 +2219,21 @@ export interface components {
             /**
              * Format: int64
              * @description send it back with every change
+             */
+            version: number;
+        };
+        SetItemSongsRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/SetItemSongsRequest.json
+             */
+            readonly $schema?: string;
+            /** @description 0 to 10 songs */
+            songs: components["schemas"]["ItemSongInput"][] | null;
+            /**
+             * Format: int64
+             * @description the item version the client loaded
              */
             version: number;
         };
@@ -1873,6 +2471,41 @@ export interface components {
              */
             readonly $schema?: string;
             draft: components["schemas"]["SongDraftBody"];
+        };
+        UpdateLiturgyItemRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/UpdateLiturgyItemRequest.json
+             */
+            readonly $schema?: string;
+            /** @description empty clears it */
+            duty_id?: string;
+            /** @description reading items only; empty clears it */
+            reading_id?: string;
+            text?: string;
+            title?: string;
+            /**
+             * Format: int64
+             * @description the item version the client loaded
+             */
+            version: number;
+        };
+        UpdateLiturgyRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/UpdateLiturgyRequest.json
+             */
+            readonly $schema?: string;
+            date?: string;
+            service_name?: string;
+            time?: string;
+            /**
+             * Format: int64
+             * @description the liturgy version the client loaded
+             */
+            version: number;
         };
         UpdateMeRequest: {
             /**
@@ -2818,6 +3451,579 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LinkView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listLiturgies: {
+        parameters: {
+            query?: {
+                state?: "draft" | "in_review" | "needs_revision" | "approved" | "published";
+                /** @description first date, inclusive */
+                from?: string;
+                /** @description last date, inclusive */
+                to?: string;
+                /** @description default date_desc; ties by time, then ID */
+                order?: "date_asc" | "date_desc";
+                /** @description default 50, at most 100 */
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListLiturgiesResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    createLiturgy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLiturgyRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiturgyView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listAssignable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListAssignableResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getPrepareWeek: {
+        parameters: {
+            query?: {
+                /** @description any date of the week as YYYY-MM-DD; default: next week in the church's time zone */
+                week?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrepareWeekView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    prepareLiturgies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrepareLiturgiesRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrepareLiturgiesResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getLiturgy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiturgyView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    deleteLiturgy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    updateLiturgy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLiturgyRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiturgyView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    addAssignment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddAssignmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignmentView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    removeAssignment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                aid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listLiturgyEdits: {
+        parameters: {
+            query?: {
+                /** @description default 50, at most 100 */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListLiturgyEditsResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    addLiturgyItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddLiturgyItemRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemResultView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    reorderLiturgyItems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReorderLiturgyItemsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResultView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    removeLiturgyItem: {
+        parameters: {
+            query: {
+                liturgy_version: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+                iid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResultView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    updateLiturgyItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                iid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLiturgyItemRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemResultView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    setItemSongs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                iid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetItemSongsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemResultView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    addItemSong: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                iid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddItemSongRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemResultView"];
                 };
             };
             /** @description Error */

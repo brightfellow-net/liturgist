@@ -92,7 +92,7 @@ func (e *LimitReachedError) Error() string {
 
 // Errors of the song library (01 §10, 06).
 var (
-	ErrVersionConflict = errors.New("changed by someone else") // 409 version_conflict
+	ErrVersionConflict = errors.New("changed by someone else") // 409 version_conflict (untyped: a song, template or service)
 	ErrSongInUse       = errors.New("song in use")             // 409 song_in_use
 )
 
@@ -163,3 +163,33 @@ func (e *NameTakenError) Error() string { return "name taken: " + e.Reason }
 type TemplateInUseError struct{ ServiceIDs []domain.ServiceID }
 
 func (e *TemplateInUseError) Error() string { return "template in use" }
+
+// Errors of liturgies (01 §10, 10 §12).
+var (
+	ErrLiturgyLocked       = errors.New("liturgy is not editable in its state")   // 409 liturgy_locked
+	ErrLiturgyNotDeletable = errors.New("published liturgy can only be archived") // 409 liturgy_not_deletable
+	ErrAssignmentExists    = errors.New("person already has this duty")           // 409 assignment_exists
+)
+
+// Scopes of a VersionConflictError.
+const (
+	ScopeLiturgy = "liturgy"
+	ScopeItem    = "item"
+)
+
+// VersionConflictError is ErrVersionConflict that names what changed: the
+// liturgy (structure) or one item (10 §5).
+type VersionConflictError struct {
+	Scope  string
+	ItemID domain.ItemID // scope item only
+}
+
+func (e *VersionConflictError) Error() string { return "changed by someone else (" + e.Scope + ")" }
+
+// Is makes errors.Is(err, ErrVersionConflict) true.
+func (e *VersionConflictError) Is(target error) bool { return target == ErrVersionConflict }
+
+// LiturgyExistsError maps to 409 liturgy_exists with the liturgy of the slot.
+type LiturgyExistsError struct{ ID domain.LiturgyID }
+
+func (e *LiturgyExistsError) Error() string { return "liturgy exists: " + string(e.ID) }

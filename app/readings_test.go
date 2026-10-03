@@ -16,13 +16,6 @@ import (
 	"github.com/brightfellow-net/liturgist/domain"
 )
 
-// readingUsageStub stands in for step 3's check of liturgies.
-type readingUsageStub struct{ inUse bool }
-
-func (u *readingUsageStub) ReadingInUse(context.Context, domain.ChurchID, domain.ReadingID) (bool, error) {
-	return u.inUse, nil
-}
-
 // fakeProvider answers from a table, or misbehaves in one chosen way.
 type fakeProvider struct {
 	id    string
@@ -163,14 +156,17 @@ func TestReadingUpdateDelete(t *testing.T) {
 		t.Errorf("failed updates changed the reading: %+v", got.Reading)
 	}
 
-	e.readUse.inUse = true
+	lid := e.draft()
+	e.useReading(lid, id)
 	if err := e.readings.Delete(e.ctx, e.admin, id); !errors.Is(err, app.ErrReadingInUse) {
 		t.Errorf("delete in use: %v", err)
 	}
 	if _, err := e.readings.Get(e.ctx, e.admin, id); err != nil {
 		t.Errorf("a reading in use must stay: %v", err)
 	}
-	e.readUse.inUse = false
+	if err := e.liturgies.Delete(e.ctx, e.admin, lid); err != nil {
+		t.Fatal(err)
+	}
 	if err := e.readings.Delete(e.ctx, e.admin, id); err != nil {
 		t.Fatal(err)
 	}

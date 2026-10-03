@@ -389,7 +389,8 @@ func TestImportMergeRemovalAndMissingTarget(t *testing.T) {
 		e.decide(b.Batch.ID, app.DecisionInput{ID: c.ID, Decision: domain.DecisionMerge, MergeInto: existing.Song.ID,
 			MergeTargetVersion: pv.TargetVersion, RemoveUnmatched: remove})
 	}
-	e.usage.busy = []domain.SectionID{existing.Song.Sections[1].ID} // the chorus is in use
+	lid := e.draft()
+	e.useSections(lid, existing.Song.ID, existing.Song.Sections[1].ID) // the chorus is in use
 	merge(true)
 	res, err := e.imports.Apply(e.ctx, e.admin, b.Batch.ID)
 	if err != nil || len(res.Failed) != 1 || res.Failed[0].Code != domain.CodeSectionInUse {
@@ -402,7 +403,9 @@ func TestImportMergeRemovalAndMissingTarget(t *testing.T) {
 	}
 	// A target deleted after the decision: not_found.
 	b2 := e.batch(pasteReq("Besar Setia-Mu", "1. lagi"))
-	e.usage.busy = nil
+	if err := e.liturgies.Delete(e.ctx, e.admin, lid); err != nil {
+		t.Fatal(err)
+	}
 	pv, _ := e.imports.MergePreview(e.ctx, e.admin, b2.Batch.ID, b2.Candidates[0].ID, existing.Song.ID, false)
 	e.decide(b2.Batch.ID, app.DecisionInput{ID: b2.Candidates[0].ID, Decision: domain.DecisionMerge, MergeInto: existing.Song.ID, MergeTargetVersion: pv.TargetVersion})
 	if err := e.songs.Delete(e.ctx, e.admin, existing.Song.ID); err != nil {

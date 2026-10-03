@@ -39,32 +39,30 @@ func (l limitStub) Limit(context.Context, domain.ChurchID, app.LimitName) (app.L
 
 // cenv is a set-up church with every use case wired on one database.
 type cenv struct {
-	t        *testing.T
-	db       *sqlstore.DB
-	clock    *clock
-	ids      app.IDGenerator
-	setup    *app.Setup
-	churches *app.Churches
-	members  *app.Members
-	roles    *app.Roles
-	invites  *app.Invites
-	resets   *app.Resets
-	songs    *app.Songs
-	usage    *usageStub
-	readings *app.Readings
-	readUse  *readingUsageStub
-	vocab    *app.Vocabulary
-	tpls     *app.Templates
-	svcs     *app.Services
-	seed     *app.Seed
-	planUse  *planUsageStub
-	imports  *app.Imports
-	operator *app.Operator
-	account  *app.Account
-	auth     *app.Auth
-	church   domain.ChurchID
-	ctx      context.Context // carries the tenant
-	admin    *domain.Session
+	t         *testing.T
+	db        *sqlstore.DB
+	clock     *clock
+	ids       app.IDGenerator
+	setup     *app.Setup
+	churches  *app.Churches
+	members   *app.Members
+	roles     *app.Roles
+	invites   *app.Invites
+	resets    *app.Resets
+	songs     *app.Songs
+	readings  *app.Readings
+	vocab     *app.Vocabulary
+	tpls      *app.Templates
+	svcs      *app.Services
+	seed      *app.Seed
+	liturgies *app.Liturgies
+	imports   *app.Imports
+	operator  *app.Operator
+	account   *app.Account
+	auth      *app.Auth
+	church    domain.ChurchID
+	ctx       context.Context // carries the tenant
+	admin     *domain.Session
 }
 
 func wireChurch(t *testing.T, db *sqlstore.DB, ent app.Entitlements) cenv {
@@ -77,29 +75,26 @@ func wireChurch(t *testing.T, db *sqlstore.DB, ent app.Entitlements) cenv {
 	if ent == nil {
 		ent = unlimited.Entitlements{}
 	}
-	usage := &usageStub{}
-	readUse := &readingUsageStub{}
-	planUse := &planUsageStub{}
-	songs := &app.Songs{Tx: db, Clock: c, IDs: ids, Usage: usage}
-	return cenv{t: t, db: db, clock: c, ids: ids, auth: auth, usage: usage, readUse: readUse,
+	songs := &app.Songs{Tx: db, Clock: c, IDs: ids}
+	return cenv{t: t, db: db, clock: c, ids: ids, auth: auth,
 		songs: songs,
 		imports: &app.Imports{Tx: db, Clock: c, IDs: ids, Songs: songs, Importers: map[domain.ImportFormat]app.Importer{
 			domain.FormatPaste: paste.Importer{}, domain.FormatChordPro: chordpro.Importer{}, domain.FormatOpenLyrics: openlyrics.Importer{}}},
-		readings: &app.Readings{Tx: db, Clock: c, IDs: ids, Usage: readUse},
-		planUse:  planUse,
-		vocab:    &app.Vocabulary{Tx: db, Clock: c, IDs: ids, Usage: planUse},
-		tpls:     &app.Templates{Tx: db, Clock: c, IDs: ids},
-		svcs:     &app.Services{Tx: db, Clock: c, IDs: ids},
-		seed:     &app.Seed{Tx: db, Clock: c, IDs: ids},
-		setup:    &app.Setup{Tx: db, Hasher: h, Clock: c, IDs: ids, Auth: auth},
-		churches: &app.Churches{Tx: db, Clock: c},
-		members:  &app.Members{Tx: db, Clock: c, Entitlements: ent},
-		roles:    &app.Roles{Tx: db, Clock: c, IDs: ids},
-		invites:  &app.Invites{Tx: db, Hasher: h, Clock: c, IDs: ids, URLs: urls, Entitlements: ent, Auth: auth},
-		resets:   &app.Resets{Tx: db, Hasher: h, Clock: c, IDs: ids, URLs: urls, Auth: auth},
-		operator: &app.Operator{Tx: db, Clock: c, IDs: ids},
-		account:  &app.Account{Tx: db, Hasher: h, Clock: c, Auth: auth},
-		ctx:      ctx,
+		readings:  &app.Readings{Tx: db, Clock: c, IDs: ids},
+		liturgies: &app.Liturgies{Tx: db, Clock: c, IDs: ids, Entitlements: ent},
+		vocab:     &app.Vocabulary{Tx: db, Clock: c, IDs: ids},
+		tpls:      &app.Templates{Tx: db, Clock: c, IDs: ids},
+		svcs:      &app.Services{Tx: db, Clock: c, IDs: ids},
+		seed:      &app.Seed{Tx: db, Clock: c, IDs: ids},
+		setup:     &app.Setup{Tx: db, Hasher: h, Clock: c, IDs: ids, Auth: auth},
+		churches:  &app.Churches{Tx: db, Clock: c},
+		members:   &app.Members{Tx: db, Clock: c, Entitlements: ent},
+		roles:     &app.Roles{Tx: db, Clock: c, IDs: ids},
+		invites:   &app.Invites{Tx: db, Hasher: h, Clock: c, IDs: ids, URLs: urls, Entitlements: ent, Auth: auth},
+		resets:    &app.Resets{Tx: db, Hasher: h, Clock: c, IDs: ids, URLs: urls, Auth: auth},
+		operator:  &app.Operator{Tx: db, Clock: c, IDs: ids},
+		account:   &app.Account{Tx: db, Hasher: h, Clock: c, Auth: auth},
+		ctx:       ctx,
 	}
 }
 

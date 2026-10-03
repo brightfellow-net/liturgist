@@ -53,6 +53,11 @@ type ChurchStore interface {
 	Templates() TemplateRepo    // liturgy templates (09 §2.2)
 	Services() ServiceRepo      // regular services (09 §2.4)
 	Seeds() SeedRepo            // the markers of seeded defaults (09 §3)
+	Liturgies() LiturgyRepo     // liturgies (10 §2.1)
+	LiturgyItems() ItemRepo     // items, item songs and sequences (10 §2.2, §2.3)
+	Assignments() AssignmentRepo
+	Edits() EditRepo  // the history of a liturgy (10 §7)
+	Usage() UsageRepo // what unpublished liturgies refer to (10 §6)
 }
 
 // Clock returns the current time in UTC, truncated to microseconds (02 §4).
@@ -266,27 +271,6 @@ type SongRepo interface {
 	FindDuplicate(ctx context.Context, hymnalKey, titleKey, language string) (DuplicateRef, bool, error)
 }
 
-// SongUsage tells whether unpublished liturgies use a song or its sections
-// (06 §6). Step 2 has no liturgies: NeverUsed answers "unused"; step 3
-// replaces it with a query.
-type SongUsage interface {
-	SongInUse(ctx context.Context, church domain.ChurchID, song domain.SongID) (bool, error)
-	SectionsInUse(ctx context.Context, church domain.ChurchID, song domain.SongID, sections []domain.SectionID) ([]domain.SectionID, error)
-}
-
-// NeverUsed is the step-2 usage check: nothing is ever in use.
-type NeverUsed struct{}
-
-// SongInUse implements SongUsage.
-func (NeverUsed) SongInUse(context.Context, domain.ChurchID, domain.SongID) (bool, error) {
-	return false, nil
-}
-
-// SectionsInUse implements SongUsage.
-func (NeverUsed) SectionsInUse(context.Context, domain.ChurchID, domain.SongID, []domain.SectionID) ([]domain.SectionID, error) {
-	return nil, nil
-}
-
 // ReadingRepo stores the church's readings (07 §6). Unique on (reference,
 // translation): a second Create returns a UniqueError named readings_church_ref_key.
 type ReadingRepo interface {
@@ -319,17 +303,6 @@ type ReadingRow struct {
 	ReferenceDisplay string
 	Translation      domain.Translation
 	TextStart        string
-}
-
-// ReadingUsage tells whether unpublished liturgies use a reading (07 §6).
-// Step 2 has no liturgies: NeverUsed answers "unused".
-type ReadingUsage interface {
-	ReadingInUse(ctx context.Context, church domain.ChurchID, reading domain.ReadingID) (bool, error)
-}
-
-// ReadingInUse implements ReadingUsage.
-func (NeverUsed) ReadingInUse(context.Context, domain.ChurchID, domain.ReadingID) (bool, error) {
-	return false, nil
 }
 
 // DuplicateRef is an existing song a candidate may duplicate.
@@ -421,18 +394,103 @@ type SeedRepo interface {
 	Mark(ctx context.Context, key string, at time.Time) error
 }
 
-// PlanningUsage tells whether liturgies use a duty or a singing part (09
-// §2.1). Slice 3A has no liturgies: NeverUsed answers "unused"; slice 3B
-// replaces it with a query.
-type PlanningUsage interface {
-	DutyInUse(ctx context.Context, church domain.ChurchID, duty string) (bool, error)
-	SingingPartInUse(ctx context.Context, church domain.ChurchID, part string) (bool, error)
+// LiturgyFilter selects the liturgies of a list (10 §4). Empty fields do not filter.
+type LiturgyFilter struct {
+	State         domain.LiturgyState
+	From, To      string // inclusive dates
+	Ascending     bool   // by date, then time, then ID
+	Limit, Offset int
 }
 
-// DutyInUse implements PlanningUsage.
-func (NeverUsed) DutyInUse(context.Context, domain.ChurchID, string) (bool, error) { return false, nil }
+// LiturgyRow is a liturgy in a list.
+type LiturgyRow struct {
+	Liturgy   domain.Liturgy
+	ItemCount int
+}
 
-// SingingPartInUse implements PlanningUsage.
-func (NeverUsed) SingingPartInUse(context.Context, domain.ChurchID, string) (bool, error) {
-	return false, nil
+// Slot is the (service, date, time) a service liturgy occupies (10 §2.1).
+type Slot struct {
+	ServiceID  domain.ServiceID
+	Date, Time string
+}
+
+// LiturgyRepo stores liturgies (10 §2.1).
+type LiturgyRepo interface {
+	// Create stores the liturgy; UniqueError liturgies_service_slot_key.
+	Create(ctx context.Context, l domain.Liturgy) error
+	ByID(ctx context.Context, id domain.LiturgyID) (domain.Liturgy, error) // ErrNotFound
+	List(ctx context.Context, f LiturgyFilter) ([]LiturgyRow, int, error)  // page and total
+	// CountActive counts the liturgies that are not archived and are in one of
+	// states (any state when states is empty).
+	CountActive(ctx context.Context, states []domain.LiturgyState) (int, error)
+	// Slots maps the slots of service liturgies with a date in from..to to the liturgy.
+	Slots(ctx context.Context, from, to string) (map[Slot]domain.LiturgyID, error)
+	// Update writes date, time and service name and sets the version to
+	// expectedVersion+1 when the stored version is expectedVersion (atomic
+	// conditional update, 02 §2.1); false when it is not or the liturgy is missing.
+	// UniqueError liturgies_service_slot_key.
+	Update(ctx context.Context, l domain.Liturgy, expectedVersion int) (bool, error)
+	// Bump adds one to the version under the same condition.
+	Bump(ctx context.Context, id domain.LiturgyID, expectedVersion int, now time.Time) (bool, error)
+	// NextSeq takes the next number of the history (UPDATE … RETURNING), which
+	// holds the liturgy's row lock until the transaction ends (10 §5).
+	NextSeq(ctx context.Context, id domain.LiturgyID) (int, error)
+	// Delete removes the liturgy with its items, songs, entries, assignments and history.
+	Delete(ctx context.Context, id domain.LiturgyID) error
+}
+
+// ItemRepo stores the items of liturgies with their songs and sequences (10 §2.2, §2.3).
+type ItemRepo interface {
+	// ByLiturgy returns the items by position, complete with songs and entries.
+	ByLiturgy(ctx context.Context, liturgy domain.LiturgyID) ([]domain.Item, error)
+	// ByID returns one complete item of the liturgy; ErrNotFound.
+	ByID(ctx context.Context, liturgy domain.LiturgyID, id domain.ItemID) (domain.Item, error)
+	IDs(ctx context.Context, liturgy domain.LiturgyID) ([]domain.ItemID, error) // by position
+	// Insert stores the item with its songs and entries.
+	Insert(ctx context.Context, it domain.Item) error
+	// SetPositions gives the items the positions 0..n-1 in the order of ids.
+	SetPositions(ctx context.Context, liturgy domain.LiturgyID, ids []domain.ItemID) error
+	// Delete removes the item with its songs and entries.
+	Delete(ctx context.Context, liturgy domain.LiturgyID, id domain.ItemID) error
+	// Update writes title, duty, text and reading, and sets the version to
+	// expectedVersion+1 when the stored version is expectedVersion; false otherwise.
+	Update(ctx context.Context, it domain.Item, expectedVersion int) (bool, error)
+	// Bump adds one to the item's version under the same condition.
+	Bump(ctx context.Context, id domain.ItemID, expectedVersion int, now time.Time) (bool, error)
+	// InsertSong adds one song with its entries to the item.
+	InsertSong(ctx context.Context, item domain.ItemID, s domain.LiturgySong) error
+	// SetSongPositions gives the item's songs the positions 0..n-1 in the order of ids.
+	SetSongPositions(ctx context.Context, item domain.ItemID, ids []domain.ItemSongID) error
+	// ReplaceSongs deletes every song and entry of the item and stores songs.
+	ReplaceSongs(ctx context.Context, item domain.ItemID, songs []domain.LiturgySong) error
+}
+
+// AssignmentRepo stores assignments (10 §2.4).
+type AssignmentRepo interface {
+	// Add stores the assignment; UniqueError assignments_user_key / assignments_name_key.
+	Add(ctx context.Context, a domain.Assignment) error
+	ByID(ctx context.Context, liturgy domain.LiturgyID, id domain.AssignmentID) (domain.Assignment, error) // ErrNotFound
+	ByLiturgy(ctx context.Context, liturgy domain.LiturgyID) ([]domain.Assignment, error)                  // by creation
+	Count(ctx context.Context, liturgy domain.LiturgyID) (int, error)
+	Remove(ctx context.Context, liturgy domain.LiturgyID, id domain.AssignmentID) error // ErrNotFound
+}
+
+// EditRepo stores the history of liturgies (10 §7).
+type EditRepo interface {
+	Append(ctx context.Context, e domain.Edit) error
+	// List returns the newest rows first, at most limit.
+	List(ctx context.Context, liturgy domain.LiturgyID, limit int) ([]domain.Edit, error)
+}
+
+// UsageRepo tells what liturgies refer to. It runs in the caller's
+// transaction, under LockChurch, so a delete cannot pass while a liturgy adds
+// the reference (10 §6). A song, section or reading is in use when a liturgy
+// that is not published refers to it.
+type UsageRepo interface {
+	SongInUse(ctx context.Context, song domain.SongID) (bool, error)
+	// SectionsInUse returns those of sections that entries refer to.
+	SectionsInUse(ctx context.Context, song domain.SongID, sections []domain.SectionID) ([]domain.SectionID, error)
+	ReadingInUse(ctx context.Context, reading domain.ReadingID) (bool, error)
+	DutyInUse(ctx context.Context, duty string) (bool, error)
+	SingingPartInUse(ctx context.Context, part string) (bool, error)
 }

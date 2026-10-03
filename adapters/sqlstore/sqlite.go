@@ -146,7 +146,22 @@ var sqliteUniqueNames = map[string]string{ //nolint:gosec // constraint names, n
 	"service_times.service_id, service_times.weekday, service_times.time": "service_times_slot_key",
 	"church_seeds.church_id, church_seeds.seed_key":                       "church_seeds_pkey",
 
-	"readings.id": "readings_pkey",
+	"liturgies.id":                      "liturgies_pkey",
+	"liturgies.church_id, liturgies.id": "liturgies_church_id_key",
+	"liturgies.church_id, liturgies.service_id, liturgies.date, liturgies.time": "liturgies_service_slot_key",
+	"liturgy_items.id":                                    "liturgy_items_pkey",
+	"liturgy_items.church_id, liturgy_items.id":           "liturgy_items_church_id_key",
+	"liturgy_item_songs.id":                               "liturgy_item_songs_pkey",
+	"liturgy_item_songs.church_id, liturgy_item_songs.id": "liturgy_item_songs_church_id_key",
+	"sequence_entries.id":                                 "sequence_entries_pkey",
+	"assignments.id":                                      "assignments_pkey",
+	"assignments.liturgy_id, assignments.duty_id, assignments.user_id":  "assignments_user_key",
+	"assignments.liturgy_id, assignments.duty_id, assignments.name_key": "assignments_name_key",
+	"liturgy_edits.id": "liturgy_edits_pkey",
+	"liturgy_edits.liturgy_id, liturgy_edits.seq": "liturgy_edits_seq_key",
+
+	"readings.id":                     "readings_pkey",
+	"readings.church_id, readings.id": "readings_church_id_key",
 	"readings.church_id, readings.reference, readings.translation_id": "readings_church_ref_key",
 
 	"roles.id":                        "roles_pkey",
@@ -185,7 +200,8 @@ var sqliteUniqueNames = map[string]string{ //nolint:gosec // constraint names, n
 	"songs.id":                  "songs_pkey",
 	"songs.church_id, songs.id": "songs_church_id_key",
 
-	"song_sections.id": "song_sections_pkey",
+	"song_sections.id":                                                 "song_sections_pkey",
+	"song_sections.church_id, song_sections.id":                        "song_sections_church_id_key",
 	"song_sections.church_id, song_sections.song_id, song_sections.id": "song_sections_church_song_id_key",
 
 	"song_arrangement_entries.song_id, song_arrangement_entries.position": "song_arrangement_entries_pkey",

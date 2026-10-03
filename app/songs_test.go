@@ -15,26 +15,6 @@ import (
 	"github.com/brightfellow-net/liturgist/domain"
 )
 
-// usageStub stands in for step 3's check of liturgies.
-type usageStub struct {
-	songInUse bool
-	busy      []domain.SectionID
-}
-
-func (u *usageStub) SongInUse(context.Context, domain.ChurchID, domain.SongID) (bool, error) {
-	return u.songInUse, nil
-}
-
-func (u *usageStub) SectionsInUse(_ context.Context, _ domain.ChurchID, _ domain.SongID, secs []domain.SectionID) ([]domain.SectionID, error) {
-	var out []domain.SectionID
-	for _, s := range secs {
-		if slices.Contains(u.busy, s) {
-			out = append(out, s)
-		}
-	}
-	return out, nil
-}
-
 func verse(key string, n int, text string) app.SectionInput {
 	return app.SectionInput{Key: key, Kind: domain.SectionVerse, Number: n, Text: text}
 }
@@ -220,7 +200,8 @@ func TestSongSectionInUse(t *testing.T) {
 	e := newChurch(t, sqlstoretest.NewSQLite(t), nil)
 	v := e.newSong("Besar Setia-Mu", "id")
 	c, v2 := v.Song.Sections[1].ID, v.Song.Sections[2].ID
-	e.usage.busy = []domain.SectionID{c}
+	lid := e.draft()
+	e.useSections(lid, v.Song.ID, c)
 	withoutChorus := []app.SectionInput{
 		{ID: v.Song.Sections[0].ID, Kind: domain.SectionVerse, Number: 1, Text: "bait satu"},
 		{ID: v2, Kind: domain.SectionVerse, Number: 2, Text: "bait dua"},
@@ -240,11 +221,12 @@ func TestSongSectionInUse(t *testing.T) {
 	if _, err := e.songs.Update(e.ctx, e.admin, v.Song.ID, app.SongChange{Version: 1, Sections: &withoutVerse}); err != nil {
 		t.Errorf("removing a section not in use: %v", err)
 	}
-	e.usage.songInUse = true
 	if err := e.songs.Delete(e.ctx, e.admin, v.Song.ID); !errors.Is(err, app.ErrSongInUse) {
 		t.Errorf("deleting a song in use: %v", err)
 	}
-	e.usage.songInUse = false
+	if err := e.liturgies.Delete(e.ctx, e.admin, lid); err != nil {
+		t.Fatal(err)
+	}
 	if err := e.songs.Delete(e.ctx, e.admin, v.Song.ID); err != nil {
 		t.Errorf("delete: %v", err)
 	}

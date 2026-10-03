@@ -25,7 +25,6 @@ type Readings struct {
 	Tx        Tx
 	Clock     Clock
 	IDs       IDGenerator
-	Usage     ReadingUsage
 	Providers []BibleTextProvider
 	Log       *slog.Logger
 	// ProviderTimeout is the deadline of every provider lookup; zero means
@@ -464,7 +463,7 @@ func (u *Readings) Update(ctx context.Context, sess *domain.Session, id domain.R
 // Delete removes a reading for good (library.edit).
 func (u *Readings) Delete(ctx context.Context, sess *domain.Session, id domain.ReadingID) error {
 	return u.Tx.Write(ctx, func(s Store) error {
-		sc, err := actorIn(ctx, s, sess, false)
+		sc, err := actorIn(ctx, s, sess, true)
 		if err != nil {
 			return err
 		}
@@ -474,7 +473,7 @@ func (u *Readings) Delete(ctx context.Context, sess *domain.Session, id domain.R
 		if _, err := sc.cs.Readings().ByID(ctx, id); err != nil {
 			return missing(err)
 		}
-		inUse, err := u.Usage.ReadingInUse(ctx, sc.actor.ChurchID, id)
+		inUse, err := sc.cs.Usage().ReadingInUse(ctx, id)
 		if err != nil {
 			return err
 		}

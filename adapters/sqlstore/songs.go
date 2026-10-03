@@ -165,6 +165,10 @@ func (r songRepo) replaceSections(ctx context.Context, s domain.Song) error {
 	}
 	for _, id := range have {
 		if !keep[id] {
+			if _, err := r.tx.ExecContext(ctx, r.d.Rebind("UPDATE sequence_entries SET song_section_id = NULL WHERE church_id = ? AND song_section_id = ?"),
+				r.churchID, id); err != nil {
+				return r.d.MapError(err)
+			}
 			if _, err := r.tx.ExecContext(ctx, r.d.Rebind("DELETE FROM song_sections WHERE church_id = ? AND song_id = ? AND id = ?"),
 				r.churchID, s.ID, id); err != nil {
 				return r.d.MapError(err)
@@ -194,6 +198,18 @@ func (r songRepo) replaceSections(ctx context.Context, s domain.Song) error {
 }
 
 func (r songRepo) Delete(ctx context.Context, id domain.SongID) error {
+	// Liturgies that still refer to the song or its sections (published ones: the
+	// use case refuses the rest) lose the reference and keep their snapshots. The
+	// foreign keys stay RESTRICT (schema "Clearing references").
+	if _, err := r.tx.ExecContext(ctx, r.d.Rebind(`UPDATE sequence_entries SET song_section_id = NULL
+		WHERE church_id = ? AND song_section_id IN (SELECT id FROM song_sections WHERE church_id = ? AND song_id = ?)`),
+		r.churchID, r.churchID, id); err != nil {
+		return r.d.MapError(err)
+	}
+	if _, err := r.tx.ExecContext(ctx, r.d.Rebind("UPDATE liturgy_item_songs SET song_id = NULL WHERE church_id = ? AND song_id = ?"),
+		r.churchID, id); err != nil {
+		return r.d.MapError(err)
+	}
 	if err := r.d.DeleteSongIndex(ctx, r.tx, string(r.churchID), string(id)); err != nil {
 		return err
 	}

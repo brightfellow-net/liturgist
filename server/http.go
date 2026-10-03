@@ -33,6 +33,7 @@ type deps struct {
 	church   httpapi.ChurchDeps
 	library  httpapi.LibraryDeps
 	planning httpapi.PlanningDeps
+	liturgy  httpapi.LiturgyDeps
 	session  func(http.Handler) http.Handler // nil: no session middleware (OpenAPI only)
 	resolver httpapi.TenantResolver          // nil: no tenant middleware (OpenAPI only)
 }
@@ -101,6 +102,7 @@ func newAPI(router chi.Router, o options, d deps) huma.API {
 	httpapi.RegisterChurch(api, d.church)
 	httpapi.RegisterLibrary(api, d.library)
 	httpapi.RegisterPlanning(api, d.planning)
+	httpapi.RegisterLiturgies(api, d.liturgy)
 	for _, fn := range o.routes {
 		fn(api)
 	}

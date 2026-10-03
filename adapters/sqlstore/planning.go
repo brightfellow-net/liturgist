@@ -228,6 +228,11 @@ func (r templateRepo) Update(ctx context.Context, t domain.Template, expectedVer
 }
 
 func (r templateRepo) Delete(ctx context.Context, id domain.TemplateID) error {
+	// Liturgies made from the template keep their items and lose the reference.
+	if _, err := r.tx.ExecContext(ctx, r.d.Rebind("UPDATE liturgies SET template_id = NULL WHERE church_id = ? AND template_id = ?"),
+		r.churchID, id); err != nil {
+		return r.d.MapError(err)
+	}
 	res, err := r.tx.ExecContext(ctx, r.d.Rebind("DELETE FROM templates WHERE church_id = ? AND id = ?"), r.churchID, id)
 	return rowsOrNotFound(r.d, res, err)
 }
@@ -379,6 +384,11 @@ func (r serviceRepo) Update(ctx context.Context, s domain.Service, expectedVersi
 }
 
 func (r serviceRepo) Delete(ctx context.Context, id domain.ServiceID) error {
+	// Liturgies of the service keep service_name and lose the reference.
+	if _, err := r.tx.ExecContext(ctx, r.d.Rebind("UPDATE liturgies SET service_id = NULL WHERE church_id = ? AND service_id = ?"),
+		r.churchID, id); err != nil {
+		return r.d.MapError(err)
+	}
 	res, err := r.tx.ExecContext(ctx, r.d.Rebind("DELETE FROM services WHERE church_id = ? AND id = ?"), r.churchID, id)
 	return rowsOrNotFound(r.d, res, err)
 }

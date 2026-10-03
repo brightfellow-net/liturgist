@@ -54,6 +54,12 @@ func churchRowsIn(t *testing.T, s app.Store, db *sqlstore.DB, cid string) string
 			"SELECT * FROM services WHERE church_id = ? ORDER BY id",
 			"SELECT * FROM service_times WHERE church_id = ? ORDER BY id",
 			"SELECT * FROM church_seeds WHERE church_id = ? ORDER BY seed_key",
+			"SELECT * FROM liturgies WHERE church_id = ? ORDER BY id",
+			"SELECT * FROM liturgy_items WHERE church_id = ? ORDER BY id",
+			"SELECT * FROM liturgy_item_songs WHERE church_id = ? ORDER BY id",
+			"SELECT * FROM sequence_entries WHERE church_id = ? ORDER BY id",
+			"SELECT * FROM assignments WHERE church_id = ? ORDER BY id",
+			"SELECT * FROM liturgy_edits WHERE church_id = ? ORDER BY id",
 		} {
 			rows, err := sqlstore.RawTx(s).QueryxContext(ctx, db.Dialect().Rebind(q), cid)
 			if err != nil {
@@ -409,6 +415,9 @@ func TestScopedRepositories(t *testing.T) {
 	for k, fn := range planningHarness(errRollback, notFound, unchanged) {
 		harness[k] = fn
 	}
+	for k, fn := range liturgyHarness(errRollback, notFound, unchanged) {
+		harness[k] = fn
+	}
 
 	// Reflection check: the harness covers every method of every repository.
 	var want []string
@@ -492,7 +501,7 @@ func TestScopedRepositories(t *testing.T) {
 					return err
 				}
 			}
-			return nil
+			return seedLiturgies(a, b, f.now)
 		})
 
 		// Each call runs in its own transaction, rolled back afterwards, so
