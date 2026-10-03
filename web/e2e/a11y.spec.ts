@@ -160,3 +160,41 @@ test.describe("E2E-W-005 accessibility of the import pages", () => {
     await expect(page.getByRole("heading", { name: "Songs", level: 1 }).or(page.getByRole("heading", { name: "Library", level: 1 }))).toBeVisible();
   });
 });
+
+test.describe("E2E-W-005 accessibility of the planning pages", () => {
+  test("templates, services, duties and singing parts", async ({ browser }) => {
+    const page = await adminPage(browser);
+    await page.goto("/liturgies/templates");
+    await expect(page.getByRole("heading", { name: "Templates", level: 2 })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Ibadah Minggu" })).toBeVisible();
+    await expectAccessible(page);
+
+    await page.getByRole("link", { name: "Ibadah Minggu" }).click();
+    await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Ibadah Minggu");
+    await expectAccessible(page);
+    await page.getByRole("button", { name: "Save changes" }).click(); // nothing changed: valid, back to the list
+    await page.getByRole("link", { name: "Add a template" }).click();
+    await page.getByRole("button", { name: "Add an item" }).click();
+    await page.getByRole("button", { name: "Save template" }).click(); // shows the errors
+    await expect(page.getByText("Enter a name.")).toBeVisible();
+    await expect(page.getByText("Enter a title.")).toBeVisible();
+    await expectAccessible(page);
+
+    await page.goto("/liturgies/services");
+    await expect(page.getByRole("heading", { name: "No services yet" })).toBeVisible();
+    await expectAccessible(page);
+    await page.getByRole("link", { name: "Add a service" }).first().click();
+    await page.getByRole("button", { name: "Save service" }).click(); // shows the errors
+    await expect(page.getByText("Enter a time.")).toBeVisible();
+    await expectAccessible(page);
+
+    for (const [path, heading] of [["/liturgies/duties", "Duties"], ["/liturgies/singing-parts", "Singing parts"]] as const) {
+      await page.goto(path);
+      await expect(page.getByRole("heading", { name: heading, level: 2 })).toBeVisible();
+      await expect(page.getByRole("listitem").first()).toBeVisible();
+      await expectAccessible(page);
+    }
+    await page.getByRole("button", { name: "Rename Semua" }).click();
+    await expectAccessible(page);
+  });
+});

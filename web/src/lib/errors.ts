@@ -9,6 +9,7 @@ export const errorCodes = [
   "not_found", "invalid_token", "already_set_up", "not_set_up", "already_member", "invite_exists",
   "identifier_taken", "lockout_prevented", "role_name_taken", "reset_not_allowed", "too_many_attempts",
   "version_conflict", "song_in_use", "section_in_use", "group_conflict",
+  "name_taken", "duty_in_use", "singing_part_in_use", "template_in_use",
   "invalid_reference", "reading_exists", "reading_in_use", "import_unreadable", "import_conflict",
   "internal", "unavailable",
 ] as const;
@@ -86,6 +87,13 @@ export function errorText(t: TFunction, err: unknown, scopeName: (scope: string)
     case "import_conflict": {
       const text = t(`errors.${p.code}.${p.reason ?? ""}`, { defaultValue: "" });
       return text || t(`errors.${p.code}.unknown`);
+    }
+    case "validation_failed":
+      // A fixed count such as 50 duties (09 §2.1): say how many are allowed.
+      return p.reason === "limit" ? t("errors.limit", { max: p.max ?? 0 }) : t("errors.validation_failed");
+    case "name_taken": {
+      const text = t(`errors.name_taken.${p.reason ?? ""}`, { defaultValue: "" });
+      return text || t("errors.name_taken.unknown");
     }
     case "limit_reached":
       return t("errors.limit_reached", { max: p.max ?? 0 });

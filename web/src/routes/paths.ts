@@ -21,6 +21,15 @@ export const paths = {
   readingNew: "/library/readings/new",
   reading: "/library/readings/:id",
   import: "/library/import",
+  planning: "/liturgies",
+  templates: "/liturgies/templates",
+  templateNew: "/liturgies/templates/new",
+  template: "/liturgies/templates/:id",
+  services: "/liturgies/services",
+  serviceNew: "/liturgies/services/new",
+  service: "/liturgies/services/:id",
+  duties: "/liturgies/duties",
+  singingParts: "/liturgies/singing-parts",
   importReview: "/library/import/:id",
 } as const;
 
@@ -40,6 +49,10 @@ export function safeNext(next: string | null): string {
 
 // readingPath fills in a reading's ID.
 export const readingPath = (id: string) => paths.reading.replace(":id", encodeURIComponent(id));
+
+// templatePath and servicePath fill in an ID.
+export const templatePath = (id: string) => paths.template.replace(":id", encodeURIComponent(id));
+export const servicePath = (id: string) => paths.service.replace(":id", encodeURIComponent(id));
 
 // importPath fills in an import batch's ID.
 export const importPath = (id: string) => paths.importReview.replace(":id", encodeURIComponent(id));

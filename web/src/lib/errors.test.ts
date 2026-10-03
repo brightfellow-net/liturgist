@@ -26,6 +26,16 @@ describe("TC-W-002 error messages", () => {
     expect(errorText(t, apiError(403, { code: "limit_reached", max: 12 }))).toContain("12 team members");
   });
 
+  it("explains the planning errors", () => {
+    expect(errorText(t, apiError(409, { code: "name_taken", reason: "template" }))).toBe("There is already a template with this name.");
+    expect(errorText(t, apiError(409, { code: "name_taken" }))).toBe("This name is already used.");
+    expect(errorText(t, apiError(409, { code: "duty_in_use" }))).toBe("This duty is used in a liturgy, so it can't be deleted.");
+    expect(errorText(t, apiError(409, { code: "singing_part_in_use" }))).toContain("singing part");
+    expect(errorText(t, apiError(409, { code: "template_in_use", service_ids: ["s1"] }))).toContain("A service uses this template");
+    expect(errorText(t, apiError(422, { code: "validation_failed", reason: "limit", max: 50, used: 50 }))).toBe("You can have at most 50 of these.");
+    expect(errorText(t, apiError(422, { code: "validation_failed" }))).toBe("Some fields need attention.");
+  });
+
   it("falls back to generic text", () => {
     expect(errorText(t, apiError(418, { code: "teapot", detail: "I'm a teapot" }))).toBe("Something went wrong. Please try again.");
     expect(errorText(t, apiError(400, { code: "invalid_token", reason: "new_reason" }))).toBe(

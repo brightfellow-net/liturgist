@@ -15,6 +15,13 @@ import { ReadingsPage } from "./routes/library/ReadingsPage";
 import { SongFormPage } from "./routes/library/SongFormPage";
 import { SongPage } from "./routes/library/SongPage";
 import { NotFoundPage } from "./routes/NotFoundPage";
+import { NameListPage } from "./routes/planning/NameListPage";
+import { PlanningIndex, PlanningLayout } from "./routes/planning/PlanningLayout";
+import { ServiceFormPage } from "./routes/planning/ServiceFormPage";
+import { ServicesPage } from "./routes/planning/ServicesPage";
+import { TemplateFormPage } from "./routes/planning/TemplateFormPage";
+import { TemplatesPage } from "./routes/planning/TemplatesPage";
+import { dutyList, partList } from "./lib/planning";
 import { PrivacyPage } from "./routes/PrivacyPage";
 import { ProfilePage } from "./routes/ProfilePage";
 import { ResetPage } from "./routes/ResetPage";
@@ -49,6 +56,20 @@ export const router = createBrowserRouter([
       { path: paths.songNew, element: <SongFormPage /> },
       { path: paths.song, element: <SongPage /> },
       { path: paths.songEdit, element: <SongFormPage /> },
+      { path: paths.planning, element: <PlanningIndex /> },
+      {
+        element: <PlanningLayout />,
+        children: [
+          { path: paths.templates, element: <TemplatesPage /> },
+          { path: paths.services, element: <ServicesPage /> },
+          { path: paths.duties, element: <NameListPage list={dutyList} /> },
+          { path: paths.singingParts, element: <NameListPage list={partList} /> },
+        ],
+      },
+      { path: paths.templateNew, element: <TemplateFormPage /> },
+      { path: paths.template, element: <TemplateFormPage /> },
+      { path: paths.serviceNew, element: <ServiceFormPage /> },
+      { path: paths.service, element: <ServiceFormPage /> },
       { path: paths.profile, element: <ProfilePage /> },
       {
         element: <SettingsLayout />,

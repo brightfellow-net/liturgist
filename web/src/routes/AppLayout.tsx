@@ -11,7 +11,7 @@ import { api, call } from "@/lib/api";
 import { isCode } from "@/lib/errors";
 import i18n, { chooseLanguage } from "@/lib/i18n";
 import { meQuery } from "@/lib/queries";
-import { showSettings } from "@/lib/scopes";
+import { showPlanning, showSettings } from "@/lib/scopes";
 import { loginWithNext, paths } from "./paths";
 
 const settingsPaths: string[] = [paths.churchSettings, paths.members, paths.roles];
@@ -74,6 +74,7 @@ export function AppLayout() {
           <nav aria-label={t("nav.label")} className="flex flex-1 flex-wrap gap-1">
             <NavLink to={paths.home} end className={link}>{t("nav.home")}</NavLink>
             <NavLink to={paths.library} className={link}>{t("nav.library")}</NavLink>
+            {showPlanning(me.data) && <NavLink to={paths.planning} className={link}>{t("nav.liturgies")}</NavLink>}
             <NavLink to={paths.profile} className={link}>{t("nav.profile")}</NavLink>
             {showSettings(me.data) && (
               <NavLink to={paths.churchSettings} className={(s) => link({ isActive: s.isActive || settingsPaths.includes(location.pathname) })}>
