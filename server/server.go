@@ -106,19 +106,23 @@ type Server struct {
 
 // useCases are the wired application use cases.
 type useCases struct {
-	auth     *app.Auth
-	account  *app.Account
-	setup    *app.Setup
-	churches *app.Churches
-	members  *app.Members
-	roles    *app.Roles
-	invites  *app.Invites
-	resets   *app.Resets
-	songs    *app.Songs
-	readings *app.Readings
-	imports  *app.Imports
-	operator *app.Operator
-	cleanup  *app.Cleanup
+	auth      *app.Auth
+	account   *app.Account
+	setup     *app.Setup
+	churches  *app.Churches
+	members   *app.Members
+	roles     *app.Roles
+	invites   *app.Invites
+	resets    *app.Resets
+	songs     *app.Songs
+	readings  *app.Readings
+	imports   *app.Imports
+	vocab     *app.Vocabulary
+	templates *app.Templates
+	services  *app.Services
+	seed      *app.Seed
+	operator  *app.Operator
+	cleanup   *app.Cleanup
 }
 
 // wire builds the use cases on db with the options' adapters.
@@ -161,12 +165,16 @@ func wire(cfg Config, db app.Tx, o *options, refresh func()) useCases {
 		roles:    &app.Roles{Tx: db, Clock: clock, IDs: ids},
 		invites: &app.Invites{Tx: db, Hasher: hasher, Clock: clock, IDs: ids, URLs: o.urls,
 			Entitlements: o.entitlements, Auth: auth},
-		songs:    songs,
-		imports:  &app.Imports{Tx: db, Clock: clock, IDs: ids, Songs: songs, Importers: importers},
-		readings: &app.Readings{Tx: db, Clock: clock, IDs: ids, Usage: app.NeverUsed{}, Providers: o.bibleProviders, Log: cfg.Logger},
-		resets:   &app.Resets{Tx: db, Hasher: hasher, Clock: clock, IDs: ids, URLs: o.urls, Auth: auth},
-		operator: &app.Operator{Tx: db, Clock: clock, IDs: ids},
-		cleanup:  &app.Cleanup{Tx: db, Clock: clock},
+		songs:     songs,
+		imports:   &app.Imports{Tx: db, Clock: clock, IDs: ids, Songs: songs, Importers: importers},
+		readings:  &app.Readings{Tx: db, Clock: clock, IDs: ids, Usage: app.NeverUsed{}, Providers: o.bibleProviders, Log: cfg.Logger},
+		vocab:     &app.Vocabulary{Tx: db, Clock: clock, IDs: ids, Usage: app.NeverUsed{}},
+		templates: &app.Templates{Tx: db, Clock: clock, IDs: ids},
+		services:  &app.Services{Tx: db, Clock: clock, IDs: ids},
+		seed:      &app.Seed{Tx: db, Clock: clock, IDs: ids},
+		resets:    &app.Resets{Tx: db, Hasher: hasher, Clock: clock, IDs: ids, URLs: o.urls, Auth: auth},
+		operator:  &app.Operator{Tx: db, Clock: clock, IDs: ids},
+		cleanup:   &app.Cleanup{Tx: db, Clock: clock},
 	}
 }
 
@@ -202,6 +210,9 @@ func New(ctx context.Context, cfg Config, opts ...Option) (*Server, error) {
 		}
 	}
 	s.uc = wire(cfg, db, &o, refresh)
+	if err := s.uc.seed.Run(ctx); err != nil { // 09 §3: defaults for churches that have none
+		cfg.Logger.Error("seeding the defaults failed; the church works without them", "error", err)
+	}
 	s.urls = o.urls
 	cookies := httpapi.Cookies{Secure: cfg.BaseURL.Scheme == "https"}
 	d := deps{
@@ -209,6 +220,7 @@ func New(ctx context.Context, cfg Config, opts ...Option) (*Server, error) {
 		church: httpapi.ChurchDeps{Setup: s.uc.setup, Churches: s.uc.churches, Members: s.uc.members, Roles: s.uc.roles,
 			Invites: s.uc.invites, Resets: s.uc.resets, Cookies: cookies, Clock: s.uc.auth.Clock, Log: cfg.Logger},
 		library:  httpapi.LibraryDeps{Songs: s.uc.songs, Readings: s.uc.readings, Imports: s.uc.imports, Log: cfg.Logger},
+		planning: httpapi.PlanningDeps{Vocabulary: s.uc.vocab, Templates: s.uc.templates, Services: s.uc.services, Log: cfg.Logger},
 		session:  httpapi.SessionMiddleware(s.uc.auth, cookies, s.uc.auth.Clock, cfg.Logger),
 		resolver: o.resolver,
 	}

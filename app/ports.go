@@ -45,9 +45,14 @@ type ChurchStore interface {
 	Memberships() MembershipRepo
 	Roles() RoleRepo
 	Invites() InviteRepo
-	Songs() SongRepo       // songs, sections, arrangements, groups and search (06)
-	Readings() ReadingRepo // saved Bible readings (07)
-	Imports() ImportRepo   // import batches and their candidates (08)
+	Songs() SongRepo            // songs, sections, arrangements, groups and search (06)
+	Readings() ReadingRepo      // saved Bible readings (07)
+	Imports() ImportRepo        // import batches and their candidates (08)
+	Duties() NameListRepo       // the church's duties (09 §2.1)
+	SingingParts() NameListRepo // the church's singing parts (09 §2.1)
+	Templates() TemplateRepo    // liturgy templates (09 §2.2)
+	Services() ServiceRepo      // regular services (09 §2.4)
+	Seeds() SeedRepo            // the markers of seeded defaults (09 §3)
 }
 
 // Clock returns the current time in UTC, truncated to microseconds (02 §4).
@@ -352,4 +357,82 @@ type ImportRepo interface {
 	DeleteBatch(ctx context.Context, id domain.ImportBatchID) error // with its candidates
 	// DeleteOlderThan deletes this church's batches not changed since cutoff.
 	DeleteOlderThan(ctx context.Context, cutoff time.Time) error
+}
+
+// NameListRepo stores one of the two ordered name lists of a church, duties or
+// singing parts (09 §2.1). Names are unique by folded key.
+type NameListRepo interface {
+	List(ctx context.Context) ([]domain.NameEntry, error)          // by position
+	ByID(ctx context.Context, id string) (domain.NameEntry, error) // ErrNotFound
+	Count(ctx context.Context) (int, error)
+	// Create adds the entry; UniqueError duties_church_name_key / singing_parts_church_name_key.
+	Create(ctx context.Context, e domain.NameEntry) error
+	// Rename changes name and key; UniqueError as for Create; ErrNotFound.
+	Rename(ctx context.Context, id, name, nameKey string) error
+	// SetOrder gives the entries the positions 0..n-1 in the order of ids.
+	SetOrder(ctx context.Context, ids []string) error
+	// Delete removes the entry. For duties it first clears the default duty of
+	// template items that name it, in the same transaction (the foreign key
+	// stays RESTRICT, schema "Clearing references").
+	Delete(ctx context.Context, id string) error
+}
+
+// TemplateRow is a template in a list.
+type TemplateRow struct {
+	ID        domain.TemplateID
+	Name      string
+	Language  string
+	ItemCount int
+	Version   int
+}
+
+// TemplateRepo stores templates with their items (09 §2.2).
+type TemplateRepo interface {
+	List(ctx context.Context) ([]TemplateRow, error)                         // by name key
+	ByID(ctx context.Context, id domain.TemplateID) (domain.Template, error) // with items; ErrNotFound
+	Count(ctx context.Context) (int, error)
+	// Create stores the template and its items; UniqueError templates_church_name_key.
+	Create(ctx context.Context, t domain.Template) error
+	// Update replaces the row and the complete item list if the stored version
+	// is expectedVersion (atomic conditional update, 02 §2.1); false when the
+	// template is missing or the version differs. UniqueError as for Create.
+	Update(ctx context.Context, t domain.Template, expectedVersion int) (bool, error)
+	Delete(ctx context.Context, id domain.TemplateID) error
+	// ServicesUsing lists the services that have the template as default.
+	ServicesUsing(ctx context.Context, id domain.TemplateID) ([]domain.ServiceID, error)
+}
+
+// ServiceRepo stores services with their weekly times (09 §2.4).
+type ServiceRepo interface {
+	List(ctx context.Context) ([]domain.Service, error) // with times, by name key
+	ByID(ctx context.Context, id domain.ServiceID) (domain.Service, error)
+	Count(ctx context.Context) (int, error)
+	// Create stores the service and its times; UniqueError services_church_name_key.
+	Create(ctx context.Context, s domain.Service) error
+	// Update is the conditional update of TemplateRepo.Update.
+	Update(ctx context.Context, s domain.Service, expectedVersion int) (bool, error)
+	Delete(ctx context.Context, id domain.ServiceID) error
+}
+
+// SeedRepo reads and writes the markers of seeded defaults (09 §3). Only
+// app.Seed and Setup use it, inside the transaction that creates the rows.
+type SeedRepo interface {
+	Applied(ctx context.Context, key string) (bool, error)
+	Mark(ctx context.Context, key string, at time.Time) error
+}
+
+// PlanningUsage tells whether liturgies use a duty or a singing part (09
+// §2.1). Slice 3A has no liturgies: NeverUsed answers "unused"; slice 3B
+// replaces it with a query.
+type PlanningUsage interface {
+	DutyInUse(ctx context.Context, church domain.ChurchID, duty string) (bool, error)
+	SingingPartInUse(ctx context.Context, church domain.ChurchID, part string) (bool, error)
+}
+
+// DutyInUse implements PlanningUsage.
+func (NeverUsed) DutyInUse(context.Context, domain.ChurchID, string) (bool, error) { return false, nil }
+
+// SingingPartInUse implements PlanningUsage.
+func (NeverUsed) SingingPartInUse(context.Context, domain.ChurchID, string) (bool, error) {
+	return false, nil
 }

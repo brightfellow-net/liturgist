@@ -34,8 +34,10 @@ type Problem struct {
 	// SectionIDs lists the sections in use (section_in_use).
 	SectionIDs []string `json:"section_ids,omitempty"`
 	// ReadingID is the reading that already exists (reading_exists).
-	ReadingID string              `json:"reading_id,omitempty"`
-	Errors    []*huma.ErrorDetail `json:"errors,omitempty"`
+	ReadingID string `json:"reading_id,omitempty"`
+	// ServiceIDs lists the services that have the template as default (template_in_use).
+	ServiceIDs []string            `json:"service_ids,omitempty"`
+	Errors     []*huma.ErrorDetail `json:"errors,omitempty"`
 }
 
 // Error implements error.
@@ -107,6 +109,8 @@ func MapError(ctx context.Context, err error, log *slog.Logger) error {
 		exists   *app.ReadingExistsError
 		unread   *app.ImportUnreadableError
 		impConf  *app.ImportConflictError
+		nameTkn  *app.NameTakenError
+		tplInUse *app.TemplateInUseError
 	)
 	info := RequestInfoFrom(ctx)
 	switch {
@@ -125,6 +129,20 @@ func MapError(ctx context.Context, err error, log *slog.Logger) error {
 	case errors.As(err, &invalid):
 		p := problem(http.StatusUnprocessableEntity, "validation_failed", invalid.Message)
 		p.Errors = []*huma.ErrorDetail{{Location: "body." + invalid.Field, Message: invalid.Message}}
+		p.Reason = invalid.Reason
+		if invalid.Reason == domain.ReasonLimit {
+			p.Max, p.Used = &invalid.Max, &invalid.Used
+		}
+		return p
+	case errors.As(err, &nameTkn):
+		p := problem(http.StatusConflict, "name_taken", "Another entry already has this name.")
+		p.Reason = nameTkn.Reason
+		return p
+	case errors.As(err, &tplInUse):
+		p := problem(http.StatusConflict, "template_in_use", "A service uses this template.")
+		for _, id := range tplInUse.ServiceIDs {
+			p.ServiceIDs = append(p.ServiceIDs, string(id))
+		}
 		return p
 	case errors.Is(err, domain.ErrInvalidIdentifier):
 		return problem(http.StatusUnprocessableEntity, "invalid_identifier", "Enter a valid email address or phone number.")
@@ -196,17 +214,19 @@ func MapError(ctx context.Context, err error, log *slog.Logger) error {
 
 // conflicts are the plain sentinel errors with their problems.
 var conflicts = map[error]*Problem{
-	app.ErrNotSetUp:        problem(http.StatusConflict, "not_set_up", "Liturgist is not set up yet."),
-	app.ErrAlreadySetUp:    problem(http.StatusConflict, "already_set_up", "Liturgist is already set up."),
-	app.ErrLockout:         problem(http.StatusConflict, "lockout_prevented", "Someone must keep the permissions to manage roles and members."),
-	app.ErrRoleNameTaken:   problem(http.StatusConflict, "role_name_taken", "Another role already has this name."),
-	app.ErrAlreadyMember:   problem(http.StatusConflict, "already_member", "This person is already a member of the church."),
-	app.ErrInviteExists:    problem(http.StatusConflict, "invite_exists", "This person already has an open invite."),
-	app.ErrIdentifierTaken: problem(http.StatusConflict, "identifier_taken", "This email or phone number belongs to another account."),
-	app.ErrResetNotAllowed: problem(http.StatusConflict, "reset_not_allowed", "This person also belongs to another church."),
-	app.ErrVersionConflict: problem(http.StatusConflict, "version_conflict", "This was changed by someone else. Reload to see their version."),
-	app.ErrSongInUse:       problem(http.StatusConflict, "song_in_use", "This song is used in a liturgy that isn't published yet."),
-	app.ErrReadingInUse:    problem(http.StatusConflict, "reading_in_use", "This reading is used in a liturgy that isn't published yet."),
+	app.ErrNotSetUp:         problem(http.StatusConflict, "not_set_up", "Liturgist is not set up yet."),
+	app.ErrAlreadySetUp:     problem(http.StatusConflict, "already_set_up", "Liturgist is already set up."),
+	app.ErrLockout:          problem(http.StatusConflict, "lockout_prevented", "Someone must keep the permissions to manage roles and members."),
+	app.ErrRoleNameTaken:    problem(http.StatusConflict, "role_name_taken", "Another role already has this name."),
+	app.ErrAlreadyMember:    problem(http.StatusConflict, "already_member", "This person is already a member of the church."),
+	app.ErrInviteExists:     problem(http.StatusConflict, "invite_exists", "This person already has an open invite."),
+	app.ErrIdentifierTaken:  problem(http.StatusConflict, "identifier_taken", "This email or phone number belongs to another account."),
+	app.ErrResetNotAllowed:  problem(http.StatusConflict, "reset_not_allowed", "This person also belongs to another church."),
+	app.ErrVersionConflict:  problem(http.StatusConflict, "version_conflict", "This was changed by someone else. Reload to see their version."),
+	app.ErrSongInUse:        problem(http.StatusConflict, "song_in_use", "This song is used in a liturgy that isn't published yet."),
+	app.ErrReadingInUse:     problem(http.StatusConflict, "reading_in_use", "This reading is used in a liturgy that isn't published yet."),
+	app.ErrDutyInUse:        problem(http.StatusConflict, "duty_in_use", "This duty is used in a liturgy."),
+	app.ErrSingingPartInUse: problem(http.StatusConflict, "singing_part_in_use", "This singing part is used in a liturgy."),
 	app.ErrInviteMismatch: problem(http.StatusForbidden, "invite_identifier_mismatch",
 		"This invite is for another account. Log out and log in as that person."),
 }

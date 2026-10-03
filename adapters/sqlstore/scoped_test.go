@@ -47,6 +47,13 @@ func churchRowsIn(t *testing.T, s app.Store, db *sqlstore.DB, cid string) string
 			"SELECT * FROM readings WHERE church_id = ? ORDER BY id",
 			"SELECT * FROM import_batches WHERE church_id = ? ORDER BY id",
 			"SELECT * FROM import_candidates WHERE church_id = ? ORDER BY id",
+			"SELECT * FROM duties WHERE church_id = ? ORDER BY id",
+			"SELECT * FROM singing_parts WHERE church_id = ? ORDER BY id",
+			"SELECT * FROM templates WHERE church_id = ? ORDER BY id",
+			"SELECT * FROM template_items WHERE church_id = ? ORDER BY id",
+			"SELECT * FROM services WHERE church_id = ? ORDER BY id",
+			"SELECT * FROM service_times WHERE church_id = ? ORDER BY id",
+			"SELECT * FROM church_seeds WHERE church_id = ? ORDER BY seed_key",
 		} {
 			rows, err := sqlstore.RawTx(s).QueryxContext(ctx, db.Dialect().Rebind(q), cid)
 			if err != nil {
@@ -399,6 +406,10 @@ func TestScopedRepositories(t *testing.T) {
 		},
 	}
 
+	for k, fn := range planningHarness(errRollback, notFound, unchanged) {
+		harness[k] = fn
+	}
+
 	// Reflection check: the harness covers every method of every repository.
 	var want []string
 	cst := reflect.TypeFor[app.ChurchStore]()
@@ -470,6 +481,9 @@ func TestScopedRepositories(t *testing.T) {
 				if err := b.Readings().Create(ctx, rb); err != nil {
 					return err
 				}
+			}
+			if err := seedPlanning(a, b, f.now); err != nil {
+				return err
 			}
 			for sid, lang := range map[string]string{"SB1": "en", "SB2": "id"} {
 				song := testSong(id(sid), "Cinta Tuhan B", lang, f.now)

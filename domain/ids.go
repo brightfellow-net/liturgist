@@ -30,4 +30,12 @@ type (
 	ImportBatchID string
 	// ImportCandidateID identifies one candidate song of an import batch.
 	ImportCandidateID string
+	// DutyID identifies a duty of a church (09).
+	DutyID string
+	// SingingPartID identifies a singing part of a church (09).
+	SingingPartID string
+	// TemplateID identifies a liturgy template (09).
+	TemplateID string
+	// ServiceID identifies a regular service (09).
+	ServiceID string
 )

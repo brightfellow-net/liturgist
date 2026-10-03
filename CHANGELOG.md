@@ -19,3 +19,6 @@ Before v1.0 any port (every interface in `app`, and `httpapi.TenantResolver`) ma
   - `domain.Reference` and `app.BibleText` are defined ([07 §2](docs/impl/07-readings.md#2-references), [§3.1](docs/impl/07-readings.md#31-lookup-order-and-storing-provider-text-p-50));
   - `BibleTextProvider` gains `ID() string`; `server.WithBibleTextProvider(p)` appends a provider;
   - import: `ChurchStore.Imports()` with `ImportRepo` and `SongRepo.FindDuplicate` ([08 §7](docs/impl/08-import.md#7-ports)); `app.ImportHint` and `app.ImportCandidate` are defined, and `Importer.Parse` reports an unreadable song with `ImportCandidate.Reject`; `server.WithImporter(format, imp)` adds or replaces an importer.
+- Step 3, slice 3A:
+  - planning setup: `ChurchStore.Duties()` and `.SingingParts()` (`NameListRepo`), `.Templates()` (`TemplateRepo`), `.Services()` (`ServiceRepo`) and `.Seeds()` (`SeedRepo`); `PlanningUsage` answers whether liturgies use a duty or a singing part (`NeverUsed` until slice 3B) ([09 §6](docs/impl/09-planning.md#6-ports));
+  - `app.Seed` creates the editable defaults at start-up for churches without the `step3` marker; `Setup` seeds a new church in its own transaction ([09 §3](docs/impl/09-planning.md#3-seeded-defaults-p-56)).

@@ -5,6 +5,7 @@ package sqlstore_test
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"slices"
 	"strconv"
@@ -238,6 +239,58 @@ func TestUniqueConstraintNames(t *testing.T) {
 			"readings_church_ref_key": func() error {
 				f.must(readingInsert, id("RD2"), id("CHA"), "PSA 2", "PSA 2", tb, "x", "", "manual", "x", 1, f.ts(0), f.ts(0))
 				return f.exec(readingInsert, id("RD3"), id("CHA"), "PSA 2", "Mzm 2", tb, "y", "", "manual", "y", 1, f.ts(0), f.ts(0))
+			},
+			// Each planning case builds its own rows, so the order of the cases doesn't matter.
+			"duties_pkey": func() error {
+				f.must(fmt.Sprintf(listInsert, "duties"), id("DU1"), id("CHA"), "Liturgis", "liturgis", 0, f.ts(0))
+				return f.exec(fmt.Sprintf(listInsert, "duties"), id("DU1"), id("CHB"), "Liturgis", "liturgis", 0, f.ts(0))
+			},
+			"duties_church_name_key": func() error {
+				f.must(fmt.Sprintf(listInsert, "duties"), id("DU2"), id("CHA"), "Pemusik", "pemusik", 1, f.ts(0))
+				return f.exec(fmt.Sprintf(listInsert, "duties"), id("DU3"), id("CHA"), "PEMUSIK", "pemusik", 2, f.ts(0))
+			},
+			"singing_parts_pkey": func() error {
+				f.must(fmt.Sprintf(listInsert, "singing_parts"), id("PT1"), id("CHA"), "Semua", "semua", 0, f.ts(0))
+				return f.exec(fmt.Sprintf(listInsert, "singing_parts"), id("PT1"), id("CHB"), "Semua", "semua", 0, f.ts(0))
+			},
+			"singing_parts_church_name_key": func() error {
+				f.must(fmt.Sprintf(listInsert, "singing_parts"), id("PT2"), id("CHA"), "Jemaat", "jemaat", 1, f.ts(0))
+				return f.exec(fmt.Sprintf(listInsert, "singing_parts"), id("PT3"), id("CHA"), "JEMAAT", "jemaat", 2, f.ts(0))
+			},
+			"templates_pkey": func() error {
+				f.must(tplInsert, id("TP1"), id("CHA"), "Ibadah", "ibadah", "id", 1, f.ts(0), f.ts(0))
+				return f.exec(tplInsert, id("TP1"), id("CHB"), "Ibadah", "ibadah", "id", 1, f.ts(0), f.ts(0))
+			},
+			"templates_church_name_key": func() error {
+				f.must(tplInsert, id("TP2"), id("CHA"), "Doa", "doa", "id", 1, f.ts(0), f.ts(0))
+				return f.template("TP3", "CHA", "DOA", "id", 1)
+			},
+			"template_items_pkey": func() error {
+				f.must(tplInsert, id("TP4"), id("CHA"), "Khotbah", "khotbah", "id", 1, f.ts(0), f.ts(0))
+				f.must(itemInsert, id("IT1"), id("CHA"), id("TP4"), 0, "T", "prayer", "", nil)
+				return f.exec(itemInsert, id("IT1"), id("CHA"), id("TP4"), 1, "T", "prayer", "", nil)
+			},
+			"services_pkey": func() error {
+				f.must(svcInsert, id("SV1"), id("CHA"), "Umum", "umum", "id", nil, 1, f.ts(0), f.ts(0))
+				return f.exec(svcInsert, id("SV1"), id("CHB"), "Umum", "umum", "id", nil, 1, f.ts(0), f.ts(0))
+			},
+			"services_church_name_key": func() error {
+				f.must(svcInsert, id("SV2"), id("CHA"), "Remaja", "remaja", "id", nil, 1, f.ts(0), f.ts(0))
+				return f.service("SV3", "CHA", "REMAJA", nil, 1)
+			},
+			"service_times_pkey": func() error {
+				f.must(svcInsert, id("SV4"), id("CHA"), "Pagi", "pagi", "id", nil, 1, f.ts(0), f.ts(0))
+				f.must(timeInsert, id("TM1"), id("CHA"), id("SV4"), 7, "07:00")
+				return f.exec(timeInsert, id("TM1"), id("CHA"), id("SV4"), 7, "09:00")
+			},
+			"service_times_slot_key": func() error {
+				f.must(svcInsert, id("SV5"), id("CHA"), "Sore", "sore", "id", nil, 1, f.ts(0), f.ts(0))
+				f.must(timeInsert, id("TM2"), id("CHA"), id("SV5"), 7, "17:00")
+				return f.svcTime("TM3", "CHA", "SV5", 7, "17:00")
+			},
+			"church_seeds_pkey": func() error {
+				f.must(seedInsert, id("CHA"), "step3", f.ts(0))
+				return f.exec(seedInsert, id("CHA"), "step3", f.ts(0))
 			},
 			"import_batches_pkey": func() error {
 				f.must(batchInsert, id("BT1"), id("CHA"), "paste", "open", id("U1"), f.ts(0), f.ts(0))

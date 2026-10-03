@@ -53,6 +53,11 @@ type cenv struct {
 	usage    *usageStub
 	readings *app.Readings
 	readUse  *readingUsageStub
+	vocab    *app.Vocabulary
+	tpls     *app.Templates
+	svcs     *app.Services
+	seed     *app.Seed
+	planUse  *planUsageStub
 	imports  *app.Imports
 	operator *app.Operator
 	account  *app.Account
@@ -74,12 +79,18 @@ func wireChurch(t *testing.T, db *sqlstore.DB, ent app.Entitlements) cenv {
 	}
 	usage := &usageStub{}
 	readUse := &readingUsageStub{}
+	planUse := &planUsageStub{}
 	songs := &app.Songs{Tx: db, Clock: c, IDs: ids, Usage: usage}
 	return cenv{t: t, db: db, clock: c, ids: ids, auth: auth, usage: usage, readUse: readUse,
 		songs: songs,
 		imports: &app.Imports{Tx: db, Clock: c, IDs: ids, Songs: songs, Importers: map[domain.ImportFormat]app.Importer{
 			domain.FormatPaste: paste.Importer{}, domain.FormatChordPro: chordpro.Importer{}, domain.FormatOpenLyrics: openlyrics.Importer{}}},
 		readings: &app.Readings{Tx: db, Clock: c, IDs: ids, Usage: readUse},
+		planUse:  planUse,
+		vocab:    &app.Vocabulary{Tx: db, Clock: c, IDs: ids, Usage: planUse},
+		tpls:     &app.Templates{Tx: db, Clock: c, IDs: ids},
+		svcs:     &app.Services{Tx: db, Clock: c, IDs: ids},
+		seed:     &app.Seed{Tx: db, Clock: c, IDs: ids},
 		setup:    &app.Setup{Tx: db, Hasher: h, Clock: c, IDs: ids, Auth: auth},
 		churches: &app.Churches{Tx: db, Clock: c},
 		members:  &app.Members{Tx: db, Clock: c, Entitlements: ent},

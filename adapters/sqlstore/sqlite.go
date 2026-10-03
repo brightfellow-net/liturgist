@@ -129,6 +129,23 @@ var sqliteUniqueNames = map[string]string{ //nolint:gosec // constraint names, n
 	"import_batches.church_id, import_batches.id": "import_batches_church_id_key",
 	"import_candidates.id":                        "import_candidates_pkey",
 
+	"duties.id":                                       "duties_pkey",
+	"duties.church_id, duties.name_key":               "duties_church_name_key",
+	"duties.church_id, duties.id":                     "duties_church_id_key",
+	"singing_parts.id":                                "singing_parts_pkey",
+	"singing_parts.church_id, singing_parts.name_key": "singing_parts_church_name_key",
+	"singing_parts.church_id, singing_parts.id":       "singing_parts_church_id_key",
+	"templates.id":                                    "templates_pkey",
+	"templates.church_id, templates.name_key":         "templates_church_name_key",
+	"templates.church_id, templates.id":               "templates_church_id_key",
+	"template_items.id":                               "template_items_pkey",
+	"services.id":                                     "services_pkey",
+	"services.church_id, services.name_key":           "services_church_name_key",
+	"services.church_id, services.id":                 "services_church_id_key",
+	"service_times.id":                                "service_times_pkey",
+	"service_times.service_id, service_times.weekday, service_times.time": "service_times_slot_key",
+	"church_seeds.church_id, church_seeds.seed_key":                       "church_seeds_pkey",
+
 	"readings.id": "readings_pkey",
 	"readings.church_id, readings.reference, readings.translation_id": "readings_church_ref_key",
 

@@ -8,6 +8,10 @@ package domain
 type InvalidInputError struct {
 	Field   string // JSON path below the body, e.g. "name" or "preferences.text_size"
 	Message string
+	// Reason is an optional stable code for the client: "limit", "required" or
+	// "language_mismatch" (01 §10). Max and Used go with "limit".
+	Reason    string
+	Max, Used int
 }
 
 func (e *InvalidInputError) Error() string { return e.Field + ": " + e.Message }

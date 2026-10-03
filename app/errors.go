@@ -145,3 +145,21 @@ func (e *ImportConflictError) Error() string { return "import conflict: " + e.Re
 
 // ErrImportTooLarge maps to 413 validation_failed (08 §5).
 var ErrImportTooLarge = errors.New("import too large")
+
+// Errors of the planning setup (01 §10, 09).
+var (
+	ErrDutyInUse        = errors.New("duty in use")         // 409 duty_in_use
+	ErrSingingPartInUse = errors.New("singing part in use") // 409 singing_part_in_use
+)
+
+// NameTakenError maps to 409 name_taken; Reason is duty, singing_part,
+// template or service.
+type NameTakenError struct{ Reason string }
+
+func (e *NameTakenError) Error() string { return "name taken: " + e.Reason }
+
+// TemplateInUseError maps to 409 template_in_use with the services that have
+// the template as their default.
+type TemplateInUseError struct{ ServiceIDs []domain.ServiceID }
+
+func (e *TemplateInUseError) Error() string { return "template in use" }

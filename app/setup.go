@@ -174,6 +174,9 @@ func (u *Setup) Run(ctx context.Context, in SetupInput) (SetupResult, error) {
 			ID: domain.MembershipID(u.IDs.NewID()), UserID: usr.ID, RoleIDs: []domain.RoleID{adminRole}, CreatedAt: now}); err != nil {
 			return err
 		}
+		if err := seedChurch(ctx, cs, u.IDs, now); err != nil {
+			return err
+		}
 		res = SetupResult{Church: c, User: usr}
 		if in.ViaCLI {
 			return nil

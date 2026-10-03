@@ -90,6 +90,59 @@ export interface paths {
         patch: operations["updateChurch"];
         trace?: never;
     };
+    "/duties": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the duties in order */
+        get: operations["listDuties"];
+        put?: never;
+        /** Add to the duties */
+        post: operations["createDuty"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/duties/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set the order of the duties */
+        put: operations["reorderDuties"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/duties/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete an entry of the duties */
+        delete: operations["deleteDuty"];
+        options?: never;
+        head?: never;
+        /** Rename an entry of the duties */
+        patch: operations["renameDuty"];
+        trace?: never;
+    };
     "/imports": {
         parameters: {
             query?: never;
@@ -542,6 +595,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/services": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the regular services */
+        get: operations["listServices"];
+        put?: never;
+        /** Add a regular service */
+        post: operations["createService"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/services/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A service with its times */
+        get: operations["getService"];
+        put?: never;
+        post?: never;
+        /** Delete a service */
+        delete: operations["deleteService"];
+        options?: never;
+        head?: never;
+        /** Change a service */
+        patch: operations["updateService"];
+        trace?: never;
+    };
     "/setup": {
         parameters: {
             query?: never;
@@ -574,6 +664,59 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/singing-parts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the singing parts in order */
+        get: operations["listSingingParts"];
+        put?: never;
+        /** Add to the singing parts */
+        post: operations["createSingingPart"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/singing-parts/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set the order of the singing parts */
+        put: operations["reorderSingingParts"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/singing-parts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete an entry of the singing parts */
+        delete: operations["deleteSingingPart"];
+        options?: never;
+        head?: never;
+        /** Rename an entry of the singing parts */
+        patch: operations["renameSingingPart"];
         trace?: never;
     };
     "/songs": {
@@ -629,6 +772,43 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the templates */
+        get: operations["listTemplates"];
+        put?: never;
+        /** Add a template */
+        post: operations["createTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/templates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A template with its items */
+        get: operations["getTemplate"];
+        put?: never;
+        post?: never;
+        /** Delete a template */
+        delete: operations["deleteTemplate"];
+        options?: never;
+        head?: never;
+        /** Change a template */
+        patch: operations["updateTemplate"];
         trace?: never;
     };
     "/translations": {
@@ -733,6 +913,15 @@ export interface components {
             privacy_contact: string | null;
             time_zone: string;
         };
+        CreateDutyRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/CreateDutyRequest.json
+             */
+            readonly $schema?: string;
+            name: string;
+        };
         CreateImportRequest: {
             /**
              * Format: uri
@@ -797,6 +986,32 @@ export interface components {
             name: string;
             scopes: string[] | null;
         };
+        CreateServiceRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/CreateServiceRequest.json
+             */
+            readonly $schema?: string;
+            default_template_id?: string;
+            /**
+             * @description default: the church's content language
+             * @enum {string}
+             */
+            language?: "id" | "en" | "zh-Hans" | "zh-Hant";
+            name: string;
+            /** @description 1 to 14 weekly times */
+            times: components["schemas"]["ServiceTimeView"][] | null;
+        };
+        CreateSingingPartRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/CreateSingingPartRequest.json
+             */
+            readonly $schema?: string;
+            name: string;
+        };
         CreateSongRequest: {
             /**
              * Format: uri
@@ -823,6 +1038,21 @@ export interface components {
             sections?: components["schemas"]["SongSection"][] | null;
             title: string;
             translator?: string;
+        };
+        CreateTemplateRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/CreateTemplateRequest.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["TemplateItemInput"][] | null;
+            /**
+             * @description default: the church's content language
+             * @enum {string}
+             */
+            language?: "id" | "en" | "zh-Hans" | "zh-Hant";
+            name: string;
         };
         CreatedInviteOutputBody: {
             /**
@@ -1018,6 +1248,24 @@ export interface components {
             readonly $schema?: string;
             items: components["schemas"]["ImportSummaryView"][] | null;
         };
+        ListServicesResponse: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/ListServicesResponse.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["ServiceView"][] | null;
+        };
+        ListTemplatesResponse: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/ListTemplatesResponse.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["TemplateSummaryView"][] | null;
+        };
         LoginRequest: {
             /**
              * Format: uri
@@ -1119,6 +1367,28 @@ export interface components {
             /** @enum {string} */
             status: "updated" | "new" | "kept" | "removed";
         };
+        NameEntryView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/NameEntryView.json
+             */
+            readonly $schema?: string;
+            actions: components["schemas"]["PlanningActions"];
+            id: string;
+            name: string;
+            /** Format: int64 */
+            position: number;
+        };
+        NameListOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/NameListOutputBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["NameEntryView"][] | null;
+        };
         ParsedReferenceView: {
             /**
              * Format: uri
@@ -1132,6 +1402,10 @@ export interface components {
             display: string;
             /** @description standard form */
             reference: string;
+        };
+        PlanningActions: {
+            delete: boolean;
+            edit: boolean;
         };
         Preferences: {
             text_size?: string;
@@ -1158,6 +1432,7 @@ export interface components {
             reason?: string;
             scopes?: string[] | null;
             section_ids?: string[] | null;
+            service_ids?: string[] | null;
             /** Format: int64 */
             status: number;
             title: string;
@@ -1224,6 +1499,44 @@ export interface components {
              * @description send it back with every change
              */
             version: number;
+        };
+        RenameDutyRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/RenameDutyRequest.json
+             */
+            readonly $schema?: string;
+            name: string;
+        };
+        RenameSingingPartRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/RenameSingingPartRequest.json
+             */
+            readonly $schema?: string;
+            name: string;
+        };
+        ReorderDutiesRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/ReorderDutiesRequest.json
+             */
+            readonly $schema?: string;
+            /** @description exactly the current IDs, once each */
+            ids: string[] | null;
+        };
+        ReorderSingingPartsRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/ReorderSingingPartsRequest.json
+             */
+            readonly $schema?: string;
+            /** @description exactly the current IDs, once each */
+            ids: string[] | null;
         };
         ResetInfoOutputBody: {
             /**
@@ -1295,6 +1608,36 @@ export interface components {
              */
             number: number | null;
             text: string;
+        };
+        ServiceTimeView: {
+            /** @description HH:MM in the church's time zone */
+            time: string;
+            /**
+             * Format: int64
+             * @description ISO: 1 Monday to 7 Sunday
+             */
+            weekday: number;
+        };
+        ServiceView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/ServiceView.json
+             */
+            readonly $schema?: string;
+            actions: components["schemas"]["PlanningActions"];
+            default_template_id: string | null;
+            default_template_name: string | null;
+            id: string;
+            /** @enum {string} */
+            language: "id" | "en" | "zh-Hans" | "zh-Hant";
+            name: string;
+            times: components["schemas"]["ServiceTimeView"][] | null;
+            /**
+             * Format: int64
+             * @description send it back with every change
+             */
+            version: number;
         };
         SetMemberRolesRequest: {
             /**
@@ -1444,6 +1787,51 @@ export interface components {
             /** Format: int64 */
             used: number;
         };
+        TemplateItemInput: {
+            default_duty_id?: string;
+            default_text?: string;
+            /** @enum {string} */
+            item_type: "song" | "reading" | "prayer" | "sermon" | "free_text" | "other";
+            title: string;
+        };
+        TemplateItemView: {
+            /** @description null: no default duty */
+            default_duty_id: string | null;
+            default_text: string;
+            /** @enum {string} */
+            item_type: "song" | "reading" | "prayer" | "sermon" | "free_text" | "other";
+            title: string;
+        };
+        TemplateSummaryView: {
+            actions: components["schemas"]["PlanningActions"];
+            id: string;
+            /** Format: int64 */
+            item_count: number;
+            /** @enum {string} */
+            language: "id" | "en" | "zh-Hans" | "zh-Hant";
+            name: string;
+            /** Format: int64 */
+            version: number;
+        };
+        TemplateView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/TemplateView.json
+             */
+            readonly $schema?: string;
+            actions: components["schemas"]["PlanningActions"];
+            id: string;
+            items: components["schemas"]["TemplateItemView"][] | null;
+            /** @enum {string} */
+            language: "id" | "en" | "zh-Hans" | "zh-Hant";
+            name: string;
+            /**
+             * Format: int64
+             * @description send it back with every change
+             */
+            version: number;
+        };
         TokenBodyBody: {
             /**
              * Format: uri
@@ -1523,6 +1911,26 @@ export interface components {
             name?: string;
             scopes?: string[];
         };
+        UpdateServiceRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/UpdateServiceRequest.json
+             */
+            readonly $schema?: string;
+            /** @description empty clears it */
+            default_template_id?: string;
+            /** @enum {string} */
+            language?: "id" | "en" | "zh-Hans" | "zh-Hant";
+            name?: string;
+            /** @description the complete list; omit to keep it */
+            times?: components["schemas"]["ServiceTimeView"][];
+            /**
+             * Format: int64
+             * @description the version the client loaded
+             */
+            version: number;
+        };
         UpdateSongRequest: {
             /**
              * Format: uri
@@ -1550,6 +1958,24 @@ export interface components {
             sections?: components["schemas"]["SongSection"][];
             title?: string;
             translator?: string;
+            /**
+             * Format: int64
+             * @description the version the client loaded
+             */
+            version: number;
+        };
+        UpdateTemplateRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/UpdateTemplateRequest.json
+             */
+            readonly $schema?: string;
+            /** @description the complete list of items */
+            items?: components["schemas"]["TemplateItemInput"][];
+            /** @enum {string} */
+            language?: "id" | "en" | "zh-Hans" | "zh-Hant";
+            name?: string;
             /**
              * Format: int64
              * @description the version the client loaded
@@ -1755,6 +2181,165 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChurchView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listDuties: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameListOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    createDuty: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDutyRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameEntryView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    reorderDuties: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReorderDutiesRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameListOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    deleteDuty: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    renameDuty: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameDutyRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameEntryView"];
                 };
             };
             /** @description Error */
@@ -2906,6 +3491,163 @@ export interface operations {
             };
         };
     };
+    listServices: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListServicesResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    createService: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateServiceRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getService: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    deleteService: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    updateService: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateServiceRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     setup: {
         parameters: {
             query?: never;
@@ -2954,6 +3696,165 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StatusOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listSingingParts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameListOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    createSingingPart: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSingingPartRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameEntryView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    reorderSingingParts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReorderSingingPartsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameListOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    deleteSingingPart: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    renameSingingPart: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameSingingPartRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameEntryView"];
                 };
             };
             /** @description Error */
@@ -3187,6 +4088,163 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listTemplates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListTemplatesResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    createTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTemplateRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    deleteTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    updateTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTemplateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateView"];
+                };
             };
             /** @description Error */
             default: {
