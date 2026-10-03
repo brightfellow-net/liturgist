@@ -55,7 +55,7 @@ describe("ServicesPage", () => {
     renderPage("/liturgies/services", "/liturgies/services", <ServicesPage />, planner);
     expect(await screen.findByRole("link", { name: "Ibadah Umum" })).toHaveAttribute("href", "/liturgies/services/s1");
     expect(screen.getByText(/Sunday 07:00; Wednesday 19:00/)).toBeInTheDocument();
-    expect(screen.getByText(/Ibadah Minggu/)).toBeInTheDocument();
+    expect(screen.getByText(/Template: Ibadah Minggu/)).toBeInTheDocument();
   });
 
   it("explains the empty state", async () => {

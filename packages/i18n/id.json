@@ -505,7 +505,8 @@
       "name_required": "Isi nama.",
       "time_invalid": "Isi jam.",
       "delete_question": "Hapus ibadah “{{name}}”? Liturgi yang dibuat darinya tetap menyimpan salinan namanya.",
-      "delete_confirm": "Hapus {{name}}"
+      "delete_confirm": "Hapus {{name}}",
+      "template_in_list": "Templat: {{name}}"
     }
   },
   "errors": {

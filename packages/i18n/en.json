@@ -509,7 +509,8 @@
       "name_required": "Enter a name.",
       "time_invalid": "Enter a time.",
       "delete_question": "Delete the service “{{name}}”? Liturgies made from it keep a copy of its name.",
-      "delete_confirm": "Delete {{name}}"
+      "delete_confirm": "Delete {{name}}",
+      "template_in_list": "Template: {{name}}"
     }
   },
   "errors": {

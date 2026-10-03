@@ -52,7 +52,7 @@ export function ServicesPage() {
               <Link className="font-medium underline" to={servicePath(s.id)}>{s.name}</Link>
               <p className="text-sm text-muted-foreground">
                 {t(`setup.content_languages.${s.language}`)} · {timesText(t, s.times)}
-                {s.default_template_name ? ` · ${s.default_template_name}` : ""}
+                {s.default_template_name ? ` · ${t("planning.services.template_in_list", { name: s.default_template_name })}` : ""}
               </p>
             </li>
           ))}

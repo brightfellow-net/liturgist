@@ -82,7 +82,7 @@ test("E2E-W-012 duties, singing parts, a template and a service", async ({ brows
   await t2.getByLabel("Time", { exact: true }).fill("19:00");
   await page.getByRole("button", { name: "Save service" }).click();
   await expect(row(page, "Ibadah Pemuda Sabtu")).toContainText("Saturday 17:00; Saturday 19:00");
-  await expect(row(page, "Ibadah Pemuda Sabtu")).toContainText("Ibadah Pemuda");
+  await expect(row(page, "Ibadah Pemuda Sabtu")).toContainText("Template: Ibadah Pemuda");
 
   // A template that a service uses can't be deleted.
   await page.getByRole("link", { name: "Templates" }).click();
