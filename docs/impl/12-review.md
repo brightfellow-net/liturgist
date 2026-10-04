@@ -104,6 +104,16 @@ Keyboard and screen readers: buttons have text, the state is announced through a
 
 Each slice is drafted, shown and approved on its own, as in step 3.
 
+### 7.1 Slice 4A as built (2026-10-04)
+
+Merged as `9f8cbe7`. Differences and additions to the text above:
+
+- **Bodies.** The four transition routes take a JSON body; a request with no body is refused (400), so `submit` and `reopen` need `{}`. The web client sends it. Making the body optional is not possible with the Huma version in use.
+- **Liturgy view.** `open_comments` is present (0) for a member with a `liturgy.*` scope until slice 4B; `last_change` is **omitted**, not null, when the liturgy never changed state; both are omitted for a member without a scope. The `comment` action arrives with 4B.
+- **Code.** `domain/review.go` (the transition table, `ValidateNote`), `app/liturgy_review.go` (`Review`, `StateChanges`, `openReviewable`), `app/liturgy_history.go` (`nextSeq`), `LiturgyRepo.Transition`, `StateChangeRepo`, `adapters/sqlstore/state_changes.go`, `web/src/routes/liturgy/Review.tsx`. `sqlstore` test hooks gain `DialectName` and `CountForTest`.
+- **Tests.** TC-R-001, 003, 006, 007 and the `CanComment` rule; IT-R-001 to 006, 009 to 012 (the free-running race `TestEditAndSubmitRace` runs 60 rounds), the two forced PostgreSQL interleavings (`TestEditLosesToTransition`, `TestSubmitLosesToEdit`, skipped on SQLite, which has one writer; removing the `state IN` predicate or the `edit_seq` condition makes them fail), WT-R-001 to 003 and 005, E2E-W-016. IT-R-007, 008, 013, 014 and WT-R-004 wait for 4B. Vitest 211, Playwright 36.
+- **Not run:** golangci-lint (the v1/v2 config mismatch of step 3 still stands).
+
 ## 8. Anti-patterns (DO NOT)
 
 | ❌ Don't | ✅ Do instead | Why |
