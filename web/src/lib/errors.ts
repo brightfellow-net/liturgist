@@ -12,7 +12,7 @@ export const errorCodes = [
   "name_taken", "duty_in_use", "singing_part_in_use", "template_in_use",
   "invalid_reference", "reading_exists", "reading_in_use", "import_unreadable", "import_conflict",
   "liturgy_exists", "liturgy_locked", "liturgy_not_deletable", "assignment_exists", "undo_refused",
-  "invalid_transition", "review_stale", "empty_liturgy", "has_problems",
+  "invalid_transition", "review_stale", "empty_liturgy", "has_problems", "comment_limit",
   "internal", "unavailable",
 ] as const;
 

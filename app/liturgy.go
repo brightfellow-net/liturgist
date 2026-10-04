@@ -28,6 +28,7 @@ type LiturgyActions struct {
 	Approve        bool `json:"approve"`
 	RequestChanges bool `json:"request_changes"`
 	Reopen         bool `json:"reopen"`
+	Comment        bool `json:"comment"`
 }
 
 func liturgyActions(a Actor, state domain.LiturgyState) LiturgyActions {
@@ -42,6 +43,7 @@ func liturgyActions(a Actor, state domain.LiturgyState) LiturgyActions {
 		Approve:        can(domain.ActionApprove),
 		RequestChanges: can(domain.ActionRequestChanges),
 		Reopen:         can(domain.ActionReopen),
+		Comment:        a.Scopes.Has(domain.ScopeLiturgyComment) && state.CanComment(),
 	}
 }
 
@@ -313,6 +315,9 @@ func (u *Liturgies) view(ctx context.Context, sc churchScope, l domain.Liturgy) 
 		Actions: liturgyActions(sc.actor, l.State)}
 	if canSeeLiturgies(sc.actor) {
 		v.Review = &ReviewInfo{}
+		if v.Review.OpenComments, err = sc.cs.Comments().Open(ctx, l.ID); err != nil {
+			return LiturgyView{}, err
+		}
 		last, err := sc.cs.StateChanges().Last(ctx, l.ID)
 		switch {
 		case err == nil:

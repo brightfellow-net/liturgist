@@ -17,6 +17,7 @@ import { liturgyLimits, liturgyQuery, longDate, problemText, withOrder } from "@
 import { dutiesQuery, itemTypes, singingPartsQuery, type ItemType } from "@/lib/planning";
 import { ItemCard } from "./ItemCard";
 import { History } from "./History";
+import { ItemComments } from "./Comments";
 import { Review } from "./Review";
 import { Team } from "./Team";
 import { paths } from "../paths";
@@ -145,6 +146,7 @@ function Editor({ liturgy, duties, parts }: { liturgy: LiturgyView; duties: Name
                 duties={duties} parts={parts} keyDisplay={keyDisplay}
                 onMove={(d) => void moveItem(i, d)} onRemove={() => void removeItem(i)}
               />
+              <ItemComments liturgy={liturgy} itemId={item.id} title={item.title} announce={setStatus} />
             </li>
           ))}
         </ol>

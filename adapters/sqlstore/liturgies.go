@@ -178,6 +178,12 @@ func (r liturgyRepo) NextSeq(ctx context.Context, id domain.LiturgyID) (int, err
 	return seq, r.d.MapError(err)
 }
 
+func (r liturgyRepo) LockForComment(ctx context.Context, id domain.LiturgyID) (bool, error) {
+	res, err := r.tx.ExecContext(ctx, r.d.Rebind(`UPDATE liturgies SET updated_at = updated_at
+		WHERE church_id = ? AND id = ? AND state IN ('draft', 'in_review', 'needs_revision')`), r.churchID, id)
+	return changed(r.d, res, err)
+}
+
 func (r liturgyRepo) Transition(ctx context.Context, id domain.LiturgyID, from, to domain.LiturgyState, expectSeq int, now time.Time) (int, bool, error) {
 	var seq int
 	err := r.tx.QueryRowContext(ctx, r.d.Rebind(`UPDATE liturgies SET state = ?, undo_floor_seq = edit_seq, updated_at = ?

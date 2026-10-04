@@ -310,8 +310,15 @@ test("E2E-W-016 submit, request changes, resubmit, approve and reopen", async ({
   await expect(sari.getByText("Sari Editor: Draft → In review")).toBeVisible();
   await expectAccessible(sari);
 
-  // The liturgist sends it back with a note.
+  // The liturgist comments on the item while the liturgy is read-only, then sends it back with a note.
   await lead.reload();
+  await lead.getByRole("button", { name: "Comment on Doa Pembuka" }).click();
+  const commentForm = lead.getByRole("group", { name: "Comment on Doa Pembuka" });
+  await commentForm.getByLabel(/^Comment/).fill("Doanya terlalu pendek");
+  await commentForm.getByRole("button", { name: "Add comment" }).click();
+  await expect(lead.getByText("Comment added.").first()).toBeVisible();
+  await expect(lead.getByText("1 open comment").first()).toBeVisible();
+  await expectAccessible(lead);
   await lead.getByRole("button", { name: "Request changes" }).click();
   await lead.getByLabel(/Note/).fill("Tambahkan doa syafaat");
   await lead.getByRole("button", { name: "Send", exact: true }).click();
@@ -321,6 +328,11 @@ test("E2E-W-016 submit, request changes, resubmit, approve and reopen", async ({
   await sari.reload();
   await expect(sari.getByText("Admin wrote: Tambahkan doa syafaat")).toBeVisible();
   await expect(saveButton(sari)).toBeVisible();
+  const itemComments = sari.getByRole("group", { name: "Comments on Doa Pembuka" });
+  await expect(itemComments.getByText("Doanya terlalu pendek")).toBeVisible();
+  await itemComments.getByRole("button", { name: "Resolve" }).click();
+  await expect(sari.getByText("Comment resolved.").first()).toBeVisible();
+  await expect(sari.getByText("1 resolved comment").first()).toBeVisible();
   await sari.getByRole("button", { name: "Submit for review" }).click();
   await expect(sari.getByText(/This liturgy is being reviewed/)).toBeVisible();
 

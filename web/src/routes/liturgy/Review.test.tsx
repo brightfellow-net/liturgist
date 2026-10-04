@@ -13,7 +13,7 @@ import { LiturgyPage } from "./LiturgyPage";
 afterEach(() => vi.unstubAllGlobals());
 void i18n.changeLanguage("en");
 
-const none = { edit: false, delete: false, submit: false, approve: false, request_changes: false, reopen: false };
+const none = { edit: false, delete: false, submit: false, approve: false, request_changes: false, reopen: false, comment: false };
 const user = { id: "u9", name: "Ruth" };
 const change = (to: string, from: string, note = "") => ({ id: "c-" + to, from_state: from, to_state: to, user, note, edit_seq: 7, created_at: "2026-10-02T09:00:00Z" });
 const history = (...items: ReturnType<typeof change>[]) => ({ status: 200, body: { items, total: items.length } });
@@ -24,6 +24,7 @@ const base = (l: LiturgyView, h = history()) => ({
   "GET /singing-parts": noParts,
   "GET /liturgies/l1/edits": noEdits,
   "GET /liturgies/l1/state-changes": h,
+  "GET /liturgies/l1/comments": { status: 200, body: { items: [], open: 0 } },
   "GET /liturgies/assignable": { status: 200, body: { items: [] } },
 });
 const page = (scopes = ["liturgy.edit", "liturgy.approve"]) => renderPage("/liturgies/:id", "/liturgies/l1", <LiturgyPage />, meWith(scopes));

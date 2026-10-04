@@ -29,6 +29,7 @@ export type ServiceView = Schemas["ServiceView"];
 
 // Liturgies (10 §4).
 export type LiturgyView = Schemas["LiturgyView"];
+export type CommentView = Schemas["CommentView"];
 export type LiturgySummaryView = Schemas["LiturgySummaryView"];
 export type LiturgyItemView = Schemas["LiturgyItemView"];
 export type ItemSongView = Schemas["ItemSongView"];

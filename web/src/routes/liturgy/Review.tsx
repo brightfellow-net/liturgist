@@ -12,6 +12,7 @@ import { Field } from "@/components/Field";
 import { api, call } from "@/lib/api";
 import { ApiError, isCode } from "@/lib/errors";
 import { liturgyQuery, problemText, stateChangesQuery } from "@/lib/liturgy";
+import { ReviewComments } from "./Comments";
 
 type Action = "submit" | "approve" | "request_changes" | "reopen";
 
@@ -131,6 +132,8 @@ export function Review({ liturgy, onChanged }: { liturgy: LiturgyView; onChanged
           </ul>
         </div>
       ) : <ErrorAlert error={run.error} />}
+
+      <ReviewComments liturgy={liturgy} announce={onChanged} />
 
       {reviewable && (
         <div className="space-y-1">

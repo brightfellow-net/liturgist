@@ -41,7 +41,7 @@ export function liturgy(changes: Partial<LiturgyView> = {}): LiturgyView {
     id: "l1", date: "2026-10-11", time: "07:00", service_id: "sv1", service_name: "Ibadah Umum", language: "id", template_id: null,
     state: "draft", version: 5, items: [textItem(), songItem()], assignments: [], problems: [],
     edit_seq: 7, open_comments: 0,
-    actions: { edit: true, delete: true, submit: true, approve: false, request_changes: false, reopen: false }, created_at: "2026-10-01T00:00:00Z", updated_at: "2026-10-01T00:00:00Z", ...changes,
+    actions: { edit: true, delete: true, submit: true, approve: false, request_changes: false, reopen: false, comment: true }, created_at: "2026-10-01T00:00:00Z", updated_at: "2026-10-01T00:00:00Z", ...changes,
   } as unknown as LiturgyView;
 }
 

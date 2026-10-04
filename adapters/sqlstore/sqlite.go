@@ -159,6 +159,8 @@ var sqliteUniqueNames = map[string]string{ //nolint:gosec // constraint names, n
 	"assignments.liturgy_id, assignments.duty_id, assignments.name_key": "assignments_name_key",
 	"liturgy_edits.id": "liturgy_edits_pkey",
 	"liturgy_edits.liturgy_id, liturgy_edits.seq":               "liturgy_edits_seq_key",
+	"liturgy_comments.id":                                       "liturgy_comments_pkey",
+	"liturgy_comments.church_id, liturgy_comments.id":           "liturgy_comments_church_id_key",
 	"liturgy_state_changes.id":                                  "liturgy_state_changes_pkey",
 	"liturgy_state_changes.church_id, liturgy_state_changes.id": "liturgy_state_changes_church_id_key",
 

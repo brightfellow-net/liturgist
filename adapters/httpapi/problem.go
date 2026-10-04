@@ -267,6 +267,7 @@ var conflicts = map[error]*Problem{
 	app.ErrLiturgyNotDeletable: problem(http.StatusConflict, "liturgy_not_deletable", "A published liturgy can only be archived."),
 	app.ErrAssignmentExists:    problem(http.StatusConflict, "assignment_exists", "This person already has this duty."),
 	app.ErrReviewStale:         problem(http.StatusConflict, "review_stale", "The liturgy changed after you opened it. Read it again."),
+	app.ErrCommentLimit:        problem(http.StatusUnprocessableEntity, "comment_limit", "This liturgy has reached its limit of comments."),
 	app.ErrEmptyLiturgy:        problem(http.StatusUnprocessableEntity, "empty_liturgy", "Add at least one item before submitting."),
 	app.ErrInviteMismatch: problem(http.StatusForbidden, "invite_identifier_mismatch",
 		"This invite is for another account. Log out and log in as that person."),

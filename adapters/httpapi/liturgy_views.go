@@ -122,7 +122,7 @@ type LiturgyView struct {
 	Version     int     `json:"version" doc:"guards the structure: the fields, and which items exist in what order"`
 	EditSeq     int     `json:"edit_seq" doc:"the number of the newest history row; approve and request changes must send the one the reviewer saw"`
 	// Review data: absent for a member without a liturgy scope (12 §2, P-74).
-	OpenComments *int               `json:"open_comments,omitempty" doc:"unresolved comments; 0 until comments are built"`
+	OpenComments *int               `json:"open_comments,omitempty" doc:"the number of unresolved comments"`
 	LastChange   *StateChangeView   `json:"last_change,omitempty" doc:"the newest state change; absent when the liturgy never changed state"`
 	Items        []LiturgyItemView  `json:"items"`
 	Assignments  []AssignmentView   `json:"assignments"`
@@ -153,6 +153,29 @@ func stateChangeView(v app.StateChangeView) StateChangeView {
 	c := v.Change
 	return StateChangeView{ID: string(c.ID), FromState: string(c.From), ToState: string(c.To),
 		User: UserRefView{ID: string(c.UserID), Name: v.UserName}, Note: c.Note, EditSeq: c.EditSeq, CreatedAt: c.CreatedAt}
+}
+
+// CommentView is a comment (12 §3).
+type CommentView struct {
+	ID         string       `json:"id"`
+	ItemID     *string      `json:"item_id" doc:"null: the whole liturgy. The item may have been removed since; item_title keeps its name"`
+	ItemTitle  string       `json:"item_title" doc:"the item's title when the comment was written"`
+	Author     UserRefView  `json:"author"`
+	Body       string       `json:"body" doc:"plain text"`
+	Resolved   bool         `json:"resolved"`
+	ResolvedBy *UserRefView `json:"resolved_by,omitempty"`
+	ResolvedAt *time.Time   `json:"resolved_at,omitempty"`
+	CreatedAt  time.Time    `json:"created_at"`
+}
+
+func commentView(v app.CommentView) CommentView {
+	c := v.Comment
+	out := CommentView{ID: string(c.ID), ItemID: optional(string(c.ItemID)), ItemTitle: c.ItemTitle,
+		Author: UserRefView{ID: string(c.AuthorID), Name: v.AuthorName}, Body: c.Body, Resolved: c.Resolved(), ResolvedAt: c.ResolvedAt, CreatedAt: c.CreatedAt}
+	if c.Resolved() {
+		out.ResolvedBy = &UserRefView{ID: string(c.ResolvedBy), Name: v.ResolverName}
+	}
+	return out
 }
 
 // ItemResultView is the answer of a write to one item.

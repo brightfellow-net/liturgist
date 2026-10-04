@@ -92,3 +92,39 @@ func ValidateNote(note *string) error {
 	}
 	return nil
 }
+
+// Limits of comments (12 §4).
+const (
+	MaxComment  = 2000
+	MaxComments = 500
+)
+
+// CommentID identifies a comment.
+type CommentID string
+
+// Comment is a remark on a liturgy or one of its items (12 §4).
+type Comment struct {
+	ID         CommentID
+	LiturgyID  LiturgyID
+	ItemID     ItemID // "" = the liturgy as a whole; no foreign key, the item may be gone
+	ItemTitle  string // the title when the comment was written
+	AuthorID   UserID
+	Body       string
+	ResolvedAt *time.Time
+	ResolvedBy UserID
+	CreatedAt  time.Time
+}
+
+// Resolved reports whether the comment is resolved.
+func (c Comment) Resolved() bool { return c.ResolvedAt != nil }
+
+// ValidateComment normalises a comment body and checks it: 1 to 2,000 characters.
+func ValidateComment(body *string) error {
+	*body = NormalizeNote(*body)
+	if n := utf8.RuneCountInString(*body); n < 1 {
+		return &InvalidInputError{Field: "body", Message: "Write something."}
+	} else if n > MaxComment {
+		return tooLong("body", MaxComment)
+	}
+	return nil
+}

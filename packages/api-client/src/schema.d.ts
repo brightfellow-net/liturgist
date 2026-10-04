@@ -473,6 +473,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/liturgies/{id}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The comments of a liturgy, oldest first */
+        get: operations["listLiturgyComments"];
+        put?: never;
+        /** Comment on an item or on the whole liturgy */
+        post: operations["addLiturgyComment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/liturgies/{id}/comments/{cid}/resolved": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Resolve a comment or reopen it */
+        put: operations["setLiturgyCommentResolved"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/liturgies/{id}/edits": {
         parameters: {
             query?: never;
@@ -1185,6 +1220,18 @@ export interface components {
              */
             version: number;
         };
+        AddLiturgyCommentRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/AddLiturgyCommentRequest.json
+             */
+            readonly $schema?: string;
+            /** @description 1 to 2,000 characters after trimming */
+            body: string;
+            /** @description an item of the liturgy; empty: the whole liturgy */
+            item_id?: string;
+        };
         AddLiturgyItemRequest: {
             /**
              * Format: uri
@@ -1287,6 +1334,42 @@ export interface components {
             name: string;
             privacy_contact: string | null;
             time_zone: string;
+        };
+        CommentListView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/CommentListView.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["CommentView"][] | null;
+            /**
+             * Format: int64
+             * @description unresolved comments of the liturgy, whatever the filter
+             */
+            open: number;
+        };
+        CommentView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/CommentView.json
+             */
+            readonly $schema?: string;
+            author: components["schemas"]["UserRefView"];
+            /** @description plain text */
+            body: string;
+            /** Format: date-time */
+            created_at: string;
+            id: string;
+            /** @description null: the whole liturgy. The item may have been removed since; item_title keeps its name */
+            item_id: string | null;
+            /** @description the item's title when the comment was written */
+            item_title: string;
+            resolved: boolean;
+            /** Format: date-time */
+            resolved_at?: string;
+            resolved_by?: components["schemas"]["UserRefView"];
         };
         CreateDutyRequest: {
             /**
@@ -1789,6 +1872,7 @@ export interface components {
         };
         LiturgyActions: {
             approve: boolean;
+            comment: boolean;
             delete: boolean;
             edit: boolean;
             reopen: boolean;
@@ -1874,7 +1958,7 @@ export interface components {
             last_change?: components["schemas"]["StateChangeView"];
             /**
              * Format: int64
-             * @description unresolved comments; 0 until comments are built
+             * @description the number of unresolved comments
              */
             open_comments?: number;
             problems: components["schemas"]["ProblemView"][] | null;
@@ -2409,6 +2493,15 @@ export interface components {
              * @description the item version the client loaded
              */
             version: number;
+        };
+        SetLiturgyCommentResolvedRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/SetLiturgyCommentResolvedRequest.json
+             */
+            readonly $schema?: string;
+            resolved: boolean;
         };
         SetMemberRolesRequest: {
             /**
@@ -4032,6 +4125,111 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listLiturgyComments: {
+        parameters: {
+            query?: {
+                /** @description only resolved or only unresolved comments */
+                resolved?: "true" | "false" | "";
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentListView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    addLiturgyComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddLiturgyCommentRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    setLiturgyCommentResolved: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                cid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetLiturgyCommentResolvedRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommentView"];
+                };
             };
             /** @description Error */
             default: {

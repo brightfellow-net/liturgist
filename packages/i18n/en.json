@@ -608,7 +608,8 @@
     "invalid_transition": "This liturgy is now {{state}}, so this can't be done. Reload the page.",
     "review_stale": "The liturgy changed after you opened it. Read it again.",
     "empty_liturgy": "Add at least one item before submitting.",
-    "has_problems": "Some items are not finished."
+    "has_problems": "Some items are not finished.",
+    "comment_limit": "This liturgy has reached its limit of 500 comments."
   },
   "import": {
     "title": "Import songs",
@@ -962,7 +963,7 @@
         "reopen": "Reopened as a draft."
       },
       "banner": {
-        "in_review": "This liturgy is being reviewed. It can't be edited until the reviewer approves it or asks for changes.",
+        "in_review": "This liturgy is being reviewed. Only comments can be added until the reviewer approves it or asks for changes.",
         "needs_revision": "Changes were requested. Edit the liturgy and submit it again.",
         "needs_revision_note": "{{name}} wrote: {{note}}",
         "approved": "Approved. Reopen it to make changes."
@@ -972,6 +973,38 @@
         "none": "Not submitted for review yet.",
         "row": "{{name}}: {{from}} → {{to}}"
       }
+    },
+    "comments": {
+      "title": "Comments",
+      "none": "No comments yet.",
+      "whole": "Whole liturgy",
+      "removed_item": "On a removed item: {{title}}",
+      "add": "Comment",
+      "add_on": "Comment on {{title}}",
+      "label": "Comment",
+      "hint": "At most 2,000 characters. Plain text.",
+      "send": "Add comment",
+      "cancel": "Cancel",
+      "resolve": "Resolve",
+      "reopen": "Reopen",
+      "resolved_by": "Resolved by {{name}}",
+      "by": "{{name}}",
+      "open_count_one": "{{count}} open comment",
+      "open_count_other": "{{count}} open comments",
+      "show_resolved_one": "{{count}} resolved comment",
+      "show_resolved_other": "{{count}} resolved comments",
+      "filter": {
+        "label": "Show",
+        "open": "Open",
+        "resolved": "Resolved",
+        "all": "All"
+      },
+      "done": {
+        "added": "Comment added.",
+        "resolved": "Comment resolved.",
+        "reopened": "Comment reopened."
+      },
+      "on_item": "Comments on {{title}}"
     }
   }
 }

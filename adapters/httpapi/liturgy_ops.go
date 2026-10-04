@@ -26,6 +26,12 @@ type itemResultOutput struct{ Body ItemResultView }
 
 type orderOutput struct{ Body OrderResultView }
 
+// CommentListView is the answer of the comment list.
+type CommentListView struct {
+	Items []CommentView `json:"items"`
+	Open  int           `json:"open" doc:"unresolved comments of the liturgy, whatever the filter"`
+}
+
 func orderResultView(r app.OrderResult) OrderResultView {
 	out := OrderResultView{LiturgyVersion: r.LiturgyVersion, ItemIDs: make([]string, len(r.ItemIDs))}
 	for i, id := range r.ItemIDs {
@@ -508,6 +514,60 @@ func RegisterLiturgies(api huma.API, d LiturgyDeps) {
 				out.Body.Items[i] = stateChangeView(c)
 			}
 			return out, nil
+		})
+	huma.Register(api, lop("listLiturgyComments", http.MethodGet, "/liturgies/{id}/comments", http.StatusOK, "The comments of a liturgy, oldest first"),
+		func(ctx context.Context, in *struct {
+			ID       string `path:"id" maxLength:"26"`
+			Resolved string `query:"resolved" enum:"true,false," doc:"only resolved or only unresolved comments"`
+		}) (*struct{ Body CommentListView }, error) {
+			var filter *bool
+			if in.Resolved != "" {
+				b := in.Resolved == "true"
+				filter = &b
+			}
+			list, err := d.Liturgies.Comments(ctx, sess(ctx), domain.LiturgyID(in.ID), filter)
+			if err != nil {
+				return nil, fail(ctx, err)
+			}
+			out := &struct{ Body CommentListView }{Body: CommentListView{Open: list.Open, Items: make([]CommentView, len(list.Items))}}
+			for i, c := range list.Items {
+				out.Body.Items[i] = commentView(c)
+			}
+			return out, nil
+		})
+	huma.Register(api, lop("addLiturgyComment", http.MethodPost, "/liturgies/{id}/comments", http.StatusCreated, "Comment on an item or on the whole liturgy"),
+		func(ctx context.Context, in *struct {
+			ID   string `path:"id" maxLength:"26"`
+			Body struct {
+				ItemID string `json:"item_id,omitempty" maxLength:"26" doc:"an item of the liturgy; empty: the whole liturgy"`
+				Body   string `json:"body" maxLength:"20000" doc:"1 to 2,000 characters after trimming"`
+			}
+		}) (*struct{ Body CommentView }, error) {
+			c, err := d.Liturgies.AddComment(ctx, sess(ctx), domain.LiturgyID(in.ID), domain.ItemID(in.Body.ItemID), in.Body.Body)
+			if err != nil {
+				return nil, fail(ctx, err)
+			}
+			d.Log.Info("comment_added", "actor", actor(ctx), "liturgy_id", in.ID, "comment_id", string(c.Comment.ID), "item_id", in.Body.ItemID)
+			return &struct{ Body CommentView }{Body: commentView(c)}, nil
+		})
+	huma.Register(api, lop("setLiturgyCommentResolved", http.MethodPut, "/liturgies/{id}/comments/{cid}/resolved", http.StatusOK, "Resolve a comment or reopen it"),
+		func(ctx context.Context, in *struct {
+			ID   string `path:"id" maxLength:"26"`
+			CID  string `path:"cid" maxLength:"26"`
+			Body struct {
+				Resolved bool `json:"resolved"`
+			}
+		}) (*struct{ Body CommentView }, error) {
+			c, err := d.Liturgies.SetCommentResolved(ctx, sess(ctx), domain.LiturgyID(in.ID), domain.CommentID(in.CID), in.Body.Resolved)
+			if err != nil {
+				return nil, fail(ctx, err)
+			}
+			event := "comment_reopened"
+			if in.Body.Resolved {
+				event = "comment_resolved"
+			}
+			d.Log.Info(event, "actor", actor(ctx), "liturgy_id", in.ID, "comment_id", in.CID)
+			return &struct{ Body CommentView }{Body: commentView(c)}, nil
 		})
 	huma.Register(api, lop("removeAssignment", http.MethodDelete, "/liturgies/{id}/assignments/{aid}", http.StatusNoContent, "Remove an assignment"),
 		func(ctx context.Context, in *struct {

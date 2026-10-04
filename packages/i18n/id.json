@@ -603,7 +603,8 @@
     "invalid_transition": "Liturgi ini sekarang {{state}}, jadi tidak bisa dilakukan. Muat ulang halaman.",
     "review_stale": "Liturgi berubah setelah Anda membukanya. Bacalah lagi.",
     "empty_liturgy": "Tambahkan setidaknya satu butir sebelum dikirim.",
-    "has_problems": "Beberapa butir belum selesai."
+    "has_problems": "Beberapa butir belum selesai.",
+    "comment_limit": "Liturgi ini sudah mencapai batas 500 komentar."
   },
   "import": {
     "title": "Impor lagu",
@@ -949,7 +950,7 @@
         "reopen": "Dibuka kembali sebagai draf."
       },
       "banner": {
-        "in_review": "Liturgi ini sedang ditinjau. Belum bisa diubah sampai peninjau menyetujui atau meminta perubahan.",
+        "in_review": "Liturgi ini sedang ditinjau. Hanya komentar yang bisa ditambahkan sampai peninjau menyetujui atau meminta perubahan.",
         "needs_revision": "Ada perubahan yang diminta. Ubah liturgi lalu kirim lagi.",
         "needs_revision_note": "{{name}} menulis: {{note}}",
         "approved": "Sudah disetujui. Buka kembali untuk mengubahnya."
@@ -959,6 +960,38 @@
         "none": "Belum dikirim untuk ditinjau.",
         "row": "{{name}}: {{from}} → {{to}}"
       }
+    },
+    "comments": {
+      "title": "Komentar",
+      "none": "Belum ada komentar.",
+      "whole": "Seluruh liturgi",
+      "removed_item": "Pada butir yang sudah dihapus: {{title}}",
+      "add": "Komentar",
+      "add_on": "Beri komentar pada {{title}}",
+      "label": "Komentar",
+      "hint": "Paling banyak 2.000 karakter. Teks biasa.",
+      "send": "Tambah komentar",
+      "cancel": "Batal",
+      "resolve": "Selesaikan",
+      "reopen": "Buka lagi",
+      "resolved_by": "Diselesaikan oleh {{name}}",
+      "by": "{{name}}",
+      "open_count_one": "{{count}} komentar terbuka",
+      "open_count_other": "{{count}} komentar terbuka",
+      "show_resolved_one": "{{count}} komentar selesai",
+      "show_resolved_other": "{{count}} komentar selesai",
+      "filter": {
+        "label": "Tampilkan",
+        "open": "Terbuka",
+        "resolved": "Selesai",
+        "all": "Semua"
+      },
+      "done": {
+        "added": "Komentar ditambahkan.",
+        "resolved": "Komentar diselesaikan.",
+        "reopened": "Komentar dibuka lagi."
+      },
+      "on_item": "Komentar pada {{title}}"
     }
   }
 }

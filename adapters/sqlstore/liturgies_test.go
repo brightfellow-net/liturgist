@@ -69,6 +69,8 @@ func seedLiturgies(a, b app.ChurchStore, now time.Time) error {
 			c.cs.Assignments().Add(ctx, domain.Assignment{ID: domain.AssignmentID(id("AS" + c.suffix)), LiturgyID: l.ID,
 				DutyID: domain.DutyID(id(c.duty)), UserID: domain.UserID(id("U1")), CreatedAt: now}))
 		seq, err := c.cs.Liturgies().NextSeq(ctx, l.ID)
+		errs = append(errs, c.cs.Comments().Create(ctx, domain.Comment{ID: domain.CommentID(id("CM" + c.suffix)), LiturgyID: l.ID,
+			ItemID: domain.ItemID(id("ITP" + c.suffix)), ItemTitle: "Doa", AuthorID: domain.UserID(id("U1")), Body: "Bagus", CreatedAt: now}))
 		errs = append(errs, err, c.cs.StateChanges().Append(ctx, domain.StateChange{ID: domain.StateChangeID(id("SC" + c.suffix)), LiturgyID: l.ID,
 			From: domain.StateDraft, To: domain.StateInReview, UserID: domain.UserID(id("U1")), Note: "n", EditSeq: seq, CreatedAt: now}))
 		errs = append(errs, err, c.cs.Edits().Append(ctx, domain.Edit{ID: domain.EditID(id("ED" + c.suffix)), LiturgyID: l.ID, Seq: seq,
@@ -155,6 +157,57 @@ func liturgyHarness(errRollback error, notFound func(error) error, unchanged fun
 	h["Liturgies.Transition"] = func(cs app.ChurchStore, now time.Time) error {
 		_, ok, err := cs.Liturgies().Transition(ctx, lgB, domain.StateDraft, domain.StateInReview, 0, now)
 		return unchanged(ok, err)
+	}
+	h["Liturgies.LockForComment"] = func(cs app.ChurchStore, _ time.Time) error {
+		if ok, err := cs.Liturgies().LockForComment(ctx, lgA); err != nil || !ok {
+			return fmt.Errorf("own liturgy: %v %w", ok, err)
+		}
+		ok, err := cs.Liturgies().LockForComment(ctx, lgB)
+		return unchanged(ok, err)
+	}
+	h["Comments.Create"] = func(cs app.ChurchStore, now time.Time) error {
+		return referenced("a comment in church B's liturgy", cs.Comments().Create(ctx, domain.Comment{ID: domain.CommentID(id("CMX")),
+			LiturgyID: lgB, AuthorID: domain.UserID(id("U1")), Body: "x", CreatedAt: now}))
+	}
+	h["Comments.List"] = func(cs app.ChurchStore, _ time.Time) error {
+		own, err := cs.Comments().List(ctx, lgA, nil)
+		other, err2 := cs.Comments().List(ctx, lgB, nil)
+		open, err3 := cs.Comments().List(ctx, lgA, ptr(false))
+		done, err4 := cs.Comments().List(ctx, lgA, ptr(true))
+		if err != nil || err2 != nil || err3 != nil || err4 != nil || len(own) != 1 || own[0].ID != domain.CommentID(id("CMA")) ||
+			len(other) != 0 || len(open) != 1 || len(done) != 0 {
+			return fmt.Errorf("comments: %+v %+v %+v %+v", own, other, open, done)
+		}
+		return nil
+	}
+	h["Comments.Count"] = func(cs app.ChurchStore, _ time.Time) error {
+		a, err := cs.Comments().Count(ctx, lgA)
+		b, err2 := cs.Comments().Count(ctx, lgB)
+		if err != nil || err2 != nil || a != 1 || b != 0 {
+			return fmt.Errorf("count %d %d %v %v", a, b, err, err2)
+		}
+		return nil
+	}
+	h["Comments.Open"] = func(cs app.ChurchStore, _ time.Time) error {
+		a, err := cs.Comments().Open(ctx, lgA)
+		b, err2 := cs.Comments().Open(ctx, lgB)
+		if err != nil || err2 != nil || a != 1 || b != 0 {
+			return fmt.Errorf("open %d %d %v %v", a, b, err, err2)
+		}
+		return nil
+	}
+	h["Comments.ByID"] = func(cs app.ChurchStore, _ time.Time) error {
+		if c, err := cs.Comments().ByID(ctx, lgA, domain.CommentID(id("CMA"))); err != nil || c.ItemTitle != "Doa" || c.Resolved() {
+			return fmt.Errorf("own: %+v %w", c, err)
+		}
+		if _, err := cs.Comments().ByID(ctx, lgA, domain.CommentID(id("CMB"))); !errors.Is(err, app.ErrNotFound) {
+			return fmt.Errorf("church B's comment through A's liturgy: %v", err)
+		}
+		_, err := cs.Comments().ByID(ctx, lgB, domain.CommentID(id("CMB")))
+		return notFound(err)
+	}
+	h["Comments.SetResolved"] = func(cs app.ChurchStore, now time.Time) error {
+		return unchanged(cs.Comments().SetResolved(ctx, lgB, domain.CommentID(id("CMB")), true, domain.UserID(id("U1")), now))
 	}
 	h["StateChanges.Append"] = func(cs app.ChurchStore, now time.Time) error {
 		return referenced("a state change in church B's liturgy", cs.StateChanges().Append(ctx, domain.StateChange{ID: domain.StateChangeID(id("SCX")),

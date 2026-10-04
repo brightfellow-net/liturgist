@@ -171,6 +171,7 @@ var (
 	ErrAssignmentExists    = errors.New("person already has this duty")           // 409 assignment_exists
 	ErrReviewStale         = errors.New("liturgy changed since it was read")      // 409 review_stale
 	ErrEmptyLiturgy        = errors.New("liturgy has no items")                   // 422 empty_liturgy
+	ErrCommentLimit        = errors.New("liturgy has too many comments")          // 422 comment_limit
 	// ErrNoSeq is NextSeq's answer when no row matched: the liturgy is gone or no
 	// longer editable. Only the helper nextSeq tells which (12 §2, P-71).
 	ErrNoSeq = errors.New("history number not taken")

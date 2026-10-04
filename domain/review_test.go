@@ -86,3 +86,22 @@ func TestCanComment(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateComment(t *testing.T) {
+	for _, tc := range []struct {
+		in, want string
+		ok       bool
+	}{
+		{"  Ganti \r\nini ", "Ganti \nini", true},
+		{"", "", false},
+		{" \n\t ", "", false},
+		{strings.Repeat("é", MaxComment), strings.Repeat("é", MaxComment), true},
+		{strings.Repeat("é", MaxComment+1), "", false},
+	} {
+		got := tc.in
+		err := ValidateComment(&got)
+		if (err == nil) != tc.ok || (tc.ok && got != tc.want) {
+			t.Errorf("%q: got %q, err %v", tc.in[:min(len(tc.in), 10)], got[:min(len(got), 10)], err)
+		}
+	}
+}
