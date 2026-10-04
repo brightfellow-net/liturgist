@@ -114,6 +114,17 @@ Merged as `9f8cbe7`. Differences and additions to the text above:
 - **Tests.** TC-R-001, 003, 006, 007 and the `CanComment` rule; IT-R-001 to 006, 009 to 012 (the free-running race `TestEditAndSubmitRace` runs 60 rounds), the two forced PostgreSQL interleavings (`TestEditLosesToTransition`, `TestSubmitLosesToEdit`, skipped on SQLite, which has one writer; removing the `state IN` predicate or the `edit_seq` condition makes them fail), WT-R-001 to 003 and 005, E2E-W-016. IT-R-007, 008, 013, 014 and WT-R-004 wait for 4B. Vitest 211, Playwright 36.
 - **Not run:** golangci-lint (the v1/v2 config mismatch of step 3 still stands).
 
+### 7.2 Slice 4B as built (2026-10-04)
+
+Merged as `5831ed7`. Step 4 is complete. Differences and additions:
+
+- **Migration** `00009_comments.sql` (both dialects); `item_id` has no foreign key, as written.
+- **Routes** as in §3 (`listLiturgyComments`, `addLiturgyComment`, `setLiturgyCommentResolved`); the liturgy view's `open_comments` is the real count and `actions.comment` exists (scope `liturgy.comment` and a state of `draft`, `in_review` or `needs_revision`). The approve response counts the comments committed before it.
+- **Code.** `app/liturgy_comments.go`; `LiturgyRepo.LockForComment` (the no-op update of §4); `CommentRepo` (`Create`, `List`, `Count`, `Open`, `ByID`, `SetResolved`); `domain.Comment`, `ValidateComment`; `web/src/routes/liturgy/Comments.tsx`. The use case reads the clock before taking the lock, so a test can hook the interleaving there.
+- **Web.** The item's comments sit under its card (group "Comments on {title}", form "Comment on {title}"); the review panel lists all comments with the filters Open (the start), Resolved and All, and holds the form for the whole liturgy. The in-review banner now says that only comments can be added.
+- **Tests.** TC-R-005 (domain and app), IT-R-007, 008, 009, 013, 014 and the comment rows of IT-R-010, the 500-comment cap with 20 simultaneous requests at the edge, `TestCommentAndApproveRace` (40 rounds, both dialects: an accepted comment is always counted by the approval), the forced PostgreSQL interleaving `TestCommentLosesToApproval` (skipped on SQLite; removing the state test from `LockForComment` makes both race tests fail), WT-R-004, and E2E-W-016 extended with a comment, a resolve and axe on the page with comments. Vitest 217, Playwright 36.
+- **Not run:** golangci-lint (the v1/v2 config mismatch of step 3 still stands).
+
 ## 8. Anti-patterns (DO NOT)
 
 | ❌ Don't | ✅ Do instead | Why |

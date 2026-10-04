@@ -40,7 +40,7 @@
 
 ## 1c. Documents for step 4
 
-[SPEC.md §10](../SPEC.md#10-suggested-build-order), step 4: review workflow up to Approved, item-level comments, state history. **Status: decisions Approved** 2026-10-04 (Spec Gate 9.0/10, self-scored; adversarial review round 4 done). Built in two slices: 4A states and history (**merged** 2026-10-04, [12 §7.1](12-review.md#71-slice-4a-as-built-2026-10-04)), 4B comments. Publishing is step 5 (owner decision 2026-10-04).
+[SPEC.md §10](../SPEC.md#10-suggested-build-order), step 4: review workflow up to Approved, item-level comments, state history. **Status: decisions Approved** 2026-10-04 (Spec Gate 9.0/10, self-scored; adversarial review round 4 done). Built in two slices: 4A states and history (**merged** 2026-10-04, [12 §7.1](12-review.md#71-slice-4a-as-built-2026-10-04)), 4B comments (**merged** 2026-10-04, [12 §7.2](12-review.md#72-slice-4b-as-built-2026-10-04)); step 4 is complete. Publishing is step 5 (owner decision 2026-10-04).
 
 | Document | Covers |
 |---|---|
