@@ -5,6 +5,8 @@ package sqlstore
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/brightfellow-net/liturgist/app"
@@ -169,8 +171,25 @@ func changed(d Dialect, res rowsResult, err error) (bool, error) {
 func (r liturgyRepo) NextSeq(ctx context.Context, id domain.LiturgyID) (int, error) {
 	var seq int
 	err := r.tx.QueryRowContext(ctx, r.d.Rebind(`UPDATE liturgies SET edit_seq = edit_seq + 1
-		WHERE church_id = ? AND id = ? RETURNING edit_seq`), r.churchID, id).Scan(&seq)
+		WHERE church_id = ? AND id = ? AND state IN ('draft', 'needs_revision') RETURNING edit_seq`), r.churchID, id).Scan(&seq)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, app.ErrNoSeq
+	}
 	return seq, r.d.MapError(err)
+}
+
+func (r liturgyRepo) Transition(ctx context.Context, id domain.LiturgyID, from, to domain.LiturgyState, expectSeq int, now time.Time) (int, bool, error) {
+	var seq int
+	err := r.tx.QueryRowContext(ctx, r.d.Rebind(`UPDATE liturgies SET state = ?, undo_floor_seq = edit_seq, updated_at = ?
+		WHERE church_id = ? AND id = ? AND state = ? AND edit_seq = ? RETURNING edit_seq`),
+		string(to), r.d.TimeArg(now), r.churchID, id, string(from), expectSeq).Scan(&seq)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, r.d.MapError(err)
+	}
+	return seq, true, nil
 }
 
 func (r liturgyRepo) Delete(ctx context.Context, id domain.LiturgyID) error {

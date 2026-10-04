@@ -17,6 +17,7 @@ import { liturgyLimits, liturgyQuery, longDate, problemText, withOrder } from "@
 import { dutiesQuery, itemTypes, singingPartsQuery, type ItemType } from "@/lib/planning";
 import { ItemCard } from "./ItemCard";
 import { History } from "./History";
+import { Review } from "./Review";
 import { Team } from "./Team";
 import { paths } from "../paths";
 
@@ -112,9 +113,7 @@ function Editor({ liturgy, duties, parts }: { liturgy: LiturgyView; duties: Name
     <div className="max-w-3xl space-y-6">
       <p><Link className="underline" to={paths.planning}>{t("liturgy.back")}</Link></p>
       <Header liturgy={liturgy} lang={i18n.language} onSaved={() => { setStatus(t("liturgy.details.saved")); touch(); }} />
-      {!editable && (
-        <Alert variant="info">{liturgy.state === "published" ? t("liturgy.locked_final") : t("liturgy.locked", { state: t(`liturgy.states.${liturgy.state}`) })}</Alert>
-      )}
+      <Review liturgy={liturgy} onChanged={(message) => { setStatus(message); touch(); }} />
       <div role="status" aria-live="polite" className="sr-only">{status}</div>
       {status && <p className="text-sm text-muted-foreground">{status}</p>}
       <ErrorAlert error={structureError} />

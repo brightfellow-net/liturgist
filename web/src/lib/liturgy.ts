@@ -46,6 +46,12 @@ export const editsQuery = (id: string) =>
     queryFn: () => call(api.GET("/liturgies/{id}/edits", { params: { path: { id }, query: { limit: liturgyLimits.recentChanges } } })),
   });
 
+export const stateChangesQuery = (id: string) =>
+  queryOptions({
+    queryKey: ["liturgy", id, "state-changes"],
+    queryFn: () => call(api.GET("/liturgies/{id}/state-changes", { params: { path: { id }, query: { limit: liturgyLimits.recentChanges } } })),
+  });
+
 // keyShape is the shape of a key the editor can say in "do" words: a letter
 // A to G, an optional # or b, and an "m" for minor (06 §2).
 const keyShape = /^([A-G])([#b]?)(m?)$/;

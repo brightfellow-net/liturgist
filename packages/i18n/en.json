@@ -604,7 +604,11 @@
     "assignment_exists": "This person already has this duty.",
     "language_mismatch": "The template and the liturgy must be in the same language.",
     "liturgy_limit": "Your church has reached its limit of {{max}} liturgies.",
-    "undo_refused": "This can't be undone or redone."
+    "undo_refused": "This can't be undone or redone.",
+    "invalid_transition": "This liturgy is now {{state}}, so this can't be done. Reload the page.",
+    "review_stale": "The liturgy changed after you opened it. Read it again.",
+    "empty_liturgy": "Add at least one item before submitting.",
+    "has_problems": "Some items are not finished."
   },
   "import": {
     "title": "Import songs",
@@ -727,7 +731,6 @@
     "moved": "{{title}} moved to place {{n}} of {{total}}.",
     "removed": "{{title}} removed.",
     "list_conflict": "The items were changed by someone else. The list was reloaded; try again.",
-    "locked": "Locked: this liturgy is {{state}}. It can't be edited now.",
     "locked_final": "This liturgy is final and can't be edited.",
     "delete": "Delete this liturgy",
     "delete_question": "Delete the liturgy “{{name}}” of {{date}} with all its items and history? This cannot be undone.",
@@ -936,6 +939,38 @@
           "changed_since": "Someone has changed this since, so it can't be redone.",
           "reference_gone": "Something this change used no longer exists, so it can't be redone."
         }
+      }
+    },
+    "review": {
+      "title": "Review",
+      "submit": "Submit for review",
+      "approve": "Approve",
+      "request_changes": "Request changes",
+      "reopen": "Reopen as draft",
+      "note": "Note (optional)",
+      "note_hint": "At most 500 characters. The team sees it in the history.",
+      "send": "Send",
+      "cancel": "Cancel",
+      "open_warning_one": "1 comment is still open.",
+      "open_warning_other": "{{count}} comments are still open.",
+      "approve_anyway": "Approve anyway",
+      "problems_title": "Finish these items before submitting:",
+      "done": {
+        "submit": "Submitted for review.",
+        "approve": "Approved.",
+        "request_changes": "Sent back for changes.",
+        "reopen": "Reopened as a draft."
+      },
+      "banner": {
+        "in_review": "This liturgy is being reviewed. It can't be edited until the reviewer approves it or asks for changes.",
+        "needs_revision": "Changes were requested. Edit the liturgy and submit it again.",
+        "needs_revision_note": "{{name}} wrote: {{note}}",
+        "approved": "Approved. Reopen it to make changes."
+      },
+      "history": {
+        "title": "Review history",
+        "none": "Not submitted for review yet.",
+        "row": "{{name}}: {{from}} → {{to}}"
       }
     }
   }

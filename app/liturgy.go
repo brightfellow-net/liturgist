@@ -22,14 +22,26 @@ type Liturgies struct {
 // LiturgyActions are the advisory actions on a liturgy (10 §4): both depend only
 // on the scope and the liturgy's own state.
 type LiturgyActions struct {
-	Edit   bool `json:"edit"`
-	Delete bool `json:"delete"`
+	Edit           bool `json:"edit"`
+	Delete         bool `json:"delete"`
+	Submit         bool `json:"submit"`
+	Approve        bool `json:"approve"`
+	RequestChanges bool `json:"request_changes"`
+	Reopen         bool `json:"reopen"`
 }
 
 func liturgyActions(a Actor, state domain.LiturgyState) LiturgyActions {
+	can := func(act domain.ReviewAction) bool {
+		r, _ := act.Rule()
+		return a.Scopes.Has(r.Scope) && r.Allowed(state)
+	}
 	return LiturgyActions{
-		Edit:   a.Scopes.Has(domain.ScopeLiturgyEdit) && state.Editable(),
-		Delete: a.Scopes.Has(domain.ScopeLiturgyManage) && state.Deletable(),
+		Edit:           a.Scopes.Has(domain.ScopeLiturgyEdit) && state.Editable(),
+		Delete:         a.Scopes.Has(domain.ScopeLiturgyManage) && state.Deletable(),
+		Submit:         can(domain.ActionSubmit),
+		Approve:        can(domain.ActionApprove),
+		RequestChanges: can(domain.ActionRequestChanges),
+		Reopen:         can(domain.ActionReopen),
 	}
 }
 
@@ -180,6 +192,21 @@ type LiturgyView struct {
 	Assignments []AssignmentView
 	Problems    []domain.Problem
 	Actions     LiturgyActions
+	// Review is nil for a member without a liturgy scope (12 §2, P-74).
+	Review *ReviewInfo
+}
+
+// ReviewInfo is what the liturgy view carries of the review workflow: the
+// newest state change and the number of unresolved comments (12 §2).
+type ReviewInfo struct {
+	LastChange   *StateChangeView
+	OpenComments int
+}
+
+// StateChangeView is a state change with the name of its author.
+type StateChangeView struct {
+	Change   domain.StateChange
+	UserName string
 }
 
 // LiturgyListItem is one line of the list.
@@ -282,8 +309,23 @@ func (u *Liturgies) view(ctx context.Context, sc churchScope, l domain.Liturgy) 
 	if err != nil {
 		return LiturgyView{}, err
 	}
-	return LiturgyView{Liturgy: l, Items: iv, Assignments: av, Problems: domain.Problems(items),
-		Actions: liturgyActions(sc.actor, l.State)}, nil
+	v := LiturgyView{Liturgy: l, Items: iv, Assignments: av, Problems: domain.Problems(items),
+		Actions: liturgyActions(sc.actor, l.State)}
+	if canSeeLiturgies(sc.actor) {
+		v.Review = &ReviewInfo{}
+		last, err := sc.cs.StateChanges().Last(ctx, l.ID)
+		switch {
+		case err == nil:
+			cv, err := sc.stateChangeView(ctx, last)
+			if err != nil {
+				return LiturgyView{}, err
+			}
+			v.Review.LastChange = &cv
+		case !errors.Is(err, ErrNotFound):
+			return LiturgyView{}, err
+		}
+	}
+	return v, nil
 }
 
 // List returns the liturgies the caller may see (10 §4). A member without a

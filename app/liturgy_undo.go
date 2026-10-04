@@ -61,9 +61,9 @@ func (u *Liturgies) step(ctx context.Context, sess *domain.Session, id domain.Li
 			return err
 		}
 		// The history counter first: the test below then sees every committed edit (10 §5).
-		seq, err := sc.cs.Liturgies().NextSeq(ctx, id)
+		seq, err := sc.nextSeq(ctx, id)
 		if err != nil {
-			return missing(err)
+			return err
 		}
 		l, err := sc.cs.Liturgies().ByID(ctx, id)
 		if err != nil {

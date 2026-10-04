@@ -443,6 +443,72 @@ func RegisterLiturgies(api huma.API, d LiturgyDeps) {
 		"Undo the caller's newest edit that nobody else has touched since"), undoOut("undone", true))
 	huma.Register(api, lop("redoLiturgyEdit", http.MethodPost, "/liturgies/{id}/redo", http.StatusOK,
 		"Apply again the edit the caller undid last"), undoOut("redone", false))
+	type reviewBody struct {
+		Note string `json:"note,omitempty" maxLength:"4000" doc:"at most 500 characters after trimming"`
+	}
+	type reviewSeqBody struct {
+		EditSeq *int   `json:"edit_seq,omitempty" minimum:"0" doc:"the edit_seq of the liturgy as the reviewer saw it"`
+		Note    string `json:"note,omitempty" maxLength:"4000" doc:"at most 500 characters after trimming"`
+	}
+	review := func(act domain.ReviewAction, id, path, summary string, withSeq bool) {
+		run := func(ctx context.Context, liturgy string, seq *int, note string) (*liturgyOutput, error) {
+			v, err := d.Liturgies.Review(ctx, sess(ctx), domain.LiturgyID(liturgy), app.ReviewInput{Action: act, EditSeq: seq, Note: note})
+			if err != nil {
+				return nil, fail(ctx, err)
+			}
+			d.Log.Info("liturgy_"+string(act), "actor", actor(ctx), "liturgy_id", liturgy, "state", string(v.Liturgy.State))
+			return &liturgyOutput{Body: liturgyView(v)}, nil
+		}
+		if withSeq {
+			huma.Register(api, lop(id, http.MethodPost, path, http.StatusOK, summary),
+				func(ctx context.Context, in *struct {
+					ID   string `path:"id" maxLength:"26"`
+					Body reviewSeqBody
+				}) (*liturgyOutput, error) {
+					return run(ctx, in.ID, in.Body.EditSeq, in.Body.Note)
+				})
+			return
+		}
+		huma.Register(api, lop(id, http.MethodPost, path, http.StatusOK, summary),
+			func(ctx context.Context, in *struct {
+				ID   string `path:"id" maxLength:"26"`
+				Body reviewBody
+			}) (*liturgyOutput, error) {
+				return run(ctx, in.ID, nil, in.Body.Note)
+			})
+	}
+	review(domain.ActionSubmit, "submitLiturgy", "/liturgies/{id}/submit", "Submit a liturgy for review (draft or needs revision to in review)", false)
+	review(domain.ActionApprove, "approveLiturgy", "/liturgies/{id}/approve", "Approve a liturgy in review", true)
+	review(domain.ActionRequestChanges, "requestLiturgyChanges", "/liturgies/{id}/request-changes", "Send a liturgy in review back for revision", true)
+	review(domain.ActionReopen, "reopenLiturgy", "/liturgies/{id}/reopen", "Reopen an approved liturgy as a draft", false)
+	huma.Register(api, lop("listLiturgyStateChanges", http.MethodGet, "/liturgies/{id}/state-changes", http.StatusOK, "The review history of a liturgy, newest first"),
+		func(ctx context.Context, in *struct {
+			ID     string `path:"id" maxLength:"26"`
+			Limit  int    `query:"limit" minimum:"0" maximum:"200" doc:"default 50"`
+			Offset int    `query:"offset" minimum:"0"`
+		}) (*struct {
+			Body struct {
+				Items []StateChangeView `json:"items"`
+				Total int               `json:"total"`
+			}
+		}, error) {
+			page, err := d.Liturgies.StateChanges(ctx, sess(ctx), domain.LiturgyID(in.ID), in.Limit, in.Offset)
+			if err != nil {
+				return nil, fail(ctx, err)
+			}
+			out := &struct {
+				Body struct {
+					Items []StateChangeView `json:"items"`
+					Total int               `json:"total"`
+				}
+			}{}
+			out.Body.Total = page.Total
+			out.Body.Items = make([]StateChangeView, len(page.Items))
+			for i, c := range page.Items {
+				out.Body.Items[i] = stateChangeView(c)
+			}
+			return out, nil
+		})
 	huma.Register(api, lop("removeAssignment", http.MethodDelete, "/liturgies/{id}/assignments/{aid}", http.StatusNoContent, "Remove an assignment"),
 		func(ctx context.Context, in *struct {
 			ID           string `path:"id" maxLength:"26"`

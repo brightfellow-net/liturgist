@@ -422,6 +422,23 @@ export interface paths {
         patch: operations["updateLiturgy"];
         trace?: never;
     };
+    "/liturgies/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve a liturgy in review */
+        post: operations["approveLiturgy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/liturgies/{id}/assignments": {
         parameters: {
             query?: never;
@@ -554,6 +571,74 @@ export interface paths {
         put?: never;
         /** Apply again the edit the caller undid last */
         post: operations["redoLiturgyEdit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/liturgies/{id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reopen an approved liturgy as a draft */
+        post: operations["reopenLiturgy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/liturgies/{id}/request-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send a liturgy in review back for revision */
+        post: operations["requestLiturgyChanges"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/liturgies/{id}/state-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The review history of a liturgy, newest first */
+        get: operations["listLiturgyStateChanges"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/liturgies/{id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit a liturgy for review (draft or needs revision to in review) */
+        post: operations["submitLiturgy"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1673,6 +1758,17 @@ export interface components {
             readonly $schema?: string;
             items: components["schemas"]["EditView"][] | null;
         };
+        ListLiturgyStateChangesResponse: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/ListLiturgyStateChangesResponse.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["StateChangeView"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
         ListServicesResponse: {
             /**
              * Format: uri
@@ -1692,8 +1788,12 @@ export interface components {
             items: components["schemas"]["TemplateSummaryView"][] | null;
         };
         LiturgyActions: {
+            approve: boolean;
             delete: boolean;
             edit: boolean;
+            reopen: boolean;
+            request_changes: boolean;
+            submit: boolean;
         };
         LiturgyItemView: {
             duty_id: string | null;
@@ -1761,10 +1861,22 @@ export interface components {
             /** Format: date-time */
             created_at: string;
             date: string;
+            /**
+             * Format: int64
+             * @description the number of the newest history row; approve and request changes must send the one the reviewer saw
+             */
+            edit_seq: number;
             id: string;
             items: components["schemas"]["LiturgyItemView"][] | null;
             /** @enum {string} */
             language: "id" | "en" | "zh-Hans" | "zh-Hant";
+            /** @description the newest state change; absent when the liturgy never changed state */
+            last_change?: components["schemas"]["StateChangeView"];
+            /**
+             * Format: int64
+             * @description unresolved comments; 0 until comments are built
+             */
+            open_comments?: number;
             problems: components["schemas"]["ProblemView"][] | null;
             /** @description null for a one-off, and after the service is deleted */
             service_id: string | null;
@@ -2014,12 +2126,14 @@ export interface components {
             liturgy_id?: string;
             /** Format: int64 */
             max?: number;
+            problems?: components["schemas"]["ProblemView"][] | null;
             reading_id?: string;
             reason?: string;
             scope?: string;
             scopes?: string[] | null;
             section_ids?: string[] | null;
             service_ids?: string[] | null;
+            state?: string;
             /** Format: int64 */
             status: number;
             title: string;
@@ -2176,6 +2290,31 @@ export interface components {
             expires_at: string;
             /** Format: date-time */
             used_at: string | null;
+        };
+        ReviewBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/ReviewBody.json
+             */
+            readonly $schema?: string;
+            /** @description at most 500 characters after trimming */
+            note?: string;
+        };
+        ReviewSeqBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/ReviewSeqBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description the edit_seq of the liturgy as the reviewer saw it
+             */
+            edit_seq?: number;
+            /** @description at most 500 characters after trimming */
+            note?: string;
         };
         RoleActions: {
             delete: boolean;
@@ -2400,6 +2539,19 @@ export interface components {
             version: number;
             /** @description the other-language versions linked to this song */
             versions: components["schemas"]["SongRefView"][] | null;
+        };
+        StateChangeView: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: int64 */
+            edit_seq: number;
+            /** @enum {string} */
+            from_state: "draft" | "in_review" | "needs_revision" | "approved" | "published";
+            id: string;
+            note: string;
+            /** @enum {string} */
+            to_state: "draft" | "in_review" | "needs_revision" | "approved" | "published";
+            user: components["schemas"]["UserRefView"];
         };
         StatusOutputBody: {
             /**
@@ -2679,6 +2831,10 @@ export interface components {
         };
         UsageStruct: {
             team_members: components["schemas"]["TeamMembersStruct"];
+        };
+        UserRefView: {
+            id: string;
+            name: string;
         };
         UserView: {
             /**
@@ -3788,6 +3944,41 @@ export interface operations {
             };
         };
     };
+    approveLiturgy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewSeqBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiturgyView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     addAssignment: {
         parameters: {
             query?: never;
@@ -4117,6 +4308,146 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UndoResultView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    reopenLiturgy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiturgyView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    requestLiturgyChanges: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewSeqBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiturgyView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listLiturgyStateChanges: {
+        parameters: {
+            query?: {
+                /** @description default 50 */
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListLiturgyStateChangesResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    submitLiturgy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiturgyView"];
                 };
             };
             /** @description Error */

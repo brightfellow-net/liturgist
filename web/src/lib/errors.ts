@@ -12,6 +12,7 @@ export const errorCodes = [
   "name_taken", "duty_in_use", "singing_part_in_use", "template_in_use",
   "invalid_reference", "reading_exists", "reading_in_use", "import_unreadable", "import_conflict",
   "liturgy_exists", "liturgy_locked", "liturgy_not_deletable", "assignment_exists", "undo_refused",
+  "invalid_transition", "review_stale", "empty_liturgy", "has_problems",
   "internal", "unavailable",
 ] as const;
 
@@ -25,6 +26,8 @@ export type Problem = {
   scope?: string; // version_conflict: "item" or "liturgy" (10 §5)
   item_id?: string;
   liturgy_id?: string; // liturgy_exists: the liturgy that holds the slot
+  state?: string; // invalid_transition: the liturgy's state now
+  problems?: { code: string; item_id: string }[]; // has_problems: the unfinished items
   scopes?: string[];
   limit?: string;
   used?: number;

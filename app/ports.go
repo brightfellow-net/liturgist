@@ -56,8 +56,9 @@ type ChurchStore interface {
 	Liturgies() LiturgyRepo     // liturgies (10 §2.1)
 	LiturgyItems() ItemRepo     // items, item songs and sequences (10 §2.2, §2.3)
 	Assignments() AssignmentRepo
-	Edits() EditRepo  // the history of a liturgy (10 §7)
-	Usage() UsageRepo // what unpublished liturgies refer to (10 §6)
+	Edits() EditRepo               // the history of a liturgy (10 §7)
+	Usage() UsageRepo              // what unpublished liturgies refer to (10 §6)
+	StateChanges() StateChangeRepo // the review history of a liturgy (12 §5)
 }
 
 // Clock returns the current time in UTC, truncated to microseconds (02 §4).
@@ -433,10 +434,26 @@ type LiturgyRepo interface {
 	// Bump adds one to the version under the same condition.
 	Bump(ctx context.Context, id domain.LiturgyID, expectedVersion int, now time.Time) (bool, error)
 	// NextSeq takes the next number of the history (UPDATE … RETURNING), which
-	// holds the liturgy's row lock until the transaction ends (10 §5).
+	// holds the liturgy's row lock until the transaction ends (10 §5). It
+	// matches only an editable liturgy (12 §2, P-71): ErrNoSeq when the liturgy
+	// is gone or locked.
 	NextSeq(ctx context.Context, id domain.LiturgyID) (int, error)
+	// Transition moves the liturgy from one state to another when it is in from
+	// and its edit_seq is expectSeq, and sets undo_floor_seq to edit_seq (12 §2).
+	// It returns the edit_seq; false when no row matched (gone, another state
+	// or changed since).
+	Transition(ctx context.Context, id domain.LiturgyID, from, to domain.LiturgyState, expectSeq int, now time.Time) (int, bool, error)
 	// Delete removes the liturgy with its items, songs, entries, assignments and history.
 	Delete(ctx context.Context, id domain.LiturgyID) error
+}
+
+// StateChangeRepo stores the review history of liturgies (12 §5).
+type StateChangeRepo interface {
+	Append(ctx context.Context, c domain.StateChange) error
+	// List returns the newest rows first, and the total number of rows.
+	List(ctx context.Context, liturgy domain.LiturgyID, limit, offset int) ([]domain.StateChange, int, error)
+	// Last returns the newest row; ErrNotFound when there is none.
+	Last(ctx context.Context, liturgy domain.LiturgyID) (domain.StateChange, error)
 }
 
 // ItemRepo stores the items of liturgies with their songs and sequences (10 §2.2, §2.3).

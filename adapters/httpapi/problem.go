@@ -41,8 +41,12 @@ type Problem struct {
 	Scope  string `json:"scope,omitempty"`
 	ItemID string `json:"item_id,omitempty"`
 	// LiturgyID is the liturgy that already holds the slot (liturgy_exists).
-	LiturgyID string              `json:"liturgy_id,omitempty"`
-	Errors    []*huma.ErrorDetail `json:"errors,omitempty"`
+	LiturgyID string `json:"liturgy_id,omitempty"`
+	// State is the liturgy's state (invalid_transition); Problems lists the
+	// unfinished items (has_problems).
+	State    string              `json:"state,omitempty"`
+	Problems []ProblemView       `json:"problems,omitempty"`
+	Errors   []*huma.ErrorDetail `json:"errors,omitempty"`
 }
 
 // Error implements error.
@@ -119,6 +123,8 @@ func MapError(ctx context.Context, err error, log *slog.Logger) error {
 		vconf    *app.VersionConflictError
 		lexists  *app.LiturgyExistsError
 		undoRef  *app.UndoRefusedError
+		badTrans *app.InvalidTransitionError
+		hasProbs *app.HasProblemsError
 	)
 	info := RequestInfoFrom(ctx)
 	switch {
@@ -159,6 +165,16 @@ func MapError(ctx context.Context, err error, log *slog.Logger) error {
 	case errors.As(err, &undoRef):
 		p := problem(http.StatusConflict, "undo_refused", "This can't be undone or redone.")
 		p.Reason = undoRef.Reason
+		return p
+	case errors.As(err, &badTrans):
+		p := problem(http.StatusConflict, "invalid_transition", "This can't be done in the liturgy's current state.")
+		p.State = string(badTrans.State)
+		return p
+	case errors.As(err, &hasProbs):
+		p := problem(http.StatusUnprocessableEntity, "has_problems", "Some items are not finished.")
+		for _, x := range hasProbs.Problems {
+			p.Problems = append(p.Problems, ProblemView{Code: x.Code, ItemID: string(x.ItemID), ItemSongID: optional(string(x.ItemSongID)), EntryID: optional(string(x.EntryID))})
+		}
 		return p
 	case errors.As(err, &lexists):
 		p := problem(http.StatusConflict, "liturgy_exists", "There is already a liturgy for this service at this time.")
@@ -250,6 +266,8 @@ var conflicts = map[error]*Problem{
 	app.ErrLiturgyLocked:       problem(http.StatusConflict, "liturgy_locked", "This liturgy can't be edited now."),
 	app.ErrLiturgyNotDeletable: problem(http.StatusConflict, "liturgy_not_deletable", "A published liturgy can only be archived."),
 	app.ErrAssignmentExists:    problem(http.StatusConflict, "assignment_exists", "This person already has this duty."),
+	app.ErrReviewStale:         problem(http.StatusConflict, "review_stale", "The liturgy changed after you opened it. Read it again."),
+	app.ErrEmptyLiturgy:        problem(http.StatusUnprocessableEntity, "empty_liturgy", "Add at least one item before submitting."),
 	app.ErrInviteMismatch: problem(http.StatusForbidden, "invite_identifier_mismatch",
 		"This invite is for another account. Log out and log in as that person."),
 }

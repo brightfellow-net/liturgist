@@ -111,21 +111,48 @@ type ProblemView struct {
 
 // LiturgyView is a whole liturgy.
 type LiturgyView struct {
-	ID          string             `json:"id"`
-	Date        string             `json:"date" pattern:"^\\d{4}-\\d{2}-\\d{2}$"`
-	Time        string             `json:"time"`
-	ServiceID   *string            `json:"service_id" doc:"null for a one-off, and after the service is deleted"`
-	ServiceName string             `json:"service_name"`
-	Language    string             `json:"language" enum:"id,en,zh-Hans,zh-Hant"`
-	TemplateID  *string            `json:"template_id"`
-	State       string             `json:"state" enum:"draft,in_review,needs_revision,approved,published"`
-	Version     int                `json:"version" doc:"guards the structure: the fields, and which items exist in what order"`
-	Items       []LiturgyItemView  `json:"items"`
-	Assignments []AssignmentView   `json:"assignments"`
-	Problems    []ProblemView      `json:"problems"`
-	Actions     app.LiturgyActions `json:"actions"`
-	CreatedAt   time.Time          `json:"created_at"`
-	UpdatedAt   time.Time          `json:"updated_at"`
+	ID          string  `json:"id"`
+	Date        string  `json:"date" pattern:"^\\d{4}-\\d{2}-\\d{2}$"`
+	Time        string  `json:"time"`
+	ServiceID   *string `json:"service_id" doc:"null for a one-off, and after the service is deleted"`
+	ServiceName string  `json:"service_name"`
+	Language    string  `json:"language" enum:"id,en,zh-Hans,zh-Hant"`
+	TemplateID  *string `json:"template_id"`
+	State       string  `json:"state" enum:"draft,in_review,needs_revision,approved,published"`
+	Version     int     `json:"version" doc:"guards the structure: the fields, and which items exist in what order"`
+	EditSeq     int     `json:"edit_seq" doc:"the number of the newest history row; approve and request changes must send the one the reviewer saw"`
+	// Review data: absent for a member without a liturgy scope (12 §2, P-74).
+	OpenComments *int               `json:"open_comments,omitempty" doc:"unresolved comments; 0 until comments are built"`
+	LastChange   *StateChangeView   `json:"last_change,omitempty" doc:"the newest state change; absent when the liturgy never changed state"`
+	Items        []LiturgyItemView  `json:"items"`
+	Assignments  []AssignmentView   `json:"assignments"`
+	Problems     []ProblemView      `json:"problems"`
+	Actions      app.LiturgyActions `json:"actions"`
+	CreatedAt    time.Time          `json:"created_at"`
+	UpdatedAt    time.Time          `json:"updated_at"`
+}
+
+// UserRefView names a person.
+type UserRefView struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// StateChangeView is one row of the review history (12 §3).
+type StateChangeView struct {
+	ID        string      `json:"id"`
+	FromState string      `json:"from_state" enum:"draft,in_review,needs_revision,approved,published"`
+	ToState   string      `json:"to_state" enum:"draft,in_review,needs_revision,approved,published"`
+	User      UserRefView `json:"user"`
+	Note      string      `json:"note"`
+	EditSeq   int         `json:"edit_seq"`
+	CreatedAt time.Time   `json:"created_at"`
+}
+
+func stateChangeView(v app.StateChangeView) StateChangeView {
+	c := v.Change
+	return StateChangeView{ID: string(c.ID), FromState: string(c.From), ToState: string(c.To),
+		User: UserRefView{ID: string(c.UserID), Name: v.UserName}, Note: c.Note, EditSeq: c.EditSeq, CreatedAt: c.CreatedAt}
 }
 
 // ItemResultView is the answer of a write to one item.
@@ -266,7 +293,15 @@ func liturgyView(v app.LiturgyView) LiturgyView {
 	out := LiturgyView{ID: string(l.ID), Date: l.Date, Time: l.Time, ServiceID: optional(string(l.ServiceID)), ServiceName: l.ServiceName,
 		Language: l.Language, TemplateID: optional(string(l.TemplateID)), State: string(l.State), Version: l.Version, Actions: v.Actions,
 		Items: make([]LiturgyItemView, len(v.Items)), Assignments: make([]AssignmentView, len(v.Assignments)),
-		Problems: make([]ProblemView, len(v.Problems)), CreatedAt: l.CreatedAt, UpdatedAt: l.UpdatedAt}
+		Problems: make([]ProblemView, len(v.Problems)), CreatedAt: l.CreatedAt, UpdatedAt: l.UpdatedAt, EditSeq: l.EditSeq}
+	if v.Review != nil {
+		n := v.Review.OpenComments
+		out.OpenComments = &n
+		if v.Review.LastChange != nil {
+			c := stateChangeView(*v.Review.LastChange)
+			out.LastChange = &c
+		}
+	}
 	for i, it := range v.Items {
 		out.Items[i] = liturgyItemView(it)
 	}

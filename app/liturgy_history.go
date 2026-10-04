@@ -6,6 +6,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/brightfellow-net/liturgist/domain"
 )
@@ -98,6 +99,20 @@ func imageOfAssignment(a domain.Assignment) assignmentImage {
 	return assignmentImage{ID: string(a.ID), DutyID: string(a.DutyID), UserID: string(a.UserID), Name: a.Name}
 }
 
+// nextSeq takes the next history number. NextSeq matches only an editable
+// liturgy, so no row means gone (404) or locked since the early state check
+// (409 liturgy_locked); the caller's transaction then rolls back (12 §2, P-71).
+func (sc churchScope) nextSeq(ctx context.Context, id domain.LiturgyID) (int, error) {
+	seq, err := sc.cs.Liturgies().NextSeq(ctx, id)
+	if errors.Is(err, ErrNoSeq) {
+		if _, err := sc.cs.Liturgies().ByID(ctx, id); err != nil {
+			return 0, missing(err)
+		}
+		return 0, ErrLiturgyLocked
+	}
+	return seq, err
+}
+
 // record writes the history row of an editing change (10 §7): the number from
 // edit_seq, taken last so the row lock of the liturgy is held to the commit
 // (10 §5), then the row, in the caller's transaction. before and after are
@@ -106,7 +121,7 @@ func imageOfAssignment(a domain.Assignment) assignmentImage {
 // caller's undone edits into dropped (11 §7.2).
 func (u *Liturgies) record(ctx context.Context, sc churchScope, id domain.LiturgyID, cmd string, item domain.ItemID,
 	liturgyVersion, itemVersion int, before, after any) error {
-	seq, err := sc.cs.Liturgies().NextSeq(ctx, id)
+	seq, err := sc.nextSeq(ctx, id)
 	if err != nil {
 		return err
 	}

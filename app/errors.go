@@ -169,7 +169,23 @@ var (
 	ErrLiturgyLocked       = errors.New("liturgy is not editable in its state")   // 409 liturgy_locked
 	ErrLiturgyNotDeletable = errors.New("published liturgy can only be archived") // 409 liturgy_not_deletable
 	ErrAssignmentExists    = errors.New("person already has this duty")           // 409 assignment_exists
+	ErrReviewStale         = errors.New("liturgy changed since it was read")      // 409 review_stale
+	ErrEmptyLiturgy        = errors.New("liturgy has no items")                   // 422 empty_liturgy
+	// ErrNoSeq is NextSeq's answer when no row matched: the liturgy is gone or no
+	// longer editable. Only the helper nextSeq tells which (12 §2, P-71).
+	ErrNoSeq = errors.New("history number not taken")
 )
+
+// InvalidTransitionError maps to 409 invalid_transition: the review action does
+// not start from the liturgy's state (12 §2).
+type InvalidTransitionError struct{ State domain.LiturgyState }
+
+func (e *InvalidTransitionError) Error() string { return "invalid transition from " + string(e.State) }
+
+// HasProblemsError maps to 422 has_problems: a submit of a liturgy with unfinished items (12 §2, P-69).
+type HasProblemsError struct{ Problems []domain.Problem }
+
+func (e *HasProblemsError) Error() string { return "liturgy has unfinished items" }
 
 // Reasons of UndoRefusedError (11 §7.2).
 const (

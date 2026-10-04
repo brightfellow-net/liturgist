@@ -156,9 +156,9 @@ describe("structure", () => {
 
 describe("read-only and problems", () => {
   it("shows a locked liturgy without forms", async () => {
-    mockApi(base(liturgy({ state: "in_review", actions: { edit: false, delete: false } })));
+    mockApi(base(liturgy({ state: "in_review", actions: { edit: false, delete: false, submit: false, approve: false, request_changes: false, reopen: false } })));
     page();
-    expect(await screen.findByText(/Locked: this liturgy is In review/)).toBeInTheDocument();
+    expect(await screen.findByText(/This liturgy is being reviewed/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Save item" })).toBeNull();
     expect(screen.getByRole("article", { name: /^Item 1: Votum/ })).toBeInTheDocument();
   });

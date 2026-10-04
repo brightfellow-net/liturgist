@@ -69,6 +69,8 @@ func seedLiturgies(a, b app.ChurchStore, now time.Time) error {
 			c.cs.Assignments().Add(ctx, domain.Assignment{ID: domain.AssignmentID(id("AS" + c.suffix)), LiturgyID: l.ID,
 				DutyID: domain.DutyID(id(c.duty)), UserID: domain.UserID(id("U1")), CreatedAt: now}))
 		seq, err := c.cs.Liturgies().NextSeq(ctx, l.ID)
+		errs = append(errs, err, c.cs.StateChanges().Append(ctx, domain.StateChange{ID: domain.StateChangeID(id("SC" + c.suffix)), LiturgyID: l.ID,
+			From: domain.StateDraft, To: domain.StateInReview, UserID: domain.UserID(id("U1")), Note: "n", EditSeq: seq, CreatedAt: now}))
 		errs = append(errs, err, c.cs.Edits().Append(ctx, domain.Edit{ID: domain.EditID(id("ED" + c.suffix)), LiturgyID: l.ID, Seq: seq,
 			UserID: domain.UserID(id("U1")), Command: domain.CmdLiturgyCreate, After: []byte(`{}`), LiturgyVersionAfter: 1,
 			Status: domain.EditDone, CreatedAt: now}))
@@ -145,7 +147,32 @@ func liturgyHarness(errRollback error, notFound func(error) error, unchanged fun
 		return unchanged(cs.Liturgies().Bump(ctx, lgB, 1, now))
 	}
 	h["Liturgies.NextSeq"] = func(cs app.ChurchStore, _ time.Time) error {
-		_, err := cs.Liturgies().NextSeq(ctx, lgB)
+		if _, err := cs.Liturgies().NextSeq(ctx, lgB); !errors.Is(err, app.ErrNoSeq) {
+			return fmt.Errorf("church B's liturgy through A: want ErrNoSeq, got %v", err)
+		}
+		return nil
+	}
+	h["Liturgies.Transition"] = func(cs app.ChurchStore, now time.Time) error {
+		_, ok, err := cs.Liturgies().Transition(ctx, lgB, domain.StateDraft, domain.StateInReview, 0, now)
+		return unchanged(ok, err)
+	}
+	h["StateChanges.Append"] = func(cs app.ChurchStore, now time.Time) error {
+		return referenced("a state change in church B's liturgy", cs.StateChanges().Append(ctx, domain.StateChange{ID: domain.StateChangeID(id("SCX")),
+			LiturgyID: lgB, From: domain.StateDraft, To: domain.StateInReview, UserID: domain.UserID(id("U1")), CreatedAt: now}))
+	}
+	h["StateChanges.List"] = func(cs app.ChurchStore, _ time.Time) error {
+		own, total, err := cs.StateChanges().List(ctx, lgA, 10, 0)
+		other, total2, err2 := cs.StateChanges().List(ctx, lgB, 10, 0)
+		if err != nil || err2 != nil || len(own) != 1 || total != 1 || len(other) != 0 || total2 != 0 {
+			return fmt.Errorf("state changes: %+v %d %+v %d %w %w", own, total, other, total2, err, err2)
+		}
+		return nil
+	}
+	h["StateChanges.Last"] = func(cs app.ChurchStore, _ time.Time) error {
+		if c, err := cs.StateChanges().Last(ctx, lgA); err != nil || c.ID != domain.StateChangeID(id("SCA")) {
+			return fmt.Errorf("own: %+v %w", c, err)
+		}
+		_, err := cs.StateChanges().Last(ctx, lgB)
 		return notFound(err)
 	}
 	h["Liturgies.Delete"] = func(cs app.ChurchStore, _ time.Time) error {

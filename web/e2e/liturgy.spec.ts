@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { expect, request, test, type Page } from "@playwright/test";
 import { baseURL } from "./env";
-import { adminApi, adminPage, createInvite, createReading, createSong, logIn, memberPassword, tokenOf } from "./helpers";
+import { adminApi, adminPage, createInvite, createReading, createSong, expectAccessible, logIn, memberPassword, tokenOf } from "./helpers";
 
 const card = (page: Page, name: RegExp) => page.getByRole("form", { name });
 
@@ -272,6 +272,68 @@ test("E2E-W-015 undo and redo, refused after a colleague's change, and with the 
   await ruth.keyboard.press("Control+z"); // the browser's own undo, not the server's
   await ruth.waitForTimeout(300);
   expect(undoRequests).toBe(before);
+
+  await api.delete(`/api/v1/liturgies/${id}`, { data: {} });
+  await api.dispose();
+});
+
+// E2E-W-016: the review round (12 §2): an editor submits, the liturgist sends it
+// back with a note, the editor fixes and resubmits, the liturgist approves and reopens.
+test("E2E-W-016 submit, request changes, resubmit, approve and reopen", async ({ browser }) => {
+  const api = await adminApi();
+  const roles = (await (await api.get("/api/v1/roles")).json()) as { id: string; origin: string | null }[];
+  const editor = roles.find((r) => r.origin === "editor")!;
+  const link = await createInvite("Sari Editor", "sari.review@example.org", [editor.id]);
+  const anon = await request.newContext({ baseURL });
+  const accepted = await anon.post("/api/v1/invites/accept", { data: { token: tokenOf(link), name: "Sari Editor", email: "sari.review@example.org", password: memberPassword } });
+  expect(accepted.status(), await accepted.text()).toBe(201);
+  await anon.dispose();
+
+  const created = await api.post("/api/v1/liturgies", { data: { service_name: "Ibadah Tinjau", date: dateAhead(50), time: "10:00", template_id: "", language: "id" } });
+  expect(created.status(), await created.text()).toBe(201);
+  const { id, version } = (await created.json()) as { id: string; version: number };
+  const item = await api.post(`/api/v1/liturgies/${id}/items`, { data: { liturgy_version: version, title: "Doa Pembuka", item_type: "free_text" } });
+  expect(item.status(), await item.text()).toBe(201);
+
+  const sari = await logIn(browser, "sari.review@example.org", memberPassword);
+  const lead = await adminPage(browser);
+  await sari.goto(`/liturgies/${id}`);
+  await lead.goto(`/liturgies/${id}`);
+  const saveButton = (p: Page) => p.getByRole("button", { name: "Save item" });
+
+  // The editor submits; the form turns read-only and the history says so.
+  await expect(saveButton(sari)).toBeVisible();
+  await expect(sari.getByRole("button", { name: "Approve" })).toHaveCount(0);
+  await sari.getByRole("button", { name: "Submit for review" }).click();
+  await expect(sari.getByText(/This liturgy is being reviewed/)).toBeVisible();
+  await expect(saveButton(sari)).toHaveCount(0);
+  await expect(sari.getByText("Sari Editor: Draft → In review")).toBeVisible();
+  await expectAccessible(sari);
+
+  // The liturgist sends it back with a note.
+  await lead.reload();
+  await lead.getByRole("button", { name: "Request changes" }).click();
+  await lead.getByLabel(/Note/).fill("Tambahkan doa syafaat");
+  await lead.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(lead.getByText("Sent back for changes.").first()).toBeVisible();
+
+  // The editor sees the note, works again, and resubmits.
+  await sari.reload();
+  await expect(sari.getByText("Admin wrote: Tambahkan doa syafaat")).toBeVisible();
+  await expect(saveButton(sari)).toBeVisible();
+  await sari.getByRole("button", { name: "Submit for review" }).click();
+  await expect(sari.getByText(/This liturgy is being reviewed/)).toBeVisible();
+
+  // The liturgist's page from before the resubmit is not stale in content (nothing was edited), so approve works; then reopen.
+  await lead.reload();
+  await lead.getByRole("button", { name: "Approve", exact: true }).click();
+  await lead.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(lead.getByText(/Approved\. Reopen it to make changes/)).toBeVisible();
+  await expectAccessible(lead);
+  await lead.getByRole("button", { name: "Reopen as draft" }).click();
+  await lead.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(saveButton(lead)).toBeVisible();
+  await expect(lead.getByText("Admin: Approved → Draft")).toBeVisible();
 
   await api.delete(`/api/v1/liturgies/${id}`, { data: {} });
   await api.dispose();

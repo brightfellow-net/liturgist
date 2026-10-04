@@ -599,7 +599,11 @@
     "assignment_exists": "Orang ini sudah punya tugas ini.",
     "language_mismatch": "Templat dan liturgi harus berbahasa sama.",
     "liturgy_limit": "Gereja Anda sudah mencapai batas {{max}} liturgi.",
-    "undo_refused": "Ini tidak bisa dibatalkan atau diulangi."
+    "undo_refused": "Ini tidak bisa dibatalkan atau diulangi.",
+    "invalid_transition": "Liturgi ini sekarang {{state}}, jadi tidak bisa dilakukan. Muat ulang halaman.",
+    "review_stale": "Liturgi berubah setelah Anda membukanya. Bacalah lagi.",
+    "empty_liturgy": "Tambahkan setidaknya satu butir sebelum dikirim.",
+    "has_problems": "Beberapa butir belum selesai."
   },
   "import": {
     "title": "Impor lagu",
@@ -717,7 +721,6 @@
     "moved": "{{title}} dipindah ke urutan {{n}} dari {{total}}.",
     "removed": "{{title}} dihapus.",
     "list_conflict": "Daftar butir diubah orang lain. Daftar sudah dimuat ulang; coba lagi.",
-    "locked": "Terkunci: liturgi ini berstatus {{state}}. Saat ini tidak bisa diubah.",
     "locked_final": "Liturgi ini sudah final dan tidak bisa diubah.",
     "delete": "Hapus liturgi ini",
     "delete_question": "Hapus liturgi “{{name}}” tanggal {{date}} beserta semua butir dan riwayatnya? Ini tidak bisa dibatalkan.",
@@ -923,6 +926,38 @@
           "changed_since": "Orang lain sudah mengubahnya, jadi tidak bisa diulangi.",
           "reference_gone": "Sesuatu yang dipakai perubahan ini sudah tidak ada, jadi tidak bisa diulangi."
         }
+      }
+    },
+    "review": {
+      "title": "Tinjauan",
+      "submit": "Kirim untuk ditinjau",
+      "approve": "Setujui",
+      "request_changes": "Minta perubahan",
+      "reopen": "Buka kembali sebagai draf",
+      "note": "Catatan (boleh kosong)",
+      "note_hint": "Paling banyak 500 karakter. Tim melihatnya di riwayat.",
+      "send": "Kirim",
+      "cancel": "Batal",
+      "open_warning_one": "Masih ada 1 komentar yang belum selesai.",
+      "open_warning_other": "Masih ada {{count}} komentar yang belum selesai.",
+      "approve_anyway": "Setujui saja",
+      "problems_title": "Selesaikan butir-butir ini sebelum dikirim:",
+      "done": {
+        "submit": "Dikirim untuk ditinjau.",
+        "approve": "Disetujui.",
+        "request_changes": "Dikembalikan untuk diperbaiki.",
+        "reopen": "Dibuka kembali sebagai draf."
+      },
+      "banner": {
+        "in_review": "Liturgi ini sedang ditinjau. Belum bisa diubah sampai peninjau menyetujui atau meminta perubahan.",
+        "needs_revision": "Ada perubahan yang diminta. Ubah liturgi lalu kirim lagi.",
+        "needs_revision_note": "{{name}} menulis: {{note}}",
+        "approved": "Sudah disetujui. Buka kembali untuk mengubahnya."
+      },
+      "history": {
+        "title": "Riwayat tinjauan",
+        "none": "Belum dikirim untuk ditinjau.",
+        "row": "{{name}}: {{from}} → {{to}}"
       }
     }
   }
