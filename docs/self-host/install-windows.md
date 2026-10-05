@@ -40,13 +40,14 @@ Open `C:\ProgramData\Liturgist\liturgist.log` and find the framed **setup link**
 
 ## Commands by hand
 
-Commands such as `user list` or `backup` do not read `liturgist.env`. Tell them where the data is first:
+Commands such as `user list`, `backup` or `setup-link` read the same `liturgist.env` and use the same data folder as the service, so you can run them from any PowerShell window:
 
 ```
-$env:LITURGIST_DATA_DIR = "C:\ProgramData\Liturgist\data"
-$env:LITURGIST_BASE_URL = "https://liturgi.example.org"
+.\liturgist.exe backup C:\Backups\liturgist.zip
 .\liturgist.exe setup-link
 ```
+
+A setting you type in the window wins over the file (`$env:LITURGIST_DATA_DIR = "D:\church"`). This only happens when `C:\ProgramData\Liturgist\liturgist.env` exists, that is, after `service install`. If the file has a mistake, the command stops and names the line. Do not run `liturgist serve` by hand while the service is running; both would use the same port and data.
 
 ## Day to day
 

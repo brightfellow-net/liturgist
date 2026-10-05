@@ -14,3 +14,6 @@ func serviceCmd(_ []string, _, stderr io.Writer) int {
 	fmt.Fprintln(stderr, "liturgist service is only supported on Windows; on Linux use the systemd unit (deploy/liturgist.service)")
 	return exitError
 }
+
+// serviceDir is empty where there is no Windows service to read settings from.
+func serviceDir() string { return "" }

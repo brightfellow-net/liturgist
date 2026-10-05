@@ -5,10 +5,17 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"strings"
 )
+
+// envFileName is the settings file of the Windows service, in its folder.
+const envFileName = "liturgist.env"
 
 // parseEnvFile reads KEY=VALUE lines. Blank lines and lines starting with #
 // are skipped, and one pair of surrounding quotes is removed. The Windows
@@ -50,4 +57,53 @@ func applyEnv(vars map[string]string, lookup func(string) (string, bool), set fu
 		}
 	}
 	return nil
+}
+
+// applySettings reads dir/liturgist.env into the environment (variables that
+// are already set win). found is false when the file does not exist.
+func applySettings(dir string, lookup func(string) (string, bool), set func(k, v string) error) (found bool, err error) {
+	f, err := os.Open(filepath.Join(dir, envFileName)) //nolint:gosec // G304: the settings folder is %ProgramData%\Liturgist, not user input
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = f.Close() }()
+	vars, err := parseEnvFile(f)
+	if err != nil {
+		return true, fmt.Errorf("%s: %w", envFileName, err)
+	}
+	return true, applyEnv(vars, lookup, set)
+}
+
+// defaultDataDir points LITURGIST_DATA_DIR at dir/data unless it is set.
+func defaultDataDir(dir string, lookup func(string) (string, bool), set func(k, v string) error) error {
+	if _, ok := lookup("LITURGIST_DATA_DIR"); ok {
+		return nil
+	}
+	return set("LITURGIST_DATA_DIR", filepath.Join(dir, "data"))
+}
+
+// loadServiceSettings lets a command typed by hand use the settings and the
+// data folder of an installed Windows service, so "liturgist backup" backs up
+// the service's data. It does nothing when no service settings file exists,
+// for commands that need no settings, and where there is no service (dir "").
+func loadServiceSettings(args []string, stderr io.Writer, dir string, lookup func(string) (string, bool), set func(k, v string) error) bool {
+	if dir == "" || len(args) == 0 {
+		return true
+	}
+	switch args[0] {
+	case "service", "version", "openapi":
+		return true
+	}
+	found, err := applySettings(dir, lookup, set)
+	if err != nil {
+		fmt.Fprintf(stderr, "%s\n", err)
+		return false
+	}
+	if found {
+		_ = defaultDataDir(dir, lookup, set)
+	}
+	return true
 }

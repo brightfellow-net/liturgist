@@ -66,6 +66,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, usage)
 		return exitConfig
 	}
+	if !loadServiceSettings(args, stderr, serviceDir(), os.LookupEnv, os.Setenv) {
+		return exitConfig
+	}
 	switch {
 	case args[0] == "serve":
 		return serve(args[1:], stdout, stderr)

@@ -22,7 +22,6 @@ import (
 
 const (
 	serviceName = "Liturgist"
-	envFileName = "liturgist.env"
 	logFileName = "liturgist.log"
 )
 
@@ -144,18 +143,11 @@ func runService() int {
 		return exitError
 	}
 	defer func() { _ = logf.Close() }()
-	if f, err := os.Open(filepath.Join(dir, envFileName)); err == nil {
-		vars, perr := parseEnvFile(f)
-		_ = f.Close()
-		if perr != nil {
-			fmt.Fprintf(logf, "%s: %v\n", envFileName, perr)
-			return exitConfig
-		}
-		_ = applyEnv(vars, os.LookupEnv, os.Setenv)
+	if _, err := applySettings(dir, os.LookupEnv, os.Setenv); err != nil {
+		fmt.Fprintln(logf, err)
+		return exitConfig
 	}
-	if _, ok := os.LookupEnv("LITURGIST_DATA_DIR"); !ok {
-		_ = os.Setenv("LITURGIST_DATA_DIR", filepath.Join(dir, "data"))
-	}
+	_ = defaultDataDir(dir, os.LookupEnv, os.Setenv)
 	cfg, opts, err := envconfig.Load(os.Getenv)
 	if err != nil {
 		fmt.Fprintf(logf, "invalid configuration:\n%v\n", err)
