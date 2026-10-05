@@ -121,7 +121,7 @@ func Load(getenv func(string) string) (server.Config, LogOptions, error) {
 
 var domainName = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 
-// parseDomain reads the settings of built-in HTTPS (14 §19). Without
+// parseDomain reads the settings of built-in HTTPS (14 §19, §21). Without
 // LITURGIST_DOMAIN the others are not read, and LITURGIST_LISTEN stays the
 // address (with a domain it is ignored, because the Docker image sets it).
 func parseDomain(get func(k, def string) string, cfg *server.Config, fail failFunc) {
@@ -136,6 +136,10 @@ func parseDomain(get func(k, def string) string, cfg *server.Config, fail failFu
 	cfg.Domain = d
 	cfg.ACMEEmail = get("LITURGIST_ACME_EMAIL", "")
 	cfg.ACMECA = get("LITURGIST_ACME_CA", "")
+	cfg.ACMEAgreed = strings.EqualFold(get("LITURGIST_ACME_AGREE", ""), "true")
+	if !cfg.ACMEAgreed {
+		fail("LITURGIST_ACME_AGREE", "must be true with LITURGIST_DOMAIN: it means you accept the subscriber agreement of the certificate authority (Let's Encrypt: https://letsencrypt.org/repository/)")
+	}
 	port := func(key, def string) int {
 		n, err := strconv.Atoi(get(key, def))
 		if err != nil || n < 1 || n > 65535 {

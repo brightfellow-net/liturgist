@@ -161,6 +161,22 @@ func TestRedirectKeepsDefaultPortOut(t *testing.T) {
 	}
 }
 
+// TC-612: the server itself refuses to ask a certificate authority for a
+// certificate unless the agreement was accepted, even for a Config that did
+// not come from the environment.
+func TestACMEWithoutAgreementIsRefused(t *testing.T) {
+	cfg := testConfig(t, "https://liturgi.test", nil)
+	cfg.Domain, cfg.HTTPPort, cfg.HTTPSPort = "liturgi.test", freePort(t), freePort(t)
+	srv, err := New(context.Background(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = srv.Close() })
+	if _, _, err := srv.acmeTLS(context.Background()); err == nil || !strings.Contains(err.Error(), "LITURGIST_ACME_AGREE") {
+		t.Errorf("got %v", err)
+	}
+}
+
 func TestNoWarningsWithBuiltInHTTPS(t *testing.T) {
 	cfg := testConfig(t, "https://liturgi.example.org", nil)
 	cfg.Domain = "liturgi.example.org"

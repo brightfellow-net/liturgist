@@ -14,10 +14,11 @@ Set one variable (see [configuration.md](configuration.md)) and start Liturgist:
 
 ```
 LITURGIST_DOMAIN=liturgi.example.org
+LITURGIST_ACME_AGREE=true
 LITURGIST_ACME_EMAIL=you@example.org
 ```
 
-`LITURGIST_ACME_EMAIL` is optional; Let's Encrypt uses it only to warn you if a certificate is about to expire without renewing. **Setting `LITURGIST_DOMAIN` means you accept the [Let's Encrypt subscriber agreement](https://letsencrypt.org/repository/).** `LITURGIST_BASE_URL` becomes `https://liturgi.example.org` by itself; if you set it, it must be exactly that. `LITURGIST_LISTEN` is ignored, and `LITURGIST_TRUSTED_PROXIES` must stay empty.
+`LITURGIST_ACME_EMAIL` is optional; Let's Encrypt uses it only to warn you if a certificate is about to expire without renewing. **`LITURGIST_ACME_AGREE=true` says that you have read and accept the [Let's Encrypt subscriber agreement](https://letsencrypt.org/repository/)** (or that of the other certificate authority you chose); with a domain, Liturgist does not start without it. `LITURGIST_BASE_URL` becomes `https://liturgi.example.org` by itself; if you set it, it must be exactly that. `LITURGIST_LISTEN` is ignored, and `LITURGIST_TRUSTED_PROXIES` must stay empty.
 
 The first start takes up to a minute while the certificate is fetched; the browser shows an error until it is ready. The log says what happens (lines starting with a number are from the certificate library). Certificates renew by themselves and are kept in `data/certs`. They are **not** in backups, because they can be fetched again.
 
@@ -25,7 +26,7 @@ Port 80 only redirects to HTTPS (and answers Let's Encrypt and the health check)
 
 | Installed as | Add |
 |---|---|
-| Docker | `-p 80:80 -p 443:443 -e LITURGIST_DOMAIN=…` instead of `-p 8080:8080`; keep the `/data` volume so the certificate survives |
+| Docker | `-p 80:80 -p 443:443 -e LITURGIST_DOMAIN=… -e LITURGIST_ACME_AGREE=true` instead of `-p 8080:8080`; keep the `/data` volume so the certificate survives |
 | Linux (systemd) | the settings in `/etc/liturgist/liturgist.env`, and permission to use ports below 1024: `sudo systemctl edit liturgist` and add `[Service]` / `AmbientCapabilities=CAP_NET_BIND_SERVICE` |
 | Windows | the settings in `liturgist.env`; allow the firewall prompt for ports 80 and 443 |
 

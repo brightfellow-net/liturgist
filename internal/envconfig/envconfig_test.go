@@ -161,14 +161,14 @@ func TestUpdateCheckSetting(t *testing.T) {
 
 func TestDomainTurnsOnBuiltInHTTPS(t *testing.T) {
 	cfg, _, err := Load(env(map[string]string{
-		"LITURGIST_DOMAIN": "Liturgi.Example.org", "LITURGIST_ACME_EMAIL": "ops@example.org",
+		"LITURGIST_DOMAIN": "Liturgi.Example.org", "LITURGIST_ACME_EMAIL": "ops@example.org", "LITURGIST_ACME_AGREE": "TRUE",
 		"LITURGIST_LISTEN": ":8080", // the Docker image sets this; it is ignored
 	}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if cfg.Domain != "liturgi.example.org" || cfg.BaseURL.String() != "https://liturgi.example.org" ||
-		cfg.HTTPPort != 80 || cfg.HTTPSPort != 443 || cfg.ACMEEmail != "ops@example.org" || cfg.ACMECA != "" {
+		cfg.HTTPPort != 80 || cfg.HTTPSPort != 443 || cfg.ACMEEmail != "ops@example.org" || cfg.ACMECA != "" || !cfg.ACMEAgreed {
 		t.Fatalf("%+v", cfg)
 	}
 }
@@ -198,15 +198,30 @@ func TestDomainRejects(t *testing.T) {
 		"bad https port": {"LITURGIST_DOMAIN": d, "LITURGIST_HTTPS_PORT": "70000"},
 		"same ports":     {"LITURGIST_DOMAIN": d, "LITURGIST_HTTP_PORT": "8000", "LITURGIST_HTTPS_PORT": "8000"},
 	} {
+		m["LITURGIST_ACME_AGREE"] = "true" // so that each case fails for its own reason
 		if _, _, err := Load(env(m)); err == nil {
 			t.Errorf("%s accepted", name)
 		}
 	}
 }
 
+// TC-612: with a domain the operator must say that they accept the agreement.
+func TestDomainNeedsTheAgreement(t *testing.T) {
+	for _, v := range []string{"", "false", "yes", "1"} {
+		_, _, err := Load(env(map[string]string{"LITURGIST_DOMAIN": "liturgi.example.org", "LITURGIST_ACME_AGREE": v}))
+		if err == nil || !strings.Contains(err.Error(), "LITURGIST_ACME_AGREE") || !strings.Contains(err.Error(), "letsencrypt.org/repository") {
+			t.Errorf("%q: %v", v, err)
+		}
+	}
+	// Without a domain the setting is not read.
+	if _, _, err := Load(env(map[string]string{})); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestDomainAcceptsMatchingBaseURL(t *testing.T) {
 	_, _, err := Load(env(map[string]string{
-		"LITURGIST_DOMAIN": "liturgi.example.org", "LITURGIST_BASE_URL": "https://liturgi.example.org/",
+		"LITURGIST_DOMAIN": "liturgi.example.org", "LITURGIST_BASE_URL": "https://liturgi.example.org/", "LITURGIST_ACME_AGREE": "true",
 		"LITURGIST_HTTP_PORT": "8080", "LITURGIST_HTTPS_PORT": "8443"}))
 	if err != nil {
 		t.Fatal(err)

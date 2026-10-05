@@ -45,6 +45,7 @@ type Config struct {
 	Domain                string // built-in HTTPS for this domain (Let's Encrypt); "" = off (14 §19)
 	ACMEEmail             string // contact address for the certificate authority; optional
 	ACMECA                string // ACME directory URL; "" = Let's Encrypt production
+	ACMEAgreed            bool   // the operator accepted the CA's subscriber agreement; required with Domain
 	HTTPPort              int    // with Domain: certificate challenges and the redirect; 0 = 80
 	HTTPSPort             int    // with Domain: the app; 0 = 443
 	TrustedProxies        []netip.Prefix

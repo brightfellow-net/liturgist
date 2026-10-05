@@ -11,6 +11,7 @@ Liturgist is configured with environment variables. Every one is optional; the d
 | `LITURGIST_TRUSTED_PROXIES` | empty | Addresses or ranges of the reverse proxy or tunnel in front of Liturgist, for example `127.0.0.1`. Only these may tell Liturgist a visitor's real IP address. Leave empty without a proxy. |
 | `LITURGIST_CLIENT_IP_HEADER` | empty | The header carrying the visitor's IP from a trusted proxy, for example `CF-Connecting-IP`. Empty means `X-Forwarded-For`. |
 | `LITURGIST_DOMAIN` | empty | A domain name: Liturgist gets a Let's Encrypt certificate and serves HTTPS itself ([https-builtin.md](https-builtin.md)). Ignores `LITURGIST_LISTEN`; `LITURGIST_BASE_URL` defaults to `https://<domain>`. |
+| `LITURGIST_ACME_AGREE` | empty | Must be `true` with `LITURGIST_DOMAIN`: you accept the certificate authority's subscriber agreement. Liturgist does not start without it. |
 | `LITURGIST_ACME_EMAIL` | empty | Contact address for Let's Encrypt (with `LITURGIST_DOMAIN`). |
 | `LITURGIST_HTTP_PORT` | `80` | With `LITURGIST_DOMAIN`: the port for certificate checks and the redirect to HTTPS. |
 | `LITURGIST_HTTPS_PORT` | `443` | With `LITURGIST_DOMAIN`: the port the app is served on. |

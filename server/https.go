@@ -6,6 +6,7 @@ package server
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -66,10 +67,13 @@ func redirectToHTTPS(domain string, httpsPort int) http.Handler {
 // cfg.ACMECA) with certmagic. Certificates are kept in <DataDir>/certs; they
 // are not part of a backup because they can be issued again.
 func (s *Server) acmeTLS(ctx context.Context) (*tls.Config, func(http.Handler) http.Handler, error) {
+	if !s.cfg.ACMEAgreed {
+		return nil, nil, errors.New("LITURGIST_ACME_AGREE must be true: accept the certificate authority's subscriber agreement")
+	}
 	magic := certmagic.NewDefault()
 	magic.Storage = &certmagic.FileStorage{Path: filepath.Join(s.cfg.DataDir, "certs")}
 	acme := certmagic.DefaultACME
-	acme.Agreed = true // setting LITURGIST_DOMAIN accepts the CA's subscriber agreement (guide)
+	acme.Agreed = true // checked above: the operator set LITURGIST_ACME_AGREE
 	acme.Email = s.cfg.ACMEEmail
 	if s.cfg.ACMECA != "" {
 		acme.CA = s.cfg.ACMECA
