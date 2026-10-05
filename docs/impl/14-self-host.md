@@ -272,7 +272,7 @@ Deviations from §8:
 | Litestream off-site copies | Left out (untested, and it does not cover `files/`); rclone, a USB copy and a manual download are described instead |
 | Every guide's commands run on a clean machine | Run: the README Docker quick start, the Compose file (`config`), the Caddy and nginx proxy settings (against a live server), the Linux `serve`/`setup-link` output, link and anchor check. **Not run:** Windows, Cloudflare Tunnel, Tailscale, certbot, rclone, cosign verification, systemd. The Windows, Cloudflare and Tailscale guides say so at the top |
 
-Open points found while writing: `liturgist.exe` run by hand does not read `liturgist.env` (the guide sets `LITURGIST_DATA_DIR` first); behind Docker a proxy on the same host appears as Docker's gateway address, so the guide tells the reader to trust that range, unconfirmed on a real setup; the System page's "not taken away" warning cannot see rclone copies.
+Open points found while writing: `liturgist.exe` run by hand did not read `liturgist.env` (fixed in [§20](#20-the-windows-command-line-reads-liturgistenv-2026-10-05)); behind Docker a proxy on the same host appears as Docker's gateway address, so the guide tells the reader to trust that range, unconfirmed on a real setup; the System page's "not taken away" warning cannot see rclone copies.
 
 ## 19. Slice 6F as built (2026-10-05)
 
@@ -289,3 +289,9 @@ Merged to `main` as `edb4182`. Code: `server/https.go` (`builtInHTTPS`, `redirec
 | Dependency | `certmagic` v0.25.6 with 9 new modules (zerossl, cpuid, libdns, acmez, miekg/dns, blake3, zap, zap/exp) and `golang.org/x/net` v0.58 to v0.59; the binary grows about 1.8 MB (29.4 to 31.2 MB) |
 
 Verified: a run against a Pebble test ACME server (certificate issued, HTTP/2 served, 308 redirect, `/healthz`, healthcheck, reuse after restart); Docker non-root binds 80 and 443 and is healthy; server tests with an injected self-signed certificate; seven mutations caught. **Not verified:** issuance from real Let's Encrypt, the systemd `AmbientCapabilities=CAP_NET_BIND_SERVICE` drop-in, the Windows service on ports 80 and 443. The certificate library logs in its own format next to the app log.
+
+## 20. The Windows command line reads liturgist.env (2026-10-05)
+
+A follow-up to 6D, which left commands typed by hand unaware of the service's settings. `loadServiceSettings` (`cmd/liturgist/envfile.go`) runs first in `run`: when `%ProgramData%\Liturgist\liturgist.env` exists it is read into the environment (variables already set win) and `LITURGIST_DATA_DIR` defaults to the service's `data` folder. Skipped for `service`, `version` and `openapi`; a malformed file stops the command and names the line; nothing happens when the file does not exist, and on Linux there is no service folder. `runService` uses the same `applySettings` and `defaultDataDir`; a settings file that exists but cannot be opened now stops the service with a logged error instead of being ignored. The guide `install-windows.md` says so, and warns not to run `serve` by hand beside the service. No line says which file was used (kept quiet so `backup` output stays clean).
+
+Tests: TC-611 (read, environment wins, explicit data folder kept, no file, skipped commands, bad file), four mutations caught. **Not verified:** on a real Windows machine, including a folder that needs administrator rights to read.
