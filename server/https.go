@@ -57,7 +57,8 @@ func redirectToHTTPS(domain string, httpsPort int) http.Handler {
 			_, _ = w.Write([]byte("ok"))
 			return
 		}
-		http.Redirect(w, r, "https://"+host+r.URL.RequestURI(), http.StatusPermanentRedirect)
+		// host is the configured domain, never the request's Host header.
+		http.Redirect(w, r, "https://"+host+r.URL.RequestURI(), http.StatusPermanentRedirect) //nolint:gosec // G710: see above
 	})
 }
 

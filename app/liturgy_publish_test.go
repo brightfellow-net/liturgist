@@ -404,8 +404,8 @@ func TestReopenLimit(t *testing.T) {
 			_, err := L.Review(e.ctx, e.admin, lid, app.ReviewInput{Action: domain.ActionReopen})
 			return err
 		}
-		if n, used, max := limitErr(reopen()); n != app.LimitMaxUnpublishedLiturgies || used != 1 || max != 1 {
-			t.Errorf("reopen at the limit: %v %d %d", n, used, max)
+		if n, used, limit := limitErr(reopen()); n != app.LimitMaxUnpublishedLiturgies || used != 1 || limit != 1 {
+			t.Errorf("reopen at the limit: %v %d %d", n, used, limit)
 		}
 		if e.liturgy(lid).Liturgy.State != domain.StatePublished {
 			t.Error("a refused reopen changed the state")
@@ -504,8 +504,8 @@ func TestArchiveUnarchive(t *testing.T) {
 		if _, err := L.Unarchive(e.ctx, editor, lid); !errors.Is(err, app.ErrForbidden) {
 			t.Errorf("editor unarchives: %v", err)
 		}
-		if n, used, max := limitErr(errOf(L.Unarchive(e.ctx, e.admin, lid))); n != app.LimitMaxActiveLiturgies || used != 1 || max != 1 {
-			t.Errorf("unarchive at the limit: %v %d %d", n, used, max)
+		if n, used, limit := limitErr(errOf(L.Unarchive(e.ctx, e.admin, lid))); n != app.LimitMaxActiveLiturgies || used != 1 || limit != 1 {
+			t.Errorf("unarchive at the limit: %v %d %d", n, used, limit)
 		}
 		if err := L.Delete(e.ctx, e.admin, e.firstLiturgyExcept(lid)); err != nil {
 			t.Fatal(err)

@@ -659,8 +659,8 @@ func TestUndoRace(t *testing.T) {
 			if got.Version != base.Version+1 {
 				t.Fatalf("round %d: version %d after one winner from %d", i, got.Version, base.Version)
 			}
-			switch {
-			case errs[0] == nil: // the undo won: B is told that the item changed
+			switch errs[0] {
+			case nil: // the undo won: B is told that the item changed
 				undone++
 				if s, id := conflict(errs[1]); s != app.ScopeItem || id != x || got.Text != prev {
 					t.Fatalf("round %d: undo won but B got %v and the text is %q, want %q", i, errs[1], got.Text, prev)

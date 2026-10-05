@@ -259,6 +259,9 @@ func TestLiturgyHTTP(t *testing.T) {
 		t.Fatalf("history: %d %v", code, body)
 	}
 	code, body = send(commenter, "GET", "/liturgies/"+one+"/edits", nil)
+	if code != 200 {
+		t.Fatalf("edits: %d %v", code, body)
+	}
 	all := items(body)
 	if last := obj(all[len(all)-1]); last["command"] != "liturgy.create" || last["seq"] != 1.0 || last["before"] != nil || last["after"] == nil {
 		t.Errorf("first row: %v", last)

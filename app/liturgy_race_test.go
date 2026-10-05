@@ -177,8 +177,8 @@ func TestSectionRemovalRace(t *testing.T) {
 			}
 			got, _ := e.songs.Get(e.ctx, e.admin, song.Song.ID)
 			entries := e.liturgy(lid).Items[0].Item.Songs
-			switch {
-			case errs[0] == nil: // the section is gone, so the entry never existed
+			switch errs[0] {
+			case nil: // the section is gone, so the entry never existed
 				removed++
 				if invalidField(errs[1]) != "songs.0.entries.1.section_id" || len(got.Song.Sections) != 2 || len(entries) != 0 {
 					t.Errorf("round %d, section removed: %v %d sections, %d songs", round, errs[1], len(got.Song.Sections), len(entries))

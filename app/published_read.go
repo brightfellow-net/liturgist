@@ -129,7 +129,7 @@ func (u *Liturgies) ListPublished(ctx context.Context, sess *domain.Session, f P
 		}
 		res = PublishedPage{Total: total, Items: make([]PublishedListItem, len(rows))}
 		for i, r := range rows {
-			res.Items[i] = PublishedListItem{Liturgy: r.Liturgy, Number: r.Number, PublishedAt: r.PublishedAt}
+			res.Items[i] = PublishedListItem(r)
 		}
 		return nil
 	})

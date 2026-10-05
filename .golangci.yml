@@ -38,7 +38,7 @@ linters:
             - pkg: "github.com/brightfellow-net/liturgist/cmd"
               desc: "adapters must not import commands"
         cmd:
-          files: ["**/cmd/**"]
+          files: ["**/cmd/**", "!$test"] # tests may open a real database
           deny:
             - pkg: "github.com/brightfellow-net/liturgist/app"
               desc: "cmd wires through server/ only (01 §3)"
@@ -46,5 +46,12 @@ linters:
               desc: "cmd wires through server/ only"
             - pkg: "github.com/brightfellow-net/liturgist/adapters"
               desc: "cmd wires through server/ only"
+  exclusions:
+    rules:
+      # Tests read their own temp files, use fixed passwords and seeded random
+      # numbers, and index slices they just checked.
+      - path: _test\.go
+        linters: [gosec]
+        text: "G(101|304|404|602)"
 formatters:
   enable: [gofmt, goimports]

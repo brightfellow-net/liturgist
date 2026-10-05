@@ -68,14 +68,14 @@ func TestReadPublishedHTTP(t *testing.T) {
 	if rec.Code != 200 || rec.Header().Get("Cache-Control") != "private, no-store" || rec.Header().Get("ETag") != "" {
 		t.Fatalf("copy: %d %v", rec.Code, rec.Header())
 	}
-	copy := decode(t, rec)
-	content := obj(copy["content"])
+	got := decode(t, rec)
+	content := obj(got["content"])
 	items := list(content["items"])
-	if copy["number"] != 1.0 || copy["revising"] != false || copy["archived"] != false || obj(copy["published_by"])["name"] == "" ||
+	if got["number"] != 1.0 || got["revising"] != false || got["archived"] != false || obj(got["published_by"])["name"] == "" ||
 		content["format"] != 1.0 || obj(content["liturgy"])["church_name"] == "" || len(items) != 1 || obj(items[0])["title"] != "Doa" ||
-		obj(obj(items[0])["duty"])["id"] != duty || obj(copy["render"])["key_display"] == "" ||
-		!strings.HasSuffix(copy["url"].(string), "/published/"+lid) {
-		t.Errorf("copy: %v", copy)
+		obj(obj(items[0])["duty"])["id"] != duty || obj(got["render"])["key_display"] == "" ||
+		!strings.HasSuffix(got["url"].(string), "/published/"+lid) {
+		t.Errorf("copy: %v", got)
 	}
 	for _, leak := range []string{"@example.org", "phone", "email"} {
 		if strings.Contains(rec.Body.String(), leak) {

@@ -164,8 +164,8 @@ type namedLimits map[app.LimitName]int
 
 func (namedLimits) Has(context.Context, domain.ChurchID, app.Feature) (bool, error) { return true, nil }
 func (n namedLimits) Limit(_ context.Context, _ domain.ChurchID, name app.LimitName) (app.Limit, error) {
-	if max, ok := n[name]; ok {
-		return app.Limit{Max: max}, nil
+	if ceiling, ok := n[name]; ok {
+		return app.Limit{Max: ceiling}, nil
 	}
 	return app.Limit{Unlimited: true}, nil
 }
@@ -176,7 +176,7 @@ func (brokenLimits) Limit(context.Context, domain.ChurchID, app.LimitName) (app.
 	return app.Limit{}, errors.New("entitlements down")
 }
 
-func limitErr(err error) (name app.LimitName, used, max int) {
+func limitErr(err error) (name app.LimitName, used, limit int) {
 	var l *app.LimitReachedError
 	if errors.As(err, &l) {
 		return l.Limit, l.Used, l.Max
@@ -201,8 +201,8 @@ func TestLiturgyLimits(t *testing.T) {
 				if _, err := create("2026-10-12"); err != nil {
 					t.Fatal(err)
 				}
-				if n, used, max := limitErr(func() error { _, err := create("2026-10-13"); return err }()); n != name || used != 2 || max != 2 {
-					t.Errorf("third liturgy: %v %d %d", n, used, max)
+				if n, used, limit := limitErr(func() error { _, err := create("2026-10-13"); return err }()); n != name || used != 2 || limit != 2 {
+					t.Errorf("third liturgy: %v %d %d", n, used, limit)
 				}
 				// Editing, reading and deleting are never limited; deleting frees a place.
 				e.addItem(a.Liturgy.ID, domain.ItemPrayer, "Doa")
@@ -220,7 +220,7 @@ func TestLiturgyLimits(t *testing.T) {
 					t.Fatal(err)
 				}
 				_, err = L.PrepareCreate(e.ctx, e.admin, []app.PrepareEntry{{ServiceID: svc, Date: "2026-10-14", Time: "19:00"}, {ServiceID: svc, Date: "2026-10-18", Time: "07:00"}})
-				if n, used, max := limitErr(err); n != name || used != 1 || max != 2 {
+				if n, used, limit := limitErr(err); n != name || used != 1 || limit != 2 {
 					t.Errorf("a batch of two with one place: %v", err)
 				}
 				if page, _ := L.List(e.ctx, e.admin, app.LiturgyFilter{Limit: 50}); page.Total != 1 {

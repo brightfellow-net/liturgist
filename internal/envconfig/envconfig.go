@@ -213,10 +213,10 @@ func parseBackup(get func(k, def string) string, fail failFunc) (at string, dail
 		fail("LITURGIST_BACKUP_TIME", "must be a time of day such as 02:00, or off")
 		at = ""
 	}
-	count := func(key, def string, min int) int {
+	count := func(key, def string, lowest int) int {
 		n, err := strconv.Atoi(get(key, def))
-		if err != nil || n < min || n > 365 {
-			fail(key, "must be a whole number from %d to 365", min)
+		if err != nil || n < lowest || n > 365 {
+			fail(key, "must be a whole number from %d to 365", lowest)
 			return 0
 		}
 		return n

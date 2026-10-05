@@ -35,7 +35,7 @@ func names(v []app.NameEntryView) []string {
 	return out
 }
 
-func limitReason(err error) (reason string, max, used int) {
+func limitReason(err error) (reason string, limit, used int) {
 	var in *domain.InvalidInputError
 	if errors.As(err, &in) {
 		return in.Reason, in.Max, in.Used
@@ -191,7 +191,7 @@ func TestNameLists(t *testing.T) {
 				}
 			}
 			_, err = e.vocab.Create(e.ctx, p, kind, "One too many")
-			if r, max, used := limitReason(err); r != domain.ReasonLimit || max != kind.Limit() || used != kind.Limit() {
+			if r, limit, used := limitReason(err); r != domain.ReasonLimit || limit != kind.Limit() || used != kind.Limit() {
 				t.Errorf("%s over the limit: %v", kind, err)
 			}
 		}
@@ -331,8 +331,8 @@ func TestTemplatesAndServices(t *testing.T) {
 		if _, err := e.svcs.Update(e.ctx, p, svc, app.ServiceChange{Version: 1, Name: &nm}); !errors.Is(err, app.ErrVersionConflict) {
 			t.Errorf("stale service: %v", err)
 		}
-		clear := domain.TemplateID("")
-		cl, err := e.svcs.Update(e.ctx, p, svc, app.ServiceChange{Version: 2, DefaultTemplateID: &clear})
+		noTemplate := domain.TemplateID("")
+		cl, err := e.svcs.Update(e.ctx, p, svc, app.ServiceChange{Version: 2, DefaultTemplateID: &noTemplate})
 		if err != nil || cl.Service.DefaultTemplateID != "" || cl.DefaultTemplateName != "" {
 			t.Errorf("clear template: %+v %v", cl, err)
 		}

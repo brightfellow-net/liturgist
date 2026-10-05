@@ -26,8 +26,8 @@ func TestStorageFullProblem(t *testing.T) {
 		{app.ErrStorageFull, http.StatusInsufficientStorage, "storage_full"},
 		{fmt.Errorf("%w: %w", app.ErrUnavailable, context.DeadlineExceeded), http.StatusServiceUnavailable, "unavailable"},
 	} {
-		p, ok := MapError(context.Background(), tc.err, log).(*Problem)
-		if !ok || p.Status != tc.status || p.Code != tc.code {
+		var p *Problem
+		if !errors.As(MapError(context.Background(), tc.err, log), &p) || p.Status != tc.status || p.Code != tc.code {
 			t.Errorf("%v: got %+v", tc.err, p)
 		}
 	}

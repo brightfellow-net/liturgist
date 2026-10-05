@@ -166,7 +166,7 @@ func liturgyHarness(errRollback error, notFound func(error) error, unchanged fun
 	}
 	h["Liturgies.NextSeq"] = func(cs app.ChurchStore, _ time.Time) error {
 		if _, err := cs.Liturgies().NextSeq(ctx, lgB); !errors.Is(err, app.ErrNoSeq) {
-			return fmt.Errorf("church B's liturgy through A: want ErrNoSeq, got %v", err)
+			return fmt.Errorf("church B's liturgy through A: want ErrNoSeq, got %w", err)
 		}
 		return nil
 	}
@@ -207,7 +207,7 @@ func liturgyHarness(errRollback error, notFound func(error) error, unchanged fun
 		a, err := cs.Published().Exists(ctx, domain.LiturgyID(id("LGPA")))
 		b, err2 := cs.Published().Exists(ctx, domain.LiturgyID(id("LGPB")))
 		if err != nil || err2 != nil || !a || b {
-			return fmt.Errorf("exists %v %v %v %v", a, b, err, err2)
+			return fmt.Errorf("exists %v %v %w %w", a, b, err, err2)
 		}
 		return nil
 	}
@@ -265,7 +265,7 @@ func liturgyHarness(errRollback error, notFound func(error) error, unchanged fun
 		a, err := cs.Comments().Count(ctx, lgA)
 		b, err2 := cs.Comments().Count(ctx, lgB)
 		if err != nil || err2 != nil || a != 1 || b != 0 {
-			return fmt.Errorf("count %d %d %v %v", a, b, err, err2)
+			return fmt.Errorf("count %d %d %w %w", a, b, err, err2)
 		}
 		return nil
 	}
@@ -273,7 +273,7 @@ func liturgyHarness(errRollback error, notFound func(error) error, unchanged fun
 		a, err := cs.Comments().Open(ctx, lgA)
 		b, err2 := cs.Comments().Open(ctx, lgB)
 		if err != nil || err2 != nil || a != 1 || b != 0 {
-			return fmt.Errorf("open %d %d %v %v", a, b, err, err2)
+			return fmt.Errorf("open %d %d %w %w", a, b, err, err2)
 		}
 		return nil
 	}
@@ -282,7 +282,7 @@ func liturgyHarness(errRollback error, notFound func(error) error, unchanged fun
 			return fmt.Errorf("own: %+v %w", c, err)
 		}
 		if _, err := cs.Comments().ByID(ctx, lgA, domain.CommentID(id("CMB"))); !errors.Is(err, app.ErrNotFound) {
-			return fmt.Errorf("church B's comment through A's liturgy: %v", err)
+			return fmt.Errorf("church B's comment through A's liturgy: %w", err)
 		}
 		_, err := cs.Comments().ByID(ctx, lgB, domain.CommentID(id("CMB")))
 		return notFound(err)
@@ -567,14 +567,6 @@ func (e lenv) item(lid domain.LiturgyID, typ domain.ItemType) domain.ItemID {
 		e.t.Fatal(err)
 	}
 	return res.Item.Item.ID
-}
-
-func invalidField(err error) string {
-	var in *domain.InvalidInputError
-	if errors.As(err, &in) {
-		return in.Field
-	}
-	return ""
 }
 
 // IT-L-007: every write route of a liturgy that is not editable.

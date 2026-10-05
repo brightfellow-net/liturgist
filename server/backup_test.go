@@ -174,12 +174,12 @@ func TestBackupWhileWriting(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = db.Close() }()
-	var n, max int
-	if err := db.QueryRow("SELECT COUNT(*), COALESCE(MAX(n), -1) FROM scratch").Scan(&n, &max); err != nil {
+	var n, top int
+	if err := db.QueryRow("SELECT COUNT(*), COALESCE(MAX(n), -1) FROM scratch").Scan(&n, &top); err != nil {
 		t.Fatal(err)
 	}
-	if n == 0 || max != n-1 { // rows are 0..n-1 with no gap: a snapshot at one moment
-		t.Errorf("snapshot has %d rows, max %d", n, max)
+	if n == 0 || top != n-1 { // rows are 0..n-1 with no gap: a snapshot at one moment
+		t.Errorf("snapshot has %d rows, max %d", n, top)
 	}
 }
 

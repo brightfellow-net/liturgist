@@ -76,13 +76,13 @@ func ValidateEntryName(kind ListKind, name *string) (key string, err error) {
 	return validateName(name, "name", kind.MaxLen())
 }
 
-// validateName trims a one-line name of 1..max characters with at least one
+// validateName trims a one-line name of 1..limit characters with at least one
 // letter or digit, and returns Fold(name).
-func validateName(name *string, field string, max int) (string, error) {
+func validateName(name *string, field string, limit int) (string, error) {
 	*name = strings.TrimSpace(*name)
 	n := utf8.RuneCountInString(*name)
-	if n < 1 || n > max {
-		return "", &InvalidInputError{Field: field, Message: "1 to " + strconv.Itoa(max) + " characters."}
+	if n < 1 || n > limit {
+		return "", &InvalidInputError{Field: field, Message: "1 to " + strconv.Itoa(limit) + " characters."}
 	}
 	if strings.IndexFunc(*name, unicode.IsControl) >= 0 {
 		return "", &InvalidInputError{Field: field, Message: "No line breaks."}
@@ -95,8 +95,8 @@ func validateName(name *string, field string, max int) (string, error) {
 }
 
 // LimitError is the error of a fixed count that would be exceeded (09 §2.1).
-func LimitError(field string, max, used int) error {
-	return &InvalidInputError{Field: field, Message: "At most " + strconv.Itoa(max) + ".", Reason: ReasonLimit, Max: max, Used: used}
+func LimitError(field string, limit, used int) error {
+	return &InvalidInputError{Field: field, Message: "At most " + strconv.Itoa(limit) + ".", Reason: ReasonLimit, Max: limit, Used: used}
 }
 
 // ItemType is the kind of a template or liturgy item (09 §2.3, 10 §2.2).

@@ -397,7 +397,7 @@ func (u *Liturgies) PrepareCreateArchiving(ctx context.Context, sess *domain.Ses
 			if !slices.ContainsFunc(svc.Times, func(t domain.ServiceTime) bool { return t.Weekday == domain.ISOWeekday(day) && t.Time == e.Time }) {
 				return &domain.InvalidInputError{Field: field + "time", Message: "The service has no occurrence at this date and time."}
 			}
-			slot := Slot{ServiceID: e.ServiceID, Date: e.Date, Time: e.Time}
+			slot := Slot(e)
 			if id, ok := slots[slot]; ok {
 				return &LiturgyExistsError{ID: id}
 			}

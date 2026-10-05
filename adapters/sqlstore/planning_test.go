@@ -234,10 +234,6 @@ func (f fixture) duty(did, church, name string, pos int) error {
 	return f.exec(fmt.Sprintf(listInsert, "duties"), id(did), id(church), name, domain.Fold(name), pos, f.ts(0))
 }
 
-func (f fixture) part(pid, church, name string, pos int) error {
-	return f.exec(fmt.Sprintf(listInsert, "singing_parts"), id(pid), id(church), name, domain.Fold(name), pos, f.ts(0))
-}
-
 func (f fixture) template(tid, church, name, lang string, version int) error {
 	return f.exec(tplInsert, id(tid), id(church), name, domain.Fold(name), lang, version, f.ts(0), f.ts(0))
 }

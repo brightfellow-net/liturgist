@@ -215,7 +215,7 @@ func TestItemRules(t *testing.T) {
 		e.addItem(lid, domain.ItemOther, "x")
 	}
 	_, err = L.AddItem(e.ctx, e.admin, lid, app.ItemInput{LiturgyVersion: ver(), Title: "61", Type: domain.ItemOther})
-	if r, max, used := limitReason(err); r != domain.ReasonLimit || max != 60 || used != 60 {
+	if r, limit, used := limitReason(err); r != domain.ReasonLimit || limit != 60 || used != 60 {
 		t.Errorf("61st item: %v", err)
 	}
 }
@@ -345,7 +345,7 @@ func TestItemSongs(t *testing.T) {
 		if r, err = put(4, many(100)); err != nil || len(r.Item.Songs[0].Song.Entries) != 100 {
 			t.Fatalf("100 entries: %v", err)
 		}
-		if _, err := put(5, many(101)); func() bool { r, max, _ := limitReason(err); return r != domain.ReasonLimit || max != 100 }() {
+		if _, err := put(5, many(101)); func() bool { r, limit, _ := limitReason(err); return r != domain.ReasonLimit || limit != 100 }() {
 			t.Errorf("101 entries: %v", err)
 		}
 		ten := make([]app.ItemSongInput, 11)
@@ -355,7 +355,7 @@ func TestItemSongs(t *testing.T) {
 		if _, err = put(5, ten[:10]...); err != nil {
 			t.Errorf("10 songs: %v", err)
 		}
-		if _, err = put(6, ten...); func() bool { r, max, _ := limitReason(err); return r != domain.ReasonLimit || max != 10 }() {
+		if _, err = put(6, ten...); func() bool { r, limit, _ := limitReason(err); return r != domain.ReasonLimit || limit != 10 }() {
 			t.Errorf("11 songs: %v", err)
 		}
 		if r, err = put(6); err != nil || len(r.Item.Songs) != 0 {
@@ -454,7 +454,7 @@ func TestAssignments(t *testing.T) {
 			}
 		}
 		_, err = L.AddAssignment(e.ctx, e.admin, lid, app.AssignmentInput{DutyID: d2, Name: "One more"})
-		if r, max, _ := limitReason(err); r != domain.ReasonLimit || max != 200 {
+		if r, limit, _ := limitReason(err); r != domain.ReasonLimit || limit != 200 {
 			t.Errorf("201st assignment: %v", err)
 		}
 		// A duty in use cannot be deleted; a liturgy with assignments can be.
