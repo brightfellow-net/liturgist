@@ -37,7 +37,7 @@ Checked against the code on 2026-10-05 (`main` at `172bab6`).
 | ID | Decision | Alternatives considered |
 |---|---|---|
 | H-1 | **Archive format** is one `.zip` (opens on any desktop, stdlib `archive/zip`): `manifest.json`, `liturgist.db`, `files/…`. The manifest holds `format: 1`, program version, schema version, `created_at` (UTC), driver `sqlite`, and the SHA-256 of `liturgist.db` | zip or tar.gz |
-| H-2 | **`serve` holds a run lock** (`liturgist.run`, flock, non-blocking) for its whole life. A second `serve` on the same data folder refuses to start; `restore` refuses while it is held. This is how "server stopped" is checked, and it also stops two servers corrupting one folder | yes / no |
+| H-2 | **`serve` holds a run lock** (`liturgist.run`, flock, non-blocking) for its whole life (taken by the `serve` command through `server.LockRun`, not by `server.New`, [§14](#14-slice-6a-as-built-2026-10-05)). A second `serve` on the same data folder refuses to start; `restore` refuses while it is held. This is how "server stopped" is checked, and it also stops two servers corrupting one folder | yes / no |
 | H-3 | **Scheduler runs inside `serve`**, not cron. Daily at `LITURGIST_BACKUP_TIME` (default `02:00`, in the church's time zone, UTC before setup); `LITURGIST_BACKUP_TIME=off` turns it off. A missed run (server off at 02:00) runs 5 minutes after start when the newest automatic backup is over 26 hours old | in-process / cron docs only |
 | H-4 | **Retention** `LITURGIST_BACKUP_KEEP_DAILY=7`, `LITURGIST_BACKUP_KEEP_WEEKLY=4`: keep the newest 7 automatic backups, plus the newest one of each of the 4 ISO weeks before them. Only `backups/auto-*.zip` is ever pruned; manual, `pre-upgrade-*` and `pre-restore-*` files are never touched by this | numbers |
 | H-5 | **"Last backup" warning** on the system page and as a banner for church admins when the newest backup of any kind is over 48 hours old, **or** no backup was downloaded or written by `liturgist backup` to another path in 30 days (a copy on the same disk does not survive the disk) | thresholds |
@@ -70,7 +70,7 @@ Runs with the server stopped (H-2). Order, each step before the next:
 | 1 | Take `liturgist.run` and `liturgist.lock`; if held: "stop the server first" | exit 1, nothing changed |
 | 2 | Open the zip; read `manifest.json`; `format` known, driver `sqlite`, SHA-256 of `liturgist.db` matches | exit 1, nothing changed |
 | 3 | Schema version of the backup greater than this program's: refuse, exit 3 (as `serve`); smaller: allowed, the next `serve` migrates it after its own pre-upgrade copy | exit 3 |
-| 4 | Extract to `<data dir>/restore-tmp/`; `PRAGMA integrity_check` and `PRAGMA foreign_key_check` on the extracted database; free space ≥ `1.2 ×` the current data | exit 1, tmp removed |
+| 4 | Extract to `<data dir>/restore-tmp/`; `PRAGMA integrity_check` and `PRAGMA foreign_key_check` on the extracted database; free space ≥ the archive's uncompressed size + `1.2 ×` the current database | exit 1, tmp removed |
 | 5 | Ask "Replace the current data? (y/N)"; `--yes` skips it; without a terminal and without `--yes` it refuses | exit 1 |
 | 6 | Keep the current data: `VACUUM INTO backups/pre-restore-<UTC>.db`, or, if the current database cannot be opened, rename it to that name; rename the current `files/` to `backups/pre-restore-files-<UTC>/` | exit 1, nothing replaced |
 | 7 | Rename the extracted database to `liturgist.db` (removing `-wal` and `-shm` first), the extracted `files/` to `files/`; remove `restore-tmp/` | the `pre-restore-*` copies stay; the message names them |
@@ -122,7 +122,7 @@ Runs with the server stopped (H-2). Order, each step before the next:
 
 | Slice | Content | Decisions needed first |
 |---|---|---|
-| **6A** | `serve` run lock; `backup`; `restore`; the zip format; shared free-space helper; `backup-and-restore.md` (first draft) | H-1, H-2, H-6 |
+| **6A** (**merged** 2026-10-05, [§14](#14-slice-6a-as-built-2026-10-05)) | `serve` run lock; `backup`; `restore`; the zip format; shared free-space helper; `backup-and-restore.md` (first draft) | H-1, H-2, H-6 |
 | **6B** | Scheduler, retention, config; `storage_full` 507 and its strings | H-3, H-4 |
 | **6C** | System routes, system page, banners, download | H-5, H-8, H-9, H-14 (+ H-13 if built) |
 | **6D** | Dockerfile, GoReleaser, release workflow, systemd unit, Windows service, `healthcheck` | H-10, H-11, H-12 |
@@ -199,3 +199,17 @@ Each slice is drafted in a worktree, shown to the owner with its deviations, and
 | CLI, exit codes, configuration | [01-foundation.md §5, §6](01-foundation.md) |
 | Scopes | `domain/scope.go`, [03-identity-auth.md §8](03-identity-auth.md#8-member-roles-and-permissions) |
 | Tenancy declarations | [04-tenancy-extensions.md](04-tenancy-extensions.md) |
+
+## 14. Slice 6A as built (2026-10-05)
+
+Merged to `main` as `2ac8faf`. Code: `internal/backup` (zip, manifest, entry checks), `adapters/sqlstore/backup.go` (`SnapshotFile`, `CheckSQLiteFile`, `ProgramVersion`, `LockRun`, `FreeBytes`, `SnapshotSpace`), `server/backup.go` (`Backup`, `Restore`), `cmd/liturgist/main.go` (`backup`, `restore`, run lock in `serve`). Guide: [backup-and-restore.md](../self-host/backup-and-restore.md).
+
+| Deviation from §2 and §3 | Why |
+|---|---|
+| The run lock is taken by the `serve` command (`server.LockRun`), not by `server.New` | Existing tests, and possibly the hosted edition, build several servers on one folder. Behaviour of H-2 for `serve` and `restore` is unchanged |
+| Restore's free-space rule is the archive's uncompressed size + `1.2 ×` the current database | "1.2 × the current data" was vague |
+| The manifest's SHA-256 covers the database only; `files/` entries rely on the zip's CRC | Per-file checksums were not specified; add if the pilot stores files that matter |
+| `SnapshotFile` uses its own connection, without `query_only` | `VACUUM INTO` is refused under `query_only`; a separate connection also never queues behind the server's writer |
+| Sessions stay in a restored database (as H-14) | Not changed by restore |
+
+Tests: TC-601, 602, 603, 604, 605, 608, 609 (mapping), IT-601 (server and CLI), IT-603, plus restore over a damaged database, a manifest that understates the schema, and the CLI exit code 3. TC-606, 607, 610 and IT-602, 604 to 606 belong to later slices. Go suite green on SQLite and PostgreSQL; golangci-lint not run.
