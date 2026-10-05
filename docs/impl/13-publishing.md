@@ -217,6 +217,22 @@ Merged as `bb3d6cc`. Differences and additions to the text above:
 - **Tests.** TC-P-001; IT-P-001, 002, 003, 004 (free-running delete race and the foreign-key backstop, not forced interleavings for reopen and library delete), 005, 006 (including the forced PostgreSQL interleaving `TestReopenLimitForced`), 007, 008, 011, 013, 015; `TestReviewVisibility` rewritten for P-79; WT-P-001 and the prepare button tests; E2E-W-017. Removing the church lock on reopen, the conditional delete (the foreign key still refuses), the `published` exception in `openLiturgy`, or the version insert each fails a test. Go on both dialects; Vitest 225; Playwright 37. Not covered by their own test: the `archived_at IS NULL` condition of `Transition` (the use case checks first). `SelectForTest` is a new test hook; the scoped-repository snapshot also covers comments and state changes now.
 - **Not run:** golangci-lint (the v1/v2 config mismatch of step 3 still stands).
 
+### 11.3 Slice 5B as built (2026-10-05)
+
+Merged as `ec7f4c4`. Differences and additions to the text above:
+
+- **Routes.** `GET /published` (`from`, `to`, `archived`, `limit` 0 to 100, `offset`), `GET /liturgies/{id}/published` and `GET /me/assignments`, all `TenancyChurch`, tag `published`, `Cache-Control: private, no-store`, no ETag. They never return phone numbers or e-mail addresses.
+- **Code.** `app/published_read.go` (`ReadPublished`, `ListPublished`, `MyAssignments`), `PublishedRepo` gains `Latest`, `ListLatest` and `Upcoming` (`Upcoming` reads the newest version with `MAX(number)`, then calls `Latest` for at most 51 rows). `Liturgies` gains `URLs`. `ReadPublished` does not go through `openLiturgy`.
+- **Home page.** "My assignments" is the home page `/` under the Welcome heading, not a separate page; every member lands there. The nav is My assignments, Published, Library, Profile, then Liturgies and Settings as before. The old "Home" label is removed.
+- **Indonesian nav label.** "Liturgi terbit" for Published (the doc's "Liturgi" is already the planning menu's word). All new Indonesian strings, including the home-screen steps, are drafts for the owner.
+- **Absent, not null.** Huma cannot mark a struct pointer nullable, so `duty`, `reading` and `part` are left out when empty.
+- **`render`.** Only `key_display` and `show_credits` (always `true`) until slice 5C adds the setting and the `print` defaults.
+- **Header source.** The list and the cards take date, time and name from the current liturgy row, not from the stored copy, so a reopened liturgy with a changed date shows the new date over the old content, with the "Being revised" tag.
+- **Left out until later.** The "Print" link (5C), the "Reading mode" link (5D) and the card link to the user's first item.
+- **Text size.** The control sends `{text_size, ui_language}` to `PATCH /me`, without the name.
+- **Tests.** `TestReadPublished`, `TestListPublished`, `TestMyAssignments` (church time zone, a person removed in version 2), `TestMyAssignmentsMore` (cut at 50), `TestReadPublishedHTTP`, 12 Vitest tests (WT-P-002, WT-P-003), E2E-W-017 extended. Dropping the newest-version condition of `Upcoming`, or reading the copy through `openLiturgy`, each fails a test. Go on both dialects; Vitest 237; Playwright 37 (the whole suite once, then E2E-W-017 again after a locator fix).
+- **Not run:** golangci-lint (the v1/v2 config mismatch of step 3 still stands).
+
 ## 12. Anti-patterns (DO NOT)
 
 | ❌ Don't | ✅ Do instead | Why |
