@@ -34,6 +34,8 @@ export const paths = {
   duties: "/liturgies/duties",
   singingParts: "/liturgies/singing-parts",
   importReview: "/library/import/:id",
+  published: "/published",
+  publishedView: "/published/:id",
 } as const;
 
 // songPath and songEditPath fill in a song's ID.
@@ -62,3 +64,6 @@ export const importPath = (id: string) => paths.importReview.replace(":id", enco
 
 // liturgyPath fills in a liturgy's ID.
 export const liturgyPath = (id: string) => paths.liturgy.replace(":id", encodeURIComponent(id));
+
+// publishedPath fills in a liturgy's ID.
+export const publishedPath = (id: string) => paths.publishedView.replace(":id", encodeURIComponent(id));

@@ -172,7 +172,7 @@ func wire(cfg Config, db app.Tx, o *options, refresh func()) useCases {
 		vocab:     &app.Vocabulary{Tx: db, Clock: clock, IDs: ids},
 		templates: &app.Templates{Tx: db, Clock: clock, IDs: ids},
 		services:  &app.Services{Tx: db, Clock: clock, IDs: ids},
-		liturgies: &app.Liturgies{Tx: db, Clock: clock, IDs: ids, Entitlements: o.entitlements},
+		liturgies: &app.Liturgies{Tx: db, Clock: clock, IDs: ids, Entitlements: o.entitlements, URLs: o.urls},
 		seed:      &app.Seed{Tx: db, Clock: clock, IDs: ids},
 		resets:    &app.Resets{Tx: db, Hasher: hasher, Clock: clock, IDs: ids, URLs: o.urls, Auth: auth},
 		operator:  &app.Operator{Tx: db, Clock: clock, IDs: ids},

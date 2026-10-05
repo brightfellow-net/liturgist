@@ -6,13 +6,14 @@
   },
   "nav": {
     "label": "Menu utama",
-    "home": "Beranda",
     "privacy": "Privasi",
     "log_out": "Keluar",
     "profile": "Profil",
     "library": "Pustaka",
     "settings": "Pengaturan",
-    "liturgies": "Liturgi"
+    "liturgies": "Liturgi",
+    "assignments": "Tugas saya",
+    "published": "Liturgi terbit"
   },
   "common": {
     "language": "Bahasa",
@@ -111,8 +112,17 @@
   },
   "home": {
     "title": "Selamat datang, {{name}}",
-    "church": "Anda anggota {{church}}.",
-    "assignments": "Tugas Anda akan tampil di sini."
+    "assignments_title": "Tugas saya",
+    "assignments_empty": "Anda belum punya tugas di liturgi mendatang. Jika Anda mendapat tugas dan liturgi sudah diterbitkan, tugas itu tampil di sini.",
+    "open": "Buka liturgi",
+    "more": "Menampilkan 50 berikutnya. Buka daftar liturgi terbit untuk sisanya.",
+    "all_published": "Semua liturgi yang terbit",
+    "install_title": "Tambahkan aplikasi ini ke layar utama",
+    "install_intro": "Setelah itu aplikasi terbuka dengan sekali ketuk, seperti aplikasi lain.",
+    "install_android": "Android (Chrome)",
+    "install_android_steps": "Buka menu (tiga titik), lalu pilih “Tambahkan ke layar utama” atau “Instal aplikasi”.",
+    "install_iphone": "iPhone (Safari)",
+    "install_iphone_steps": "Ketuk tombol Bagikan, lalu “Tambahkan ke Layar Utama”."
   },
   "profile": {
     "title": "Profil",
@@ -1011,5 +1021,19 @@
       },
       "on_item": "Komentar pada {{title}}"
     }
+  },
+  "published": {
+    "title": "Liturgi yang terbit",
+    "empty": "Belum ada yang diterbitkan. Liturgi tampil di sini setelah gereja menerbitkannya.",
+    "back": "Semua liturgi yang terbit",
+    "pages": "Halaman",
+    "revising_tag": "Sedang direvisi",
+    "revising": "Liturgi ini sedang direvisi. Anda membaca versi yang terbit pada {{date}}.",
+    "archived": "Liturgi ini sudah diarsipkan.",
+    "version": "Versi {{number}}, terbit {{date}} oleh {{name}}.",
+    "not_published": "Liturgi ini belum diterbitkan.",
+    "update_app": "Perbarui aplikasi untuk membaca liturgi ini.",
+    "team": "Tim",
+    "ccli": "CCLI {{number}}"
   }
 }

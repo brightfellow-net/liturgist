@@ -207,6 +207,27 @@ func liturgyHarness(errRollback error, notFound func(error) error, unchanged fun
 		}
 		return nil
 	}
+	h["Published.Latest"] = func(cs app.ChurchStore, _ time.Time) error {
+		if v, err := cs.Published().Latest(ctx, domain.LiturgyID(id("LGPA"))); err != nil || v.ID != domain.PublishedVersionID(id("PVA")) || string(v.Content) != `{"format":1}` {
+			return fmt.Errorf("own: %+v %w", v, err)
+		}
+		_, err := cs.Published().Latest(ctx, domain.LiturgyID(id("LGPB")))
+		return notFound(err)
+	}
+	h["Published.ListLatest"] = func(cs app.ChurchStore, _ time.Time) error {
+		rows, total, err := cs.Published().ListLatest(ctx, app.PublishedFilter{Archived: app.ArchivedAll, Limit: 50})
+		if err != nil || total != 1 || len(rows) != 1 || rows[0].Liturgy.ID != domain.LiturgyID(id("LGPA")) || rows[0].Number != 1 {
+			return fmt.Errorf("list: %d %+v %w", total, rows, err)
+		}
+		return nil
+	}
+	h["Published.Upcoming"] = func(cs app.ChurchStore, _ time.Time) error {
+		rows, err := cs.Published().Upcoming(ctx, domain.UserID(id("U1")), "0001-01-01", 50)
+		if err != nil || len(rows) != 1 || rows[0].Liturgy.ID != domain.LiturgyID(id("LGPA")) || rows[0].Version.ID != domain.PublishedVersionID(id("PVA")) {
+			return fmt.Errorf("upcoming: %+v %w", rows, err)
+		}
+		return nil
+	}
 	h["Liturgies.LockForComment"] = func(cs app.ChurchStore, _ time.Time) error {
 		if ok, err := cs.Liturgies().LockForComment(ctx, lgA); err != nil || !ok {
 			return fmt.Errorf("own liturgy: %v %w", ok, err)

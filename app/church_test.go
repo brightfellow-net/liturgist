@@ -81,7 +81,7 @@ func wireChurch(t *testing.T, db *sqlstore.DB, ent app.Entitlements) cenv {
 		imports: &app.Imports{Tx: db, Clock: c, IDs: ids, Songs: songs, Importers: map[domain.ImportFormat]app.Importer{
 			domain.FormatPaste: paste.Importer{}, domain.FormatChordPro: chordpro.Importer{}, domain.FormatOpenLyrics: openlyrics.Importer{}}},
 		readings:  &app.Readings{Tx: db, Clock: c, IDs: ids},
-		liturgies: &app.Liturgies{Tx: db, Clock: c, IDs: ids, Entitlements: ent},
+		liturgies: &app.Liturgies{Tx: db, Clock: c, IDs: ids, Entitlements: ent, URLs: urls},
 		vocab:     &app.Vocabulary{Tx: db, Clock: c, IDs: ids},
 		tpls:      &app.Templates{Tx: db, Clock: c, IDs: ids},
 		svcs:      &app.Services{Tx: db, Clock: c, IDs: ids},

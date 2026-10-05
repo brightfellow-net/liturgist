@@ -510,6 +510,7 @@ func RegisterLiturgies(api huma.API, d LiturgyDeps) {
 	review(domain.ActionRequestChanges, "requestLiturgyChanges", "/liturgies/{id}/request-changes", "Send a liturgy in review back for revision", true)
 	review(domain.ActionReopen, "reopenLiturgy", "/liturgies/{id}/reopen", "Reopen an approved or published liturgy as a draft", false)
 	review(domain.ActionPublish, "publishLiturgy", "/liturgies/{id}/publish", "Publish an approved liturgy: store its published version", true)
+	registerPublished(api, d)
 	archiveOp := func(id, path, summary, event string, run func(ctx context.Context, sess *domain.Session, id domain.LiturgyID) (app.LiturgyView, error)) {
 		huma.Register(api, lop(id, http.MethodPost, path, http.StatusOK, summary),
 			func(ctx context.Context, in *liturgyPath) (*liturgyOutput, error) {

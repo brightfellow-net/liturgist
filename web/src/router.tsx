@@ -28,6 +28,8 @@ import { TemplatesPage } from "./routes/planning/TemplatesPage";
 import { dutyList, partList } from "./lib/planning";
 import { PrivacyPage } from "./routes/PrivacyPage";
 import { ProfilePage } from "./routes/ProfilePage";
+import { PublishedListPage } from "./routes/published/PublishedListPage";
+import { PublishedPage } from "./routes/published/PublishedPage";
 import { ResetPage } from "./routes/ResetPage";
 import { ChurchSettingsPage } from "./routes/settings/ChurchSettingsPage";
 import { MembersPage } from "./routes/settings/MembersPage";
@@ -77,6 +79,8 @@ export const router = createBrowserRouter([
       { path: paths.template, element: <TemplateFormPage /> },
       { path: paths.serviceNew, element: <ServiceFormPage /> },
       { path: paths.service, element: <ServiceFormPage /> },
+      { path: paths.published, element: <PublishedListPage /> },
+      { path: paths.publishedView, element: <PublishedPage /> },
       { path: paths.profile, element: <ProfilePage /> },
       {
         element: <SettingsLayout />,

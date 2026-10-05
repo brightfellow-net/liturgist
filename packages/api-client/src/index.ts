@@ -67,3 +67,11 @@ export type SongDraft = Schemas["SongDraftBody"];
 export type DraftSection = Schemas["DraftSectionBody"];
 export type MergePreviewView = Schemas["MergePreviewView"];
 export type ApplyResultView = Schemas["ApplyResultView"];
+
+// Published liturgies (13 §5).
+export type PublishedCopyView = Schemas["PublishedCopyView"];
+export type PublishedContentView = Schemas["PublishedContentView"];
+export type PublishedItemView = Schemas["PublishedItemView"];
+export type PublishedSongView = Schemas["PublishedSongView"];
+export type PublishedListItemView = Schemas["PublishedListItemView"];
+export type MyAssignmentView = Schemas["MyAssignmentView"];

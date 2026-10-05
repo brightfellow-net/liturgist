@@ -23,7 +23,7 @@ test("E2E-W-002 invite and accept", async ({ browser }) => {
 
   await expect(page.getByRole("heading", { name: "Welcome, Yohanes" })).toBeVisible();
   const nav = page.getByRole("navigation", { name: "Main menu" });
-  await expect(nav.getByRole("link")).toHaveText(["Home", "Library", "Profile"]); // team member: no Settings
+  await expect(nav.getByRole("link")).toHaveText(["My assignments", "Published", "Library", "Profile"]); // team member: no Settings
 });
 
 test("E2E-W-003 login throttle message", async ({ browser }) => {

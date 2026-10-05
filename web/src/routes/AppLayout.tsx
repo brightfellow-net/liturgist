@@ -72,7 +72,8 @@ export function AppLayout() {
         <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-2 px-4 py-2">
           <p className="mr-4 font-semibold">{me.data.church?.name ?? t("app.name")}</p>
           <nav aria-label={t("nav.label")} className="flex flex-1 flex-wrap gap-1">
-            <NavLink to={paths.home} end className={link}>{t("nav.home")}</NavLink>
+            <NavLink to={paths.home} end className={link}>{t("nav.assignments")}</NavLink>
+            <NavLink to={paths.published} className={link}>{t("nav.published")}</NavLink>
             <NavLink to={paths.library} className={link}>{t("nav.library")}</NavLink>
             {showPlanning(me.data) && <NavLink to={paths.planning} className={link}>{t("nav.liturgies")}</NavLink>}
             <NavLink to={paths.profile} className={link}>{t("nav.profile")}</NavLink>

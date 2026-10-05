@@ -6,13 +6,14 @@
   },
   "nav": {
     "label": "Main menu",
-    "home": "Home",
     "privacy": "Privacy",
     "log_out": "Log out",
     "profile": "Profile",
     "library": "Library",
     "settings": "Settings",
-    "liturgies": "Liturgies"
+    "liturgies": "Liturgies",
+    "assignments": "My assignments",
+    "published": "Published"
   },
   "common": {
     "language": "Language",
@@ -111,8 +112,17 @@
   },
   "home": {
     "title": "Welcome, {{name}}",
-    "church": "You are a member of {{church}}.",
-    "assignments": "Your assignments will appear here."
+    "assignments_title": "My assignments",
+    "assignments_empty": "You have no duties in upcoming liturgies. When you are given a duty and the liturgy is published, it appears here.",
+    "open": "Open the liturgy",
+    "more": "Showing the next 50. Open the published list for the rest.",
+    "all_published": "All published liturgies",
+    "install_title": "Add this app to your home screen",
+    "install_intro": "Then it opens like any other app, with one tap.",
+    "install_android": "Android (Chrome)",
+    "install_android_steps": "Open the menu (three dots) and choose “Add to Home screen” or “Install app”.",
+    "install_iphone": "iPhone (Safari)",
+    "install_iphone_steps": "Tap the Share button, then “Add to Home Screen”."
   },
   "profile": {
     "title": "Profile",
@@ -1024,5 +1034,19 @@
       },
       "on_item": "Comments on {{title}}"
     }
+  },
+  "published": {
+    "title": "Published liturgies",
+    "empty": "Nothing has been published yet. The liturgies appear here once your church publishes them.",
+    "back": "All published liturgies",
+    "pages": "Pages",
+    "revising_tag": "Being revised",
+    "revising": "This liturgy is being revised. You are reading the version published on {{date}}.",
+    "archived": "This liturgy is archived.",
+    "version": "Version {{number}}, published {{date}} by {{name}}.",
+    "not_published": "This liturgy has not been published.",
+    "update_app": "Update the app to read this liturgy.",
+    "team": "Team",
+    "ccli": "CCLI {{number}}"
   }
 }

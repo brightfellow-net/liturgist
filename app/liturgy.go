@@ -18,6 +18,7 @@ type Liturgies struct {
 	Clock        Clock
 	IDs          IDGenerator
 	Entitlements Entitlements
+	URLs         URLBuilder // optional: the link of a published copy (13 §5)
 }
 
 // LiturgyActions are the advisory actions on a liturgy (10 §4): both depend only

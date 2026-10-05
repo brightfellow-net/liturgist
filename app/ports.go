@@ -428,6 +428,36 @@ type PublishedRepo interface {
 	Info(ctx context.Context, liturgy domain.LiturgyID) (domain.PublishedVersion, error)
 	// Exists reports whether the liturgy has any version.
 	Exists(ctx context.Context, liturgy domain.LiturgyID) (bool, error)
+	// Latest returns the newest version with its content; ErrNotFound when the
+	// liturgy has none.
+	Latest(ctx context.Context, liturgy domain.LiturgyID) (domain.PublishedVersion, error)
+	// ListLatest lists the liturgies that have a version, newest date first
+	// (13 §5), with the number and time of their newest version, and the total.
+	ListLatest(ctx context.Context, f PublishedFilter) ([]PublishedRow, int, error)
+	// Upcoming returns, soonest first, at most limit non-archived liturgies
+	// dated today or later whose newest version lists the user (13 §5).
+	Upcoming(ctx context.Context, user domain.UserID, today string, limit int) ([]PublishedUpcoming, error)
+}
+
+// PublishedFilter selects the rows of the published list (13 §5).
+type PublishedFilter struct {
+	From, To string // inclusive YYYY-MM-DD; empty = open
+	Archived ArchivedFilter
+	Limit    int
+	Offset   int
+}
+
+// PublishedRow is a liturgy with its newest version, without content.
+type PublishedRow struct {
+	Liturgy     domain.Liturgy
+	Number      int
+	PublishedAt time.Time
+}
+
+// PublishedUpcoming is an upcoming liturgy with its newest version, content included.
+type PublishedUpcoming struct {
+	Liturgy domain.Liturgy
+	Version domain.PublishedVersion
 }
 
 // LiturgyRow is a liturgy in a list.

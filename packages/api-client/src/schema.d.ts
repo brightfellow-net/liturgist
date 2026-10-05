@@ -629,6 +629,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/liturgies/{id}/published": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The newest published version of a liturgy */
+        get: operations["getPublished"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/liturgies/{id}/redo": {
         parameters: {
             query?: never;
@@ -766,6 +783,23 @@ export interface paths {
         patch: operations["updateMe"];
         trace?: never;
     };
+    "/me/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's duties in upcoming published liturgies, soonest first */
+        get: operations["listMyAssignments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/password": {
         parameters: {
             query?: never;
@@ -846,6 +880,23 @@ export interface paths {
         put?: never;
         /** Create a password-reset link for a member */
         post: operations["createResetLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/published": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the published liturgies, newest first */
+        get: operations["listPublished"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1903,6 +1954,17 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        ListOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/ListOutputBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["PublishedListItemView"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
         ListServicesResponse: {
             /**
              * Format: uri
@@ -2140,6 +2202,38 @@ export interface components {
             /** @enum {string} */
             status: "updated" | "new" | "kept" | "removed";
         };
+        MineOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/MineOutputBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["MyAssignmentView"][] | null;
+            /** @description there are more than 50 upcoming liturgies */
+            more: boolean;
+        };
+        MyAssignmentItemView: {
+            id: string;
+            title: string;
+            type: string;
+        };
+        MyAssignmentLiturgyView: {
+            date: string;
+            id: string;
+            /** @enum {string} */
+            language: "id" | "en" | "zh-Hans" | "zh-Hant";
+            /** Format: int64 */
+            number: number;
+            revising: boolean;
+            service_name: string;
+            time: string;
+        };
+        MyAssignmentView: {
+            duties: components["schemas"]["PublishedRefView"][] | null;
+            items: components["schemas"]["MyAssignmentItemView"][] | null;
+            liturgy: components["schemas"]["MyAssignmentLiturgyView"];
+        };
         NameEntryView: {
             /**
              * Format: uri
@@ -2305,11 +2399,129 @@ export interface components {
             source: string;
             text: string;
         };
+        PublishedAssignmentView: {
+            duty: components["schemas"]["PublishedRefView"];
+            name: string;
+            /** @description null for a free-text name */
+            user_id: string | null;
+        };
+        PublishedContentView: {
+            assignments: components["schemas"]["PublishedAssignmentView"][] | null;
+            /**
+             * Format: int64
+             * @description 1; a reader that meets a larger number asks for an update
+             */
+            format: number;
+            items: components["schemas"]["PublishedItemView"][] | null;
+            licence_footer: string;
+            liturgy: components["schemas"]["PublishedLiturgyView"];
+        };
+        PublishedCopyView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/PublishedCopyView.json
+             */
+            readonly $schema?: string;
+            archived: boolean;
+            content: components["schemas"]["PublishedContentView"];
+            /** Format: int64 */
+            number: number;
+            /** Format: date-time */
+            published_at: string;
+            published_by: components["schemas"]["UserRefView"];
+            render: components["schemas"]["PublishedRenderView"];
+            /** @description the liturgy has been reopened: this copy is the last one published */
+            revising: boolean;
+            /** @description the shareable link; it needs a login */
+            url: string;
+        };
+        PublishedEntryView: {
+            key_change: string;
+            note: string;
+            /** @description absent when the whole congregation or nobody in particular sings */
+            part?: components["schemas"]["PublishedRefView"];
+            section_id: string;
+        };
         PublishedInfoView: {
             /** Format: int64 */
             number: number;
             /** Format: date-time */
             published_at: string;
+        };
+        PublishedItemView: {
+            /** @description absent when the item has no duty */
+            duty?: components["schemas"]["PublishedRefView"];
+            id: string;
+            /** Format: int64 */
+            position: number;
+            /** @description absent for an item that is not a reading */
+            reading?: components["schemas"]["PublishedReadingView"];
+            songs: components["schemas"]["PublishedSongView"][] | null;
+            text: string;
+            title: string;
+            type: string;
+        };
+        PublishedListItemView: {
+            archived: boolean;
+            date: string;
+            /** @description the liturgy's ID */
+            id: string;
+            /** @enum {string} */
+            language: "id" | "en" | "zh-Hans" | "zh-Hant";
+            /** Format: int64 */
+            number: number;
+            /** Format: date-time */
+            published_at: string;
+            revising: boolean;
+            service_name: string;
+            time: string;
+        };
+        PublishedLiturgyView: {
+            church_name: string;
+            date: string;
+            /** @enum {string} */
+            language: "id" | "en" | "zh-Hans" | "zh-Hant";
+            service_name: string;
+            time: string;
+        };
+        PublishedReadingView: {
+            attribution: string;
+            reference_display: string;
+            text: string;
+            translation_code: string;
+        };
+        PublishedRefView: {
+            id: string;
+            name: string;
+        };
+        PublishedRenderView: {
+            /** @enum {string} */
+            key_display: "do" | "letter";
+            show_credits: boolean;
+        };
+        PublishedSectionView: {
+            id: string;
+            kind: string;
+            label: string;
+            /** Format: int64 */
+            number: number;
+            text: string;
+        };
+        PublishedSongView: {
+            ccli_song_number: string;
+            copyright_holder: string;
+            copyright_line: string;
+            entries: components["schemas"]["PublishedEntryView"][] | null;
+            hymnal_number: string;
+            hymnal_source: string;
+            /** @description letters, e.g. G or Bb; the display form is applied by the reader */
+            key: string;
+            note: string;
+            /** @description only the sections the sequence uses, each once */
+            sections: components["schemas"]["PublishedSectionView"][] | null;
+            song_id: string;
+            title: string;
         };
         ReadingActions: {
             delete: boolean;
@@ -4629,6 +4841,38 @@ export interface operations {
             };
         };
     };
+    getPublished: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublishedCopyView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     redoLiturgyEdit: {
         parameters: {
             query?: never;
@@ -4924,6 +5168,36 @@ export interface operations {
             };
         };
     };
+    listMyAssignments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MineOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     changePassword: {
         parameters: {
             query?: never;
@@ -5093,6 +5367,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LinkView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listPublished: {
+        parameters: {
+            query?: {
+                /** @description first date, inclusive, YYYY-MM-DD */
+                from?: string;
+                /** @description last date, inclusive, YYYY-MM-DD */
+                to?: string;
+                /** @description default false: archived liturgies are hidden */
+                archived?: "false" | "true" | "all";
+                /** @description default 50 */
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOutputBody"];
                 };
             };
             /** @description Error */

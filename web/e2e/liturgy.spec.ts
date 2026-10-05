@@ -364,8 +364,13 @@ test("E2E-W-017 publish, archive, unarchive and reopen", async ({ browser }) => 
   const created = await api.post("/api/v1/liturgies", { data: { service_name: "Ibadah Terbit", date: dateAhead(60), time: "10:00", template_id: "", language: "id" } });
   expect(created.status(), await created.text()).toBe(201);
   const { id, version } = (await created.json()) as { id: string; version: number };
-  const item = await api.post(`/api/v1/liturgies/${id}/items`, { data: { liturgy_version: version, title: "Doa Pembuka", item_type: "free_text" } });
+  const duties = (await (await api.get("/api/v1/duties")).json()) as { items: { id: string }[] };
+  const item = await api.post(`/api/v1/liturgies/${id}/items`, { data: { liturgy_version: version, title: "Doa Pembuka", item_type: "prayer", duty_id: duties.items[0].id } });
   expect(item.status(), await item.text()).toBe(201);
+  const assignable = (await (await api.get("/api/v1/liturgies/assignable")).json()) as { items: { user_id: string; name: string }[] };
+  const tiaID = assignable.items.find((m) => m.name === "Tia Team")!.user_id;
+  const assigned = await api.post(`/api/v1/liturgies/${id}/assignments`, { data: { duty_id: duties.items[0].id, user_id: tiaID } });
+  expect(assigned.status(), await assigned.text()).toBe(201);
 
   const lead = await adminPage(browser);
   await lead.goto(`/liturgies/${id}`);
@@ -387,6 +392,21 @@ test("E2E-W-017 publish, archive, unarchive and reopen", async ({ browser }) => 
   const asTia = await tia.request.get(`/api/v1/liturgies/${id}`);
   expect(asTia.status()).toBe(404);
 
+  // She reads the published copy instead: her card on the home page, then the view.
+  await tia.goto("/");
+  const card = tia.getByRole("listitem").filter({ hasText: "Ibadah Terbit" });
+  await expect(card.getByText("Doa Pembuka")).toBeVisible();
+  await expectAccessible(tia);
+  await card.getByRole("link", { name: "Open the liturgy" }).click();
+  await expect(tia.getByRole("heading", { name: "Ibadah Terbit", level: 1 })).toBeVisible();
+  await expect(tia.getByRole("heading", { name: "Doa Pembuka", level: 2 })).toBeVisible();
+  await expectAccessible(tia);
+  await tia.getByRole("button", { name: "Large", exact: true }).click();
+  await expect(tia.locator("html")).toHaveAttribute("data-text-size", "large");
+  await tia.goto("/published");
+  await expect(tia.getByRole("link", { name: /Ibadah Terbit/ })).toBeVisible();
+  await expectAccessible(tia);
+
   await lead.getByRole("button", { name: "Archive", exact: true }).click();
   await expect(lead.getByText("Archived.").first()).toBeVisible();
   await expect(lead.getByText(/Archived\. This liturgy stays readable/)).toBeVisible();
@@ -397,6 +417,13 @@ test("E2E-W-017 publish, archive, unarchive and reopen", async ({ browser }) => 
   await lead.getByRole("button", { name: "Send", exact: true }).click();
   await expect(lead.getByText(/Being revised\. The team still sees version 1/)).toBeVisible();
   await expect(lead.getByText("Admin: Published → Draft")).toBeVisible();
+
+  // The team still reads version 1, marked as being revised.
+  await tia.goto("/published");
+  await expect(tia.getByText("Being revised")).toBeVisible();
+  const stillThere = await tia.request.get(`/api/v1/liturgies/${id}/published`);
+  expect(stillThere.status()).toBe(200);
+  expect(((await stillThere.json()) as { revising: boolean; number: number }).revising).toBe(true);
 
   // It was published once, so it can never be deleted: the API says so and the button is gone.
   await expect(lead.getByRole("button", { name: "Delete this liturgy" })).toHaveCount(0);
