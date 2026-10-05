@@ -45,7 +45,7 @@ type SystemStatusView struct {
 	} `json:"backup"`
 	EmailConfigured bool `json:"email_configured"`
 	HTTPS           struct {
-		Mode                string `json:"mode" enum:"plain_http,behind_proxy"`
+		Mode                string `json:"mode" enum:"plain_http,behind_proxy,built_in"`
 		PlainHTTPWarning    bool   `json:"plain_http_warning" doc:"reachable on the network over plain HTTP"`
 		ProxyMissingWarning bool   `json:"proxy_missing_warning" doc:"BASE_URL says https but no trusted proxy is configured"`
 	} `json:"https"`

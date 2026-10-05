@@ -24,7 +24,7 @@ Open the **setup link** shown in the log to create your church and its first adm
 | [Linux](docs/self-host/install-linux.md) | a Linux server or Raspberry Pi, with systemd |
 | [Windows](docs/self-host/install-windows.md) | a Windows PC or server, as a service |
 
-Then add HTTPS: [Caddy](docs/self-host/https-caddy.md) (simplest), [nginx](docs/self-host/https-nginx.md), [Cloudflare Tunnel](docs/self-host/https-cloudflare-tunnel.md) or [Tailscale](docs/self-host/https-tailscale.md).
+Then add HTTPS: [built in](docs/self-host/https-builtin.md) (Let's Encrypt, when the server has a public address), [Caddy](docs/self-host/https-caddy.md), [nginx](docs/self-host/https-nginx.md), [Cloudflare Tunnel](docs/self-host/https-cloudflare-tunnel.md) or [Tailscale](docs/self-host/https-tailscale.md).
 
 ## Look after it
 

@@ -9,9 +9,11 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/brightfellow-net/liturgist/internal/envconfig"
+	"github.com/brightfellow-net/liturgist/server"
 )
 
 // healthTimeout is how long healthcheck waits for the server (H-11).
@@ -25,16 +27,20 @@ func healthcheck(getenv func(string) string, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "invalid configuration:\n%v\n", err)
 		return exitError
 	}
-	if err := probe(context.Background(), healthURL(cfg.Listen)); err != nil {
+	if err := probe(context.Background(), healthURL(cfg)); err != nil {
 		fmt.Fprintln(stderr, "unhealthy:", err)
 		return exitError
 	}
 	return exitOK
 }
 
-// healthURL turns a listen address into the loopback URL of /healthz.
-func healthURL(listen string) string {
-	host, port, _ := net.SplitHostPort(listen)
+// healthURL is the loopback URL of /healthz: on the listen address, or with
+// built-in HTTPS on the plain port, which needs no certificate.
+func healthURL(cfg server.Config) string {
+	host, port, _ := net.SplitHostPort(cfg.Listen)
+	if cfg.Domain != "" {
+		host, port = "127.0.0.1", strconv.Itoa(cfg.HTTPPort)
+	}
 	switch host {
 	case "", "0.0.0.0":
 		host = "127.0.0.1"

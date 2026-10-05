@@ -60,4 +60,4 @@ $env:LITURGIST_BASE_URL = "https://liturgi.example.org"
 
 ## HTTPS and backups
 
-The server listens on `127.0.0.1:8080` only. For HTTPS use [Caddy](https-caddy.md) (it also runs on Windows), [Cloudflare Tunnel](https-cloudflare-tunnel.md) or [Tailscale](https-tailscale.md). Nightly backups go to `C:\ProgramData\Liturgist\data\backups`; take a copy elsewhere: [backup-and-restore.md](backup-and-restore.md).
+The server listens on `127.0.0.1:8080` only. For HTTPS use [built-in HTTPS](https-builtin.md), [Caddy](https-caddy.md) (it also runs on Windows), [Cloudflare Tunnel](https-cloudflare-tunnel.md) or [Tailscale](https-tailscale.md). Nightly backups go to `C:\ProgramData\Liturgist\data\backups`; take a copy elsewhere: [backup-and-restore.md](backup-and-restore.md).

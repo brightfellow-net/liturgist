@@ -19,7 +19,7 @@ The log shows a framed **setup link**. Open it in your browser to create your ch
 docker exec liturgist /liturgist setup-link
 ```
 
-`-p 127.0.0.1:8080:8080` makes the app reachable from this computer only. To let others in, put HTTPS in front of it first ([Caddy](https-caddy.md), [nginx](https-nginx.md), [Cloudflare Tunnel](https-cloudflare-tunnel.md) or [Tailscale](https-tailscale.md)); then set `LITURGIST_BASE_URL` to the public `https://` address and `LITURGIST_TRUSTED_PROXIES` to the proxy.
+`-p 127.0.0.1:8080:8080` makes the app reachable from this computer only. To let others in, set up HTTPS first: [built-in HTTPS](https-builtin.md) (replaces this `docker run`), or put a proxy in front: [Caddy](https-caddy.md), [nginx](https-nginx.md), [Cloudflare Tunnel](https-cloudflare-tunnel.md) or [Tailscale](https-tailscale.md)); then set `LITURGIST_BASE_URL` to the public `https://` address and `LITURGIST_TRUSTED_PROXIES` to the proxy.
 
 Seen from the container, a proxy running on the same computer comes from Docker's network gateway, not `127.0.0.1`. Look at the address in a request line of `docker logs` and trust that, or the whole range (`172.16.0.0/12` covers Docker's defaults).
 

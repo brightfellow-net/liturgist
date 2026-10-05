@@ -10,6 +10,11 @@ Liturgist is configured with environment variables. Every one is optional; the d
 | `LITURGIST_EXTRA_HOSTS` | empty | Other host names or IPs the server answers to, for example `192.168.1.10,gereja.local`. Any other `Host` gets a 421 error. |
 | `LITURGIST_TRUSTED_PROXIES` | empty | Addresses or ranges of the reverse proxy or tunnel in front of Liturgist, for example `127.0.0.1`. Only these may tell Liturgist a visitor's real IP address. Leave empty without a proxy. |
 | `LITURGIST_CLIENT_IP_HEADER` | empty | The header carrying the visitor's IP from a trusted proxy, for example `CF-Connecting-IP`. Empty means `X-Forwarded-For`. |
+| `LITURGIST_DOMAIN` | empty | A domain name: Liturgist gets a Let's Encrypt certificate and serves HTTPS itself ([https-builtin.md](https-builtin.md)). Ignores `LITURGIST_LISTEN`; `LITURGIST_BASE_URL` defaults to `https://<domain>`. |
+| `LITURGIST_ACME_EMAIL` | empty | Contact address for Let's Encrypt (with `LITURGIST_DOMAIN`). |
+| `LITURGIST_HTTP_PORT` | `80` | With `LITURGIST_DOMAIN`: the port for certificate checks and the redirect to HTTPS. |
+| `LITURGIST_HTTPS_PORT` | `443` | With `LITURGIST_DOMAIN`: the port the app is served on. |
+| `LITURGIST_ACME_CA` | Let's Encrypt | With `LITURGIST_DOMAIN`: another ACME server, for example Let's Encrypt's staging server for a trial. |
 | `LITURGIST_BACKUP_TIME` | `02:00` | Time of the daily automatic backup, in the church's time zone, or `off`. |
 | `LITURGIST_BACKUP_KEEP_DAILY` | `7` | Newest automatic backups kept (1 to 365). |
 | `LITURGIST_BACKUP_KEEP_WEEKLY` | `4` | Further weeks that keep one backup each (0 to 365; 0 keeps none). |
@@ -37,5 +42,5 @@ Change a variable, then restart the server.
 
 Liturgist logs a warning, and carries on, when:
 
-- it listens on the network, `LITURGIST_BASE_URL` starts with `http://` and no proxy is trusted: passwords can be read on the network. Put HTTPS in front of it ([Caddy](https-caddy.md), [nginx](https-nginx.md), [Cloudflare Tunnel](https-cloudflare-tunnel.md), [Tailscale](https-tailscale.md)).
+- it listens on the network, `LITURGIST_BASE_URL` starts with `http://` and no proxy is trusted: passwords can be read on the network. Put HTTPS in front of it ([built in](https-builtin.md), [Caddy](https-caddy.md), [nginx](https-nginx.md), [Cloudflare Tunnel](https-cloudflare-tunnel.md), [Tailscale](https-tailscale.md)).
 - `LITURGIST_BASE_URL` starts with `https://` but `LITURGIST_TRUSTED_PROXIES` is empty.

@@ -3168,7 +3168,7 @@ export interface components {
         };
         SystemStatusViewHTTPSStruct: {
             /** @enum {string} */
-            mode: "plain_http" | "behind_proxy";
+            mode: "plain_http" | "behind_proxy" | "built_in";
             /** @description reachable on the network over plain HTTP */
             plain_http_warning: boolean;
             /** @description BASE_URL says https but no trusted proxy is configured */

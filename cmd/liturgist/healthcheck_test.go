@@ -10,6 +10,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/brightfellow-net/liturgist/server"
 )
 
 func TestHealthURL(t *testing.T) {
@@ -20,7 +22,7 @@ func TestHealthURL(t *testing.T) {
 		"127.0.0.1:8080": "http://127.0.0.1:8080/healthz",
 		"10.0.0.5:80":    "http://10.0.0.5:80/healthz",
 	} {
-		if got := healthURL(listen); got != want {
+		if got := healthURL(server.Config{Listen: listen}); got != want {
 			t.Errorf("healthURL(%q) = %q, want %q", listen, got, want)
 		}
 	}
@@ -74,5 +76,12 @@ func TestHealthcheckBadConfig(t *testing.T) {
 	var errb bytes.Buffer
 	if code := healthcheck(envOf("nope"), &errb); code != exitError {
 		t.Fatalf("exit %d", code)
+	}
+}
+
+func TestHealthURLWithDomainUsesThePlainPort(t *testing.T) {
+	cfg := server.Config{Listen: ":8080", Domain: "liturgi.example.org", HTTPPort: 8081}
+	if got, want := healthURL(cfg), "http://127.0.0.1:8081/healthz"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
 	}
 }

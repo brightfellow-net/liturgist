@@ -1164,6 +1164,7 @@
     "https": "HTTPS",
     "https_plain_http": "HTTP biasa",
     "https_behind_proxy": "HTTPS lewat proxy",
+    "https_built_in": "HTTPS bawaan",
     "update": "Pembaruan",
     "update_off": "Pemeriksaan pembaruan mati.",
     "update_unknown": "Belum diperiksa.",

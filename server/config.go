@@ -42,6 +42,11 @@ type Config struct {
 	BackupKeepWeekly      int    // 0 = 4; set BackupKeepWeekly to -1 for none
 	SessionTTL            time.Duration
 	SessionMaxAge         time.Duration
+	Domain                string // built-in HTTPS for this domain (Let's Encrypt); "" = off (14 §19)
+	ACMEEmail             string // contact address for the certificate authority; optional
+	ACMECA                string // ACME directory URL; "" = Let's Encrypt production
+	HTTPPort              int    // with Domain: certificate challenges and the redirect; 0 = 80
+	HTTPSPort             int    // with Domain: the app; 0 = 443
 	TrustedProxies        []netip.Prefix
 	ClientIPHeader        string
 	Logger                *slog.Logger
@@ -62,6 +67,12 @@ func withDefaults(cfg Config) Config {
 	}
 	if cfg.BackupKeepWeekly == 0 {
 		cfg.BackupKeepWeekly = 4
+	}
+	if cfg.HTTPPort == 0 {
+		cfg.HTTPPort = 80
+	}
+	if cfg.HTTPSPort == 0 {
+		cfg.HTTPSPort = 443
 	}
 	if cfg.Logger == nil {
 		cfg.Logger = slog.New(slog.DiscardHandler)
@@ -85,6 +96,9 @@ func StartupWarnings(cfg Config) []string {
 // httpWarnings are the two conditions of StartupWarnings: reachable over
 // plain HTTP, and a BASE_URL that says https with no trusted proxy.
 func httpWarnings(cfg Config) (plainHTTP, proxyMissing bool) {
+	if cfg.Domain != "" {
+		return false, false
+	}
 	httpBase := cfg.BaseURL.Scheme == "http"
 	noProxies := len(cfg.TrustedProxies) == 0
 	return !isLoopbackListen(cfg.Listen) && httpBase && noProxies, !httpBase && noProxies

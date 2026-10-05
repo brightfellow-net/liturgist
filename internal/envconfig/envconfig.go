@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/netip"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -51,10 +52,19 @@ func Load(getenv func(string) string) (server.Config, LogOptions, error) {
 		fail("LITURGIST_LISTEN", "must be host:port: %v", err)
 	}
 
-	base, err := parseBaseURL(get("LITURGIST_BASE_URL", "http://localhost:8080"))
+	parseDomain(get, &cfg, fail)
+
+	baseDefault := "http://localhost:8080"
+	if cfg.Domain != "" {
+		baseDefault = "https://" + cfg.Domain
+	}
+	base, err := parseBaseURL(get("LITURGIST_BASE_URL", baseDefault))
 	if err != nil {
 		fail("LITURGIST_BASE_URL", "%v", err)
-		base, _ = url.Parse("http://localhost:8080")
+		base, _ = url.Parse(baseDefault)
+	}
+	if cfg.Domain != "" && (base.Scheme != "https" || strings.ToLower(base.Hostname()) != cfg.Domain || base.Port() != "") {
+		fail("LITURGIST_BASE_URL", "must be https://%s with LITURGIST_DOMAIN set", cfg.Domain)
 	}
 	cfg.BaseURL = base
 
@@ -87,6 +97,9 @@ func Load(getenv func(string) string) (server.Config, LogOptions, error) {
 		fail("LITURGIST_SESSION_MAX_AGE", "must be at least LITURGIST_SESSION_TTL")
 	}
 
+	if cfg.Domain != "" && get("LITURGIST_TRUSTED_PROXIES", "") != "" {
+		fail("LITURGIST_TRUSTED_PROXIES", "not used with LITURGIST_DOMAIN: Liturgist then serves the visitors itself")
+	}
 	for _, p := range splitList(get("LITURGIST_TRUSTED_PROXIES", "")) {
 		prefix, err := parsePrefix(p)
 		if err != nil {
@@ -104,6 +117,38 @@ func Load(getenv func(string) string) (server.Config, LogOptions, error) {
 		fail("LITURGIST_LOG_LEVEL", "must be debug, info, warn or error")
 	}
 	return cfg, logOpts, errors.Join(errs...)
+}
+
+var domainName = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
+
+// parseDomain reads the settings of built-in HTTPS (14 §19). Without
+// LITURGIST_DOMAIN the others are not read, and LITURGIST_LISTEN stays the
+// address (with a domain it is ignored, because the Docker image sets it).
+func parseDomain(get func(k, def string) string, cfg *server.Config, fail failFunc) {
+	d := strings.ToLower(get("LITURGIST_DOMAIN", ""))
+	if d == "" {
+		return
+	}
+	if _, err := netip.ParseAddr(d); err == nil || !domainName.MatchString(d) || d == "localhost" {
+		fail("LITURGIST_DOMAIN", "must be a domain name such as liturgi.example.org (no https://, port or path)")
+		return
+	}
+	cfg.Domain = d
+	cfg.ACMEEmail = get("LITURGIST_ACME_EMAIL", "")
+	cfg.ACMECA = get("LITURGIST_ACME_CA", "")
+	port := func(key, def string) int {
+		n, err := strconv.Atoi(get(key, def))
+		if err != nil || n < 1 || n > 65535 {
+			fail(key, "must be a port number from 1 to 65535")
+			return 0
+		}
+		return n
+	}
+	cfg.HTTPPort = port("LITURGIST_HTTP_PORT", "80")
+	cfg.HTTPSPort = port("LITURGIST_HTTPS_PORT", "443")
+	if cfg.HTTPPort != 0 && cfg.HTTPPort == cfg.HTTPSPort {
+		fail("LITURGIST_HTTPS_PORT", "must differ from LITURGIST_HTTP_PORT")
+	}
 }
 
 func parseBaseURL(s string) (*url.URL, error) {

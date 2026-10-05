@@ -47,7 +47,7 @@ type SystemFacts struct {
 	}
 	EmailConfigured bool
 	HTTPS           struct {
-		Mode                string // "plain_http" | "behind_proxy"
+		Mode                string // "plain_http" | "behind_proxy" | "built_in"
 		PlainHTTPWarning    bool
 		ProxyMissingWarning bool
 	}

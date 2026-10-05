@@ -105,6 +105,8 @@ type Server struct {
 	single   *tenancy.SingleChurch // nil when the SaaS supplies a resolver
 	urls     app.URLBuilder
 	uc       useCases
+
+	tlsSource tlsSource // nil = certmagic; tests replace it
 }
 
 // useCases are the wired application use cases.
@@ -271,17 +273,14 @@ func (s *Server) Run(ctx context.Context) error {
 		go s.updates.run(ctx)
 	}
 
-	srv := &http.Server{
-		Addr:              s.cfg.Listen,
-		Handler:           s.handler,
-		ReadHeaderTimeout: 10 * time.Second,
-		// Requests keep ctx's values but not its cancellation: on SIGTERM,
-		// requests in flight must finish (IT-F-004), within Shutdown's limit.
-		BaseContext: func(net.Listener) context.Context { return context.WithoutCancel(ctx) },
+	listeners, err := s.listeners(ctx)
+	if err != nil {
+		return err
 	}
-	errc := make(chan error, 1)
-	go func() { errc <- srv.ListenAndServe() }()
-	s.cfg.Logger.Info("listening", "addr", s.cfg.Listen, "version", Version)
+	errc := make(chan error, len(listeners))
+	for _, l := range listeners {
+		go func() { errc <- l.serve() }()
+	}
 
 	select {
 	case err := <-errc:
@@ -290,13 +289,46 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
 	defer cancel()
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		return fmt.Errorf("shutdown: %w", err)
+	for _, l := range listeners {
+		if err := l.srv.Shutdown(shutdownCtx); err != nil {
+			return fmt.Errorf("shutdown: %w", err)
+		}
 	}
-	if err := <-errc; !errors.Is(err, http.ErrServerClosed) {
-		return err
+	for range listeners {
+		if err := <-errc; !errors.Is(err, http.ErrServerClosed) {
+			return err
+		}
 	}
 	return nil
+}
+
+// listener is one HTTP or HTTPS server of Run.
+type listener struct {
+	srv   *http.Server
+	serve func() error
+}
+
+// newHTTPServer is a server with the timeouts of Run. Requests keep ctx's
+// values but not its cancellation: on SIGTERM, requests in flight must finish
+// (IT-F-004), within Shutdown's limit.
+func newHTTPServer(ctx context.Context, addr string, h http.Handler) *http.Server {
+	return &http.Server{
+		Addr:              addr,
+		Handler:           h,
+		ReadHeaderTimeout: 10 * time.Second,
+		BaseContext:       func(net.Listener) context.Context { return context.WithoutCancel(ctx) },
+	}
+}
+
+// listeners starts what Run serves: one plain server on Listen, or with a
+// Domain the HTTPS server and the port-80 server (14 §19).
+func (s *Server) listeners(ctx context.Context) ([]listener, error) {
+	if s.cfg.Domain == "" {
+		srv := newHTTPServer(ctx, s.cfg.Listen, s.handler)
+		s.cfg.Logger.Info("listening", "addr", s.cfg.Listen, "version", Version)
+		return []listener{{srv, srv.ListenAndServe}}, nil
+	}
+	return s.builtInHTTPS(ctx)
 }
 
 // announceSetup issues a new setup token when no church exists and prints

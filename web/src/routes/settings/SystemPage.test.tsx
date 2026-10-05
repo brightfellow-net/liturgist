@@ -63,6 +63,15 @@ describe("SystemPage (IT-605)", () => {
     ]);
   });
 
+  it.each([
+    ["plain_http", "Plain HTTP"],
+    ["behind_proxy", "HTTPS through a proxy"],
+    ["built_in", "Built-in HTTPS"],
+  ] as const)("names the way HTTPS is provided: %s", async (mode, text) => {
+    show(systemStatus({ https: { mode, plain_http_warning: false, proxy_missing_warning: false } }));
+    expect(await screen.findByText(text)).toBeInTheDocument();
+  });
+
   it("has no download with PostgreSQL", async () => {
     show(systemStatus({ database: { driver: "postgres", size_bytes: 1, schema_version: 14 }, backup: { supported: false, scheduled: false, last_at: null, last_kind: "", last_copied_at: null, warning: "" } }));
     expect(await screen.findByText("Backups of PostgreSQL are made with pg_dump; see the backup guide.")).toBeInTheDocument();

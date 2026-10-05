@@ -51,7 +51,7 @@ The same `sudo -u liturgist env LITURGIST_DATA_DIR=/var/lib/liturgist …` prefi
 
 ## 5. HTTPS
 
-The server listens on `127.0.0.1:8080` only. Put one of these in front: [Caddy](https-caddy.md) (simplest), [nginx](https-nginx.md), [Cloudflare Tunnel](https-cloudflare-tunnel.md) or [Tailscale](https-tailscale.md).
+The server listens on `127.0.0.1:8080` only. Either let it serve HTTPS itself ([built-in HTTPS](https-builtin.md)), or put one of these in front: [Caddy](https-caddy.md) (simplest), [nginx](https-nginx.md), [Cloudflare Tunnel](https-cloudflare-tunnel.md) or [Tailscale](https-tailscale.md).
 
 ## 6. Backups
 

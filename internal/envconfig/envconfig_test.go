@@ -158,3 +158,57 @@ func TestUpdateCheckSetting(t *testing.T) {
 		t.Errorf("maybe: %v", err)
 	}
 }
+
+func TestDomainTurnsOnBuiltInHTTPS(t *testing.T) {
+	cfg, _, err := Load(env(map[string]string{
+		"LITURGIST_DOMAIN": "Liturgi.Example.org", "LITURGIST_ACME_EMAIL": "ops@example.org",
+		"LITURGIST_LISTEN": ":8080", // the Docker image sets this; it is ignored
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Domain != "liturgi.example.org" || cfg.BaseURL.String() != "https://liturgi.example.org" ||
+		cfg.HTTPPort != 80 || cfg.HTTPSPort != 443 || cfg.ACMEEmail != "ops@example.org" || cfg.ACMECA != "" {
+		t.Fatalf("%+v", cfg)
+	}
+}
+
+func TestDomainOff(t *testing.T) {
+	cfg, _, err := Load(env(map[string]string{"LITURGIST_HTTP_PORT": "bad"}))
+	if err != nil || cfg.Domain != "" || cfg.HTTPPort != 0 {
+		t.Fatalf("%+v, %v", cfg, err)
+	}
+}
+
+func TestDomainRejects(t *testing.T) {
+	d := "liturgi.example.org"
+	for name, m := range map[string]map[string]string{
+		"scheme":         {"LITURGIST_DOMAIN": "https://" + d},
+		"port":           {"LITURGIST_DOMAIN": d + ":443"},
+		"path":           {"LITURGIST_DOMAIN": d + "/x"},
+		"address":        {"LITURGIST_DOMAIN": "192.168.1.5"},
+		"ipv6":           {"LITURGIST_DOMAIN": "::1"},
+		"localhost":      {"LITURGIST_DOMAIN": "localhost"},
+		"one label":      {"LITURGIST_DOMAIN": "church"},
+		"base http":      {"LITURGIST_DOMAIN": d, "LITURGIST_BASE_URL": "http://" + d},
+		"base other":     {"LITURGIST_DOMAIN": d, "LITURGIST_BASE_URL": "https://other.example.org"},
+		"base port":      {"LITURGIST_DOMAIN": d, "LITURGIST_BASE_URL": "https://" + d + ":8443"},
+		"proxies":        {"LITURGIST_DOMAIN": d, "LITURGIST_TRUSTED_PROXIES": "127.0.0.1"},
+		"bad http port":  {"LITURGIST_DOMAIN": d, "LITURGIST_HTTP_PORT": "0"},
+		"bad https port": {"LITURGIST_DOMAIN": d, "LITURGIST_HTTPS_PORT": "70000"},
+		"same ports":     {"LITURGIST_DOMAIN": d, "LITURGIST_HTTP_PORT": "8000", "LITURGIST_HTTPS_PORT": "8000"},
+	} {
+		if _, _, err := Load(env(m)); err == nil {
+			t.Errorf("%s accepted", name)
+		}
+	}
+}
+
+func TestDomainAcceptsMatchingBaseURL(t *testing.T) {
+	_, _, err := Load(env(map[string]string{
+		"LITURGIST_DOMAIN": "liturgi.example.org", "LITURGIST_BASE_URL": "https://liturgi.example.org/",
+		"LITURGIST_HTTP_PORT": "8080", "LITURGIST_HTTPS_PORT": "8443"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+}

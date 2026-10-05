@@ -143,6 +143,9 @@ func (s *systemInfo) Facts(ctx context.Context, church domain.Church) (app.Syste
 	if s.cfg.BaseURL.Scheme == "http" {
 		f.HTTPS.Mode = "plain_http"
 	}
+	if s.cfg.Domain != "" {
+		f.HTTPS.Mode = "built_in"
+	}
 	if s.updates != nil {
 		f.Update.Enabled = true
 		f.Update.Latest = s.updates.Latest()

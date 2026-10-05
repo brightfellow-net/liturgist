@@ -1177,6 +1177,7 @@
     "https": "HTTPS",
     "https_plain_http": "Plain HTTP",
     "https_behind_proxy": "HTTPS through a proxy",
+    "https_built_in": "Built-in HTTPS",
     "update": "Updates",
     "update_off": "The update check is off.",
     "update_unknown": "Not checked yet.",
