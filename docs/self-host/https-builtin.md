@@ -20,7 +20,7 @@ LITURGIST_ACME_EMAIL=you@example.org
 
 `LITURGIST_ACME_EMAIL` is optional; Let's Encrypt uses it only to warn you if a certificate is about to expire without renewing. **`LITURGIST_ACME_AGREE=true` says that you have read and accept the [Let's Encrypt subscriber agreement](https://letsencrypt.org/repository/)** (or that of the other certificate authority you chose); with a domain, Liturgist does not start without it. `LITURGIST_BASE_URL` becomes `https://liturgi.example.org` by itself; if you set it, it must be exactly that. `LITURGIST_LISTEN` is ignored, and `LITURGIST_TRUSTED_PROXIES` must stay empty.
 
-The first start takes up to a minute while the certificate is fetched; the browser shows an error until it is ready. The log says what happens (lines starting with a number are from the certificate library). Certificates renew by themselves and are kept in `data/certs`. They are **not** in backups, because they can be fetched again.
+The first start takes up to a minute while the certificate is fetched; the browser shows an error until it is ready. The log says what happens (the lines of the certificate library carry `source=certmagic` and follow `LITURGIST_LOG_LEVEL` and `LITURGIST_LOG_FORMAT` like the rest). Certificates renew by themselves and are kept in `data/certs`. They are **not** in backups, because they can be fetched again.
 
 Port 80 only redirects to HTTPS (and answers Let's Encrypt and the health check).
 

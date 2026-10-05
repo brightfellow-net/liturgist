@@ -14,6 +14,9 @@ import (
 	"strconv"
 
 	"github.com/caddyserver/certmagic"
+	"go.uber.org/zap"
+
+	"github.com/brightfellow-net/liturgist/internal/logging"
 )
 
 // tlsSource gives the TLS settings of the built-in HTTPS and the wrapper that
@@ -70,9 +73,22 @@ func (s *Server) acmeTLS(ctx context.Context) (*tls.Config, func(http.Handler) h
 	if !s.cfg.ACMEAgreed {
 		return nil, nil, errors.New("LITURGIST_ACME_AGREE must be true: accept the certificate authority's subscriber agreement")
 	}
-	magic := certmagic.NewDefault()
-	magic.Storage = &certmagic.FileStorage{Path: filepath.Join(s.cfg.DataDir, "certs")}
+	// Our own cache and config: certmagic's default cache renews with a fresh
+	// default config (default storage, no agreement), not with this one. Its
+	// zap log goes through the app log.
+	zl := zap.New(logging.ZapCore(s.cfg.Logger, "certmagic"))
+	var magic *certmagic.Config
+	cache := certmagic.NewCache(certmagic.CacheOptions{
+		GetConfigForCert: func(certmagic.Certificate) (*certmagic.Config, error) { return magic, nil },
+		Logger:           zl,
+	})
+	go func() { <-ctx.Done(); cache.Stop() }()
+	magic = certmagic.New(cache, certmagic.Config{
+		Storage: &certmagic.FileStorage{Path: filepath.Join(s.cfg.DataDir, "certs")},
+		Logger:  zl,
+	})
 	acme := certmagic.DefaultACME
+	acme.Logger = zl
 	acme.Agreed = true // checked above: the operator set LITURGIST_ACME_AGREE
 	acme.Email = s.cfg.ACMEEmail
 	if s.cfg.ACMECA != "" {
