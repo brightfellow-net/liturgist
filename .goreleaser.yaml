@@ -1,0 +1,54 @@
+# Run by .github/workflows/release.yml on a v* tag, after "make web".
+# The Docker image is built there from the Dockerfile.
+version: 2
+project_name: liturgist
+
+builds:
+  - id: linux
+    main: ./cmd/liturgist
+    binary: liturgist
+    env: [CGO_ENABLED=0]
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: &ldflags
+      - -s -w
+      - -X github.com/brightfellow-net/liturgist/server.Version={{ .Version }}
+      - -X github.com/brightfellow-net/liturgist/server.Commit={{ .ShortCommit }}
+      - -X github.com/brightfellow-net/liturgist/server.BuildDate={{ .Date }}
+  - id: windows
+    main: ./cmd/liturgist
+    binary: liturgist
+    env: [CGO_ENABLED=0]
+    goos: [windows]
+    goarch: [amd64]
+    flags: [-trimpath]
+    ldflags: *ldflags
+
+archives:
+  - id: linux
+    ids: [linux]
+    formats: [tar.gz]
+    name_template: "liturgist_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+      - src: deploy/liturgist.service
+        strip_parent: true
+  - id: windows
+    ids: [windows]
+    formats: [zip]
+    name_template: "liturgist_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  disable: true
+
+release:
+  # The notes are the CHANGELOG.md section of this version (see the workflow).
+  prerelease: auto

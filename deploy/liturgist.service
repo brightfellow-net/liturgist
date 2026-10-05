@@ -1,0 +1,38 @@
+# Install: see docs/self-host/install-linux.md
+#   sudo useradd --system --home /var/lib/liturgist --shell /usr/sbin/nologin liturgist
+#   sudo install -m 0755 liturgist /usr/local/bin/liturgist
+#   sudo install -m 0644 deploy/liturgist.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now liturgist
+# Settings go in /etc/liturgist/liturgist.env (KEY=VALUE lines, optional).
+[Unit]
+Description=Liturgist
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=liturgist
+Group=liturgist
+StateDirectory=liturgist
+Environment=LITURGIST_DATA_DIR=/var/lib/liturgist
+EnvironmentFile=-/etc/liturgist/liturgist.env
+ExecStart=/usr/local/bin/liturgist serve
+Restart=on-failure
+RestartSec=5
+# Allow time for a running backup to finish before systemd kills the server.
+TimeoutStopSec=60
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/liturgist
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

@@ -4,3 +4,4 @@ bin/
 node_modules/
 web/test-results/
 web/playwright-report/
+dist/

@@ -1,0 +1,10 @@
+.git
+.claude
+bin
+data
+node_modules
+**/node_modules
+web/dist
+web/test-results
+web/playwright-report
+docs

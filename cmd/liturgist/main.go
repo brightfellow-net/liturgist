@@ -54,6 +54,8 @@ commands:
   search reindex                         rebuild the song search index
   backup [file]                          write one archive of the database and files (SQLite)
   restore <file> [--yes]                 replace the data with a backup; the server must be stopped
+  healthcheck                            exit 0 if the running server answers /healthz (for Docker)
+  service install|uninstall|start|stop   Windows only: manage the Windows service
   openapi                                print the OpenAPI document
   version                                print version information`
 
@@ -89,6 +91,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return backupCmd(args[1:], stdout, stderr)
 	case args[0] == "restore":
 		return restoreCmd(args[1:], stdin, stdout, stderr)
+	case args[0] == "healthcheck":
+		return healthcheck(os.Getenv, stderr)
+	case args[0] == "service":
+		return serviceCmd(args[1:], stdout, stderr)
 	case args[0] == "openapi":
 		doc, err := server.OpenAPI()
 		if err != nil {
@@ -162,6 +168,13 @@ func serve(args []string, stdout, stderr io.Writer) int {
 	if !ok {
 		return exitConfig
 	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return serveUntil(ctx, cfg, stderr)
+}
+
+// serveUntil runs the server until ctx ends. The Windows service calls it too.
+func serveUntil(ctx context.Context, cfg server.Config, stderr io.Writer) int {
 	cfg.Notices = stderr
 	release, err := server.LockRun(cfg)
 	if err != nil {
@@ -170,8 +183,6 @@ func serve(args []string, stdout, stderr io.Writer) int {
 		return exitError
 	}
 	defer release()
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	srv, err := server.New(ctx, cfg)
 	if err != nil {
