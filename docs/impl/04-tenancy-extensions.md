@@ -96,7 +96,7 @@ type URLBuilder interface {
 | `POST /api/v1/me/password` | session | see [03 §9](03-identity-auth.md#9-password-reset) | 204 |
 | `POST /api/v1/me/sessions/end-others` | session | — | 204 ([03 §4](03-identity-auth.md#4-sessions)) |
 | `GET /api/v1/church` | baseline | — | church + `actions` |
-| `PATCH /api/v1/church` | `church.settings` | `{ name?, default_ui_language?, default_language?, default_translation_code?, time_zone?, key_display?, feedback_url?, privacy_contact? }` | church |
+| `PATCH /api/v1/church` | `church.settings` | `{ name?, default_ui_language?, default_language?, default_translation_code?, time_zone?, key_display?, feedback_url?, privacy_contact?, show_credits?, licence_footer?, print? }` (the last three from step 5, [13 §6](13-publishing.md#6-print-view-p-81): `licence_footer` may be the empty string; `print` is a complete object; the update takes `LockChurch`) | church |
 | `GET /api/v1/members` | `members.view` | — | `{ members: [...], usage: { team_members: { used, max \| null } } }` |
 | `PATCH /api/v1/members/{membershipId}` | `roles.manage` | `{ role_ids: [...] }` | member |
 | `DELETE /api/v1/members/{membershipId}` | `members.manage` | — | 204 |

@@ -541,9 +541,23 @@ Written by slice 3D, from the second review of the undo rules ([11 §7.2](../imp
 
 `id` (PK `liturgy_comments_pkey`), `church_id`, `liturgy_id` (FK (`church_id`, `liturgy_id`) → `liturgies` ON DELETE CASCADE `liturgy_comments_liturgy_fkey`), `item_id` (nullable; **no foreign key**: a comment outlives its removed item, [12 §4](../impl/12-review.md#4-comments-p-72); checked by the app on create), `item_title` (text, empty for the whole liturgy), `author_id` (FK → `users(id)` ON DELETE RESTRICT `liturgy_comments_author_fkey`), `body` (text; 1–2000 **(app)**), `resolved_at`, `resolved_by` (nullable; `CHECK ((resolved_at IS NULL) = (resolved_by IS NULL))` `liturgy_comments_resolved_check`; `resolved_by` FK → `users(id)` ON DELETE RESTRICT `liturgy_comments_resolved_by_fkey`), `created_at`. `UNIQUE liturgy_comments_church_id_key` (`church_id`, `id`). Index `liturgy_comments_church_liturgy_idx` (`church_id`, `liturgy_id`, `created_at`, `id`) (serves every listing, resolved or not); partial index `liturgy_comments_church_open_idx` (`church_id`, `liturgy_id`) `WHERE resolved_at IS NULL`.
 
+## Step 5 tables
+
+> Status: **Approved** 2026-10-05, with [13-publishing.md](../impl/13-publishing.md). One migration after `00009_comments.sql`, in both dialect folders: `00010_published.sql` (`published_versions`, `published_assignees`). Conventions as for step 3.
+
+### published_versions
+
+`id` (PK `published_versions_pkey`), `church_id`, `liturgy_id` (FK (`church_id`, `liturgy_id`) → `liturgies` **ON DELETE NO ACTION** `published_versions_liturgy_fkey`: a liturgy that has a version cannot be deleted, [13 §2](../impl/13-publishing.md#2-publishing-p-75); `NO ACTION` rather than `RESTRICT` so that deleting a whole church still cascades), `number` (int, `CHECK (number >= 1)` `published_versions_number_check`), `content` (text holding JSON, format 1; 2–4194304 bytes measured on the stored bytes **(app)**), `published_by` (FK → `users(id)` ON DELETE RESTRICT `published_versions_user_fkey`), `published_at`. `UNIQUE published_versions_liturgy_number_key` (`church_id`, `liturgy_id`, `number`) — church-leading, serves "latest" (`ORDER BY number DESC LIMIT 1`); `UNIQUE published_versions_church_id_key` (`church_id`, `id`). Rows are never updated.
+
+### published_assignees
+
+`church_id`, `version_id` (FK (`church_id`, `version_id`) → `published_versions(church_id, id)` ON DELETE CASCADE `published_assignees_version_fkey`), `user_id` (FK → `users(id)` ON DELETE RESTRICT `published_assignees_user_fkey`). PK `published_assignees_pkey` (`church_id`, `version_id`, `user_id`). Index `published_assignees_church_user_idx` (`church_id`, `user_id`, `version_id`) — serves "my assignments". Written with the version in the same transaction, never updated; repeats `assignments[].user_id` of the version's content.
+
+`churches.settings` gains the keys `show_credits`, `licence_footer` and `print` ([13 §6](../impl/13-publishing.md#6-print-view-p-81)); no column change.
+
 ## Later steps
 
-Tables for comments, state changes and published versions are added in the steps that build them, following [SPEC.md §7](../SPEC.md#7-data-model-sketch) and the conventions above.
+Tables for later steps are added in the steps that build them, following [SPEC.md §7](../SPEC.md#7-data-model-sketch) and the conventions above.
 
 ## References
 
