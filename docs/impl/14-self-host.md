@@ -42,7 +42,7 @@ Checked against the code on 2026-10-05 (`main` at `172bab6`).
 | H-4 | **Retention** `LITURGIST_BACKUP_KEEP_DAILY=7`, `LITURGIST_BACKUP_KEEP_WEEKLY=4`: keep the newest 7 automatic backups, plus the newest one of each of the 4 ISO weeks before them. Only `backups/auto-*.zip` is ever pruned; manual, `pre-upgrade-*` and `pre-restore-*` files are never touched by this | numbers |
 | H-5 | **"Last backup" warning** on the system page and as a banner for church admins when the newest backup of any kind is over 48 hours old, **or** no backup was downloaded or written by `liturgist backup` to another path in 30 days (a copy on the same disk does not survive the disk) | thresholds |
 | H-6 | **Disk-space warning** below 1 GiB free or 5% free, whichever is larger. A backup or pre-upgrade copy needs `1.2 ×` the database size plus the size of `files/` free, else it is skipped with a warning (a manual `backup` refuses with exit 1) | numbers |
-| H-7 | **Built-in HTTPS (`certmagic`) is deferred** to slice 6F, after the pilot. It is a large new dependency and the pilot runs behind Caddy or a tunnel (guides in 6E). Needs your approval of the dependency when 6F starts | defer / build now |
+| H-7 | **Decided 2026-10-05: build now** (owner approved the `certmagic` dependency when 6F started). Original proposal: **Built-in HTTPS (`certmagic`) is deferred** to slice 6F, after the pilot. It is a large new dependency and the pilot runs behind Caddy or a tunnel (guides in 6E). Needs your approval of the dependency when 6F starts | defer / build now |
 | H-8 | **System routes exist only in the single-church (community) tenancy.** The hosted edition does not register them, and `TestTenancyDeclarations` names each as community-only | yes / no |
 | H-9 | **Gate** for the system page and the download is `church.settings` ([domain/scope.go](../../domain/scope.go)), held by the Church admin role | scope |
 | H-10 | **Windows service** with `golang.org/x/sys/windows/svc` (`x/sys` is already in `go.mod`): `liturgist service install\|uninstall\|start\|stop`. No new module | yes / defer |
@@ -127,7 +127,7 @@ Runs with the server stopped (H-2). Order, each step before the next:
 | **6C** (**merged** 2026-10-05, [§16](#16-slice-6c-as-built-2026-10-05)) | System routes, system page, banners, download | H-5, H-8, H-9, H-14 (+ H-13 if built) |
 | **6D** (**merged** 2026-10-05, [§17](#17-slice-6d-as-built-2026-10-05)) | Dockerfile, GoReleaser, release workflow, systemd unit, Windows service, `healthcheck` | H-10, H-11, H-12 |
 | **6E** (**merged** 2026-10-05, [§18](#18-slice-6e-as-built-2026-10-05)) | The rest of the guides and the README | none |
-| **6F** | Built-in HTTPS with `certmagic` (deferred) | H-7 |
+| **6F** (**merged** 2026-10-05, [§19](#19-slice-6f-as-built-2026-10-05)) | Built-in HTTPS with `certmagic` (deferred) | H-7 |
 
 Each slice is drafted in a worktree, shown to the owner with its deviations, and merged only on explicit approval. A docs commit with the as-built notes follows each, as in step 5.
 
@@ -273,3 +273,19 @@ Deviations from §8:
 | Every guide's commands run on a clean machine | Run: the README Docker quick start, the Compose file (`config`), the Caddy and nginx proxy settings (against a live server), the Linux `serve`/`setup-link` output, link and anchor check. **Not run:** Windows, Cloudflare Tunnel, Tailscale, certbot, rclone, cosign verification, systemd. The Windows, Cloudflare and Tailscale guides say so at the top |
 
 Open points found while writing: `liturgist.exe` run by hand does not read `liturgist.env` (the guide sets `LITURGIST_DATA_DIR` first); behind Docker a proxy on the same host appears as Docker's gateway address, so the guide tells the reader to trust that range, unconfirmed on a real setup; the System page's "not taken away" warning cannot see rclone copies.
+
+## 19. Slice 6F as built (2026-10-05)
+
+Merged to `main` as `edb4182`. Code: `server/https.go` (`builtInHTTPS`, `redirectToHTTPS`, `acmeTLS`), `Run` now starts a list of listeners (`server/server.go`), `parseDomain` in `internal/envconfig`, `healthURL(cfg)`, HTTPS mode `built_in` on the system page. Guide: [https-builtin.md](../self-host/https-builtin.md).
+
+| Item | As built |
+|---|---|
+| Settings | `LITURGIST_DOMAIN` (turns it on), `LITURGIST_ACME_EMAIL`, `LITURGIST_HTTP_PORT` (80), `LITURGIST_HTTPS_PORT` (443), `LITURGIST_ACME_CA` (default Let's Encrypt production) |
+| With a domain | `LITURGIST_LISTEN` is ignored (the Docker image sets it); `LITURGIST_BASE_URL` defaults to `https://<domain>` and must equal it if set; `LITURGIST_TRUSTED_PROXIES` is a configuration error; no start-up warnings |
+| Listeners | HTTPS (app) on the HTTPS port; the plain port answers ACME HTTP-01, `/healthz`, `/readyz` and 308-redirects the rest. The TLS-ALPN challenge is answered on the HTTPS port. `AltHTTPPort`/`AltTLSALPNPort` are set to the configured ports so certmagic starts no listener of its own |
+| Certificates | `<data>/certs` (certmagic file storage); not in backups (a test checks it) |
+| Agreement | Setting the domain counts as accepting the CA's subscriber agreement (`Agreed = true`); the guide says so |
+| Health check | uses the plain port, no certificate needed |
+| Dependency | `certmagic` v0.25.6 with 9 new modules (zerossl, cpuid, libdns, acmez, miekg/dns, blake3, zap, zap/exp) and `golang.org/x/net` v0.58 to v0.59; the binary grows about 1.8 MB (29.4 to 31.2 MB) |
+
+Verified: a run against a Pebble test ACME server (certificate issued, HTTP/2 served, 308 redirect, `/healthz`, healthcheck, reuse after restart); Docker non-root binds 80 and 443 and is healthy; server tests with an injected self-signed certificate; seven mutations caught. **Not verified:** issuance from real Let's Encrypt, the systemd `AmbientCapabilities=CAP_NET_BIND_SERVICE` drop-in, the Windows service on ports 80 and 443. The certificate library logs in its own format next to the app log.
