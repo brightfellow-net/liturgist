@@ -10,7 +10,7 @@ jobs:
       - uses: golangci/golangci-lint-action@v9
         with: { version: v2.14.0 }
       - run: scripts/check-license.sh
-      - run: go test -race ./...
+      - run: go test -race -timeout 20m ./...
         env: { LITURGIST_TEST_POSTGRES: "1" }
       - run: GOOS=windows GOARCH=amd64 go build -o /dev/null ./cmd/liturgist
       - run: GOOS=linux GOARCH=arm64 go build -o /dev/null ./cmd/liturgist

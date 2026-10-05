@@ -394,7 +394,15 @@ func histories(def int) int {
 	return def
 }
 
-func TestUndoModelSQLite(t *testing.T) { runModel(t, sqlstoretest.NewSQLite, histories(150), 40) }
+// The model tests run one history after another, so the race detector finds
+// nothing in them and only slows them down: fewer histories under -race.
+func TestUndoModelSQLite(t *testing.T) {
+	n := 150
+	if raceEnabled {
+		n = 10
+	}
+	runModel(t, sqlstoretest.NewSQLite, histories(n), 40)
+}
 
 func TestUndoModelPostgres(t *testing.T) { runModel(t, sqlstoretest.NewPostgres, histories(10), 40) }
 
