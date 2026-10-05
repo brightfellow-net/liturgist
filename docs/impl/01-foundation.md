@@ -63,7 +63,7 @@ docs/                     SPEC, PILOT, impl/, reference/
 | `server` | everything above | `cmd/...` |
 | `cmd/liturgist` | `server`, `internal/...` | `app`, `domain`, `adapters` directly |
 
-The `cmd` rule skips test files (a test may open a real database through `adapters/sqlstore`). Install the linter with the version CI pins (`go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0`); a v1 binary cannot read `.golangci.yml`. `go test -race ./app/` takes longer than Go's default 10 minute timeout on a slow machine because of `TestUndoModelSQLite`; pass `-timeout 30m`.
+The `cmd` rule skips test files (a test may open a real database through `adapters/sqlstore`). Install the linter with the version CI pins (`go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0`); a v1 binary cannot read `.golangci.yml`. Under `-race`, `TestUndoModelSQLite` runs 10 histories instead of 150 (the race detector finds nothing in a sequential test), and CI passes `-timeout 20m`; `go test -race ./app/` with PostgreSQL still takes about 7 minutes.
 
 ## 4. Build and generated files
 
