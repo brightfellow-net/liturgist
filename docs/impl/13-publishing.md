@@ -247,6 +247,23 @@ Merged as `d7cae7c`. Differences and additions to the text above:
 - **Tests.** TC `TestChurchPrintSettings`; `TestPrintSettings` (render, footer at publish, replace, clear, refusal, scope); IT-P-016 `TestPrintSettingsHTTP`; WT-P-004 (`PrintPage.test.tsx`), WT-P-005 (settings page); E2E-W-018. Showing credits on the musician sheet, ignoring `show_credits`, not copying the footer, and skipping the print validation each fails a test. Go on both dialects; Vitest 252; Playwright 38.
 - **Not run:** golangci-lint (the v1/v2 config mismatch of step 3 still stands). The Indonesian texts of the Printing section, the sheets and the options are drafts for the owner.
 
+### 11.5 Slice 5D as built (2026-10-05)
+
+Merged as `05e8261`. Differences and additions to §7:
+
+- **No Workbox.** The service worker is hand-written (`web/sw/sw.js`, about 140 lines) to avoid new dependencies. A Vite plugin (`serviceWorker` in `vite.config.ts`) fills in the build id (a hash of the built file names) and the precache list, and emits `dist/sw.js`. It is registered only in production builds (`lib/offline.ts`). The Go server serves `/sw.js`, `/manifest.webmanifest` and the two icons at the root with `Cache-Control: no-cache`; a missing one is a 404, not the index page.
+- **Caches.** `shell-<build>` (cache first, plus the index page as the offline fallback for navigation) and `pub-<build>` (network first, 4 s timeout). Only `GET …/api/v1/liturgies/{id}/published` and `…/api/v1/me/assignments` without a query string are kept. The cache is opened only when an answer is stored, so a clear in between cannot be undone by a late answer.
+- **Five liturgies.** The limit of 5 counts liturgies only; "my assignments" does not take a slot [Q-5.4]. A liturgy read again becomes the newest.
+- **Clearing.** `clearOffline()` removes the marker, tells the worker (it bumps its generation and deletes `pub-*`), and deletes `pub-*` itself. **The shell cache stays**, since it holds only public files and the login page must open offline afterwards. It runs first at logout (also on the invite page), on a 401, and when `/me` shows a user other than the marker. A failing logout call is now ignored: offline, the server session stays until it expires (accepted; no queued logout).
+- **Offline notice.** `lib/offline.ts` records the paths whose last answer carried `X-From-Cache: 1` (an `openapi-fetch` middleware); `OfflineNotice` shows it on the published view (with `published_at`) and on Home (without a date).
+- **Opening offline.** When `GET /me` fails with a network error and the marker exists, `AppLayout` shows `OfflineFrame`: only "My assignments", the saved views they link to, and Log out. Reads are not retried while `navigator.onLine` is false.
+- **Reading mode.** `?read=1` on `/published/:id` (`isReadingMode`); `AppLayout` drops the header and footer. The viewer's items (duty in `assignments[]` with their user ID) show "Your part" and a bar; "Go to my part" focuses the first. `KeepScreenOn` is a switch, hidden without the Wake Lock API.
+- **Manifest and icons.** `web/public/manifest.webmanifest` and two placeholder icons (a white cross on blue) for the owner to replace. `index.html` links them.
+- **Privacy.** The page gains "Phone numbers" and "Saved on your phone". The first already says approvers see numbers, which is true only once 5E is built.
+- **Not built.** The church path prefix: the worker matches `/api/v1/…` at the root, and the "church path changes" clear is left for the SaaS step, as no prefix exists yet.
+- **Tests.** WT-P-005 (`Reading.test.tsx`), WT-P-007 (`sw.test.ts` runs the worker with a fake cache; `Offline.test.tsx` for the client, logout and the offline frame), `TestFrontendBuilt` (root files), E2E-W-019. Dropping `X-From-Cache`, the trim, the clear, the route filter or the generation check each fails a test. Go on SQLite (no database change); Vitest 275; Playwright 39.
+- **Not run:** golangci-lint. The Indonesian texts are drafts for the owner.
+
 ## 12. Anti-patterns (DO NOT)
 
 | ❌ Don't | ✅ Do instead | Why |
@@ -309,7 +326,7 @@ Merged as `d7cae7c`. Differences and additions to the text above:
 | WT-P-008 | i18n and accessibility | Every string through `publish.*` keys in `en` and `id` (Indonesian is a draft for the owner's review); live regions |
 
 ### End-to-end (Playwright)
-E2E-W-017: the liturgist publishes an approved liturgy, a team member (no scope) opens "My assignments" and the published view, prints with the musician variant, opens reading mode; the liturgist reopens, republishes and sees the change summary; the team member sees the old version marked "being revised" in between and gets 404 on the editable liturgy's URL; axe passes on each page. E2E-W-018 (5D): offline reload of the published view from the cache; logout clears it.
+E2E-W-017: the liturgist publishes an approved liturgy, a team member (no scope) opens "My assignments" and the published view, prints with the musician variant, opens reading mode; the liturgist reopens, republishes and sees the change summary; the team member sees the old version marked "being revised" in between and gets 404 on the editable liturgy's URL; axe passes on each page. E2E-W-019 (5D; E2E-W-018 is the print test of 5C): reading mode, then offline reload of the published view from the cache; logout clears it.
 
 ## 14. Error handling matrix
 
