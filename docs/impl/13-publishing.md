@@ -264,6 +264,19 @@ Merged as `05e8261`. Differences and additions to §7:
 - **Tests.** WT-P-005 (`Reading.test.tsx`), WT-P-007 (`sw.test.ts` runs the worker with a fake cache; `Offline.test.tsx` for the client, logout and the offline frame), `TestFrontendBuilt` (root files), E2E-W-019. Dropping `X-From-Cache`, the trim, the clear, the route filter or the generation check each fails a test. Go on SQLite (no database change); Vitest 275; Playwright 39.
 - **Not run:** golangci-lint. The Indonesian texts are drafts for the owner.
 
+### 11.6 Slice 5E as built (2026-10-05)
+
+Merged as `da99444`. Differences and additions to §8:
+
+- **Summary route.** `GET /liturgies/{id}/published/summary` (`getPublishedSummary`, `liturgy.approve`, `private, no-store`). Besides the fields of §8 it returns `liturgy` (service name, date, time, language, church name) and `key_display`, which the texts need, and each recipient has `member` (false for a free-text name), so that the page can tell a member with no phone (Copy button) from a name with no account (no button). The items carry titles, duties, song headings and reading references only; a test checks that item text does not leak. A phone number appears in no other route.
+- **Recipients.** One per assigned member of the newest version who is still a member (checked at read time; a member who left is skipped, and their phone is not read), one per free-text name (trimmed, case-folded), with their duty names.
+- **`Compare`.** `domain.Compare(previous, latest)` returns `Changes{Items, Songs, Reading, Assignments}`. Songs match by song ID and occurrence within an item. A key change counts when the song's key or its ordered list of entry `key_change` values differs (`entry_keys` says which). A reading counts as changed when its reference or translation differs, or when it is added or removed on an item present in both versions. Duty changes compare IDs only. Moves use the longest common subsequence of the common items. `PublishedRepo.Previous` returns the version before the newest.
+- **Texts.** `lib/messages.ts` builds them from the data with `i18next` fixed to the liturgy's language (`msg.*` keys), falling back to the church's default interface language for `zh-*`. The item list is the droppable block: the songs block and the readings lines for the team text; the person's parts and their songs and readings for a personal text; the change lines for the change summary. A title line left with nothing under it is dropped too. The check-boxes Songs, Keys and Readings also filter the change summary. The limit is 1,500 characters (not bytes).
+- **Page.** `/published/:id/messages` (`MessagesPage`), linked from the published view and from the review bar for members with `liturgy.approve`. The preview is a read-only text area; Copy selects it when the Clipboard API refuses. The query is not kept after the page is left.
+- **Link warning.** The server cannot tell whether `LITURGIST_BASE_URL` is set, so the page warns when the link's host is `localhost`, `127.0.0.1` or `::1`.
+- **Tests.** TC-P-003 `TestCompare`; `TestSummaryOfPublished`; IT-P-010 `TestPublishedSummaryHTTP`; the `Published.Previous` harness entry (the harness seed now has two versions per church, so `Latest`, `Info`, `ListLatest` and `Upcoming` expect version 2); WT-P-006 (`messages.test.ts`, `Messages.test.tsx`); E2E-W-020. Removing the scope check, keeping a member who left, ignoring moves and ignoring the length limit each fails a test. Go on both dialects; Vitest 301; Playwright 40.
+- **Not run:** golangci-lint. The Indonesian texts are drafts for the owner.
+
 ## 12. Anti-patterns (DO NOT)
 
 | ❌ Don't | ✅ Do instead | Why |
