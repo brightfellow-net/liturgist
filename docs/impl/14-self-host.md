@@ -288,7 +288,7 @@ Merged to `main` as `edb4182`. Code: `server/https.go` (`builtInHTTPS`, `redirec
 | Health check | uses the plain port, no certificate needed |
 | Dependency | `certmagic` v0.25.6 with 9 new modules (zerossl, cpuid, libdns, acmez, miekg/dns, blake3, zap, zap/exp) and `golang.org/x/net` v0.58 to v0.59; the binary grows about 1.8 MB (29.4 to 31.2 MB) |
 
-Verified: a run against a Pebble test ACME server (certificate issued, HTTP/2 served, 308 redirect, `/healthz`, healthcheck, reuse after restart); Docker non-root binds 80 and 443 and is healthy; server tests with an injected self-signed certificate; seven mutations caught. **Not verified:** issuance from real Let's Encrypt, the systemd `AmbientCapabilities=CAP_NET_BIND_SERVICE` drop-in, the Windows service on ports 80 and 443. The certificate library logs in its own format next to the app log.
+Verified: a run against a Pebble test ACME server (certificate issued, HTTP/2 served, 308 redirect, `/healthz`, healthcheck, reuse after restart); Docker non-root binds 80 and 443 and is healthy; server tests with an injected self-signed certificate; seven mutations caught. **Not verified:** issuance from real Let's Encrypt, the systemd `AmbientCapabilities=CAP_NET_BIND_SERVICE` drop-in, the Windows service on ports 80 and 443. The certificate library's log now goes through the app log ([§22](#22-the-certificate-library-logs-through-the-app-log-2026-10-05)).
 
 ## 20. The Windows command line reads liturgist.env (2026-10-05)
 
@@ -301,3 +301,11 @@ Tests: TC-611 (read, environment wins, explicit data folder kept, no file, skipp
 Replaces the "agreement" row of §19: setting `LITURGIST_DOMAIN` no longer counts as accepting the certificate authority's subscriber agreement. With a domain, `LITURGIST_ACME_AGREE=true` (case-insensitive; any other value is refused) is required; without it `envconfig.Load` fails with the setting's name and the Let's Encrypt agreement URL (exit code 2). `Config.ACMEAgreed` carries it, and `acmeTLS` refuses to run without it, so a `Config` built in code cannot skip it. Without a domain the setting is not read. Chosen by the owner on 2026-10-05 because nothing was released yet, so the extra line breaks no one. The guides (`https-builtin.md`, `configuration.md`) show the line.
 
 Tests: TC-612 (the setting is required, `""`, `false`, `yes` and `1` refused; the server refuses without it), the domain tests pass the agreement so each rejection has its own reason; three mutations caught. The certmagic flow itself was not rerun against Pebble; it sets `Agreed` as before, behind the check.
+
+## 22. The certificate library logs through the app log (2026-10-05)
+
+A follow-up to 6F. `internal/logging/zapbridge.go` is a `zapcore.Core` that writes the certificate library's zap lines to the slog logger, so they follow `LITURGIST_LOG_LEVEL` and `LITURGIST_LOG_FORMAT` and the redaction of the app; each carries `source=certmagic` (and `logger=<name>`). The library's `identifier` field is renamed `domain` because the redaction hides `identifier` as a login name. `go.uber.org/zap` becomes a direct dependency (it was already in the module graph).
+
+**Fixes a 6F flaw:** `certmagic.NewDefault()` shares a process-wide cache whose renewal callback builds a fresh default config (default storage folder, no agreement), not the one 6F set up on the instance. `acmeTLS` now builds its own cache with a callback that returns its config, and stops the cache when the context ends. Found by reading the library; the old failure was not reproduced.
+
+Tests: TC-613 (message, level, name and fields; level filter; redaction), four mutations caught (the fifth, the filter in `Check`, is redundant because zap checks the level first). Verified against a Pebble server: issuance with the bridged log, and a renewal through the cache using 150-second certificates and a temporary 5-second check interval (scratch build, not committed), with the data kept in `data/certs`. **Not verified:** real Let's Encrypt.
