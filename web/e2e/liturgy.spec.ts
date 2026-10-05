@@ -556,3 +556,61 @@ test("E2E-W-019 reading mode and offline use", async ({ browser }) => {
   expect(await ola.evaluate(async () => (await caches.keys()).filter((n) => n.startsWith("pub-")))).toEqual([]);
   expect(await ola.evaluate(() => localStorage.getItem("liturgist.user"))).toBeNull();
 });
+
+// E2E-W-020: the WhatsApp texts after publishing, and after publishing again.
+test("E2E-W-020 messages for the team", async ({ browser }) => {
+  const api = await adminApi();
+  const created = await api.post("/api/v1/liturgies", { data: { service_name: "Ibadah Pesan", date: dateAhead(63), time: "08:30", template_id: "", language: "id" } });
+  expect(created.status(), await created.text()).toBe(201);
+  const { id, version } = (await created.json()) as { id: string; version: number };
+  const duties = (await (await api.get("/api/v1/duties")).json()) as { items: { id: string }[] };
+  const item = await api.post(`/api/v1/liturgies/${id}/items`, { data: { liturgy_version: version, title: "Doa Pembuka", item_type: "prayer", duty_id: duties.items[0].id } });
+  expect(item.status(), await item.text()).toBe(201);
+  const assigned = await api.post(`/api/v1/liturgies/${id}/assignments`, { data: { duty_id: duties.items[0].id, name: "Pak Joko" } });
+  expect(assigned.status(), await assigned.text()).toBe(201);
+  const publish = async () => {
+    let step = await (await api.post(`/api/v1/liturgies/${id}/submit`, { data: {} })).json();
+    step = await (await api.post(`/api/v1/liturgies/${id}/approve`, { data: { edit_seq: step.edit_seq } })).json();
+    const res = await api.post(`/api/v1/liturgies/${id}/publish`, { data: { edit_seq: step.edit_seq } });
+    expect(res.status(), await res.text()).toBe(200);
+  };
+  await publish();
+
+  const admin = await adminPage(browser);
+  await admin.goto(`/liturgies/${id}`);
+  await admin.getByRole("link", { name: "Send to the team" }).click();
+  await expect(admin.getByRole("heading", { name: "Send to the team", level: 1 })).toBeVisible();
+  const team = admin.getByRole("textbox", { name: "Text for Team summary" });
+  await expect(team).toHaveValue(/\*Liturgi Ibadah Pesan\*\n.*· 08:30/);
+  await expect(team).toHaveValue(/Liturgis: Pak Joko/);
+  await expect(admin.getByRole("link", { name: "Share to WhatsApp" })).toHaveAttribute("href", /^https:\/\/wa\.me\/\?text=\*Liturgi%20Ibadah%20Pesan/);
+  await expect(admin.getByText(/first version, so there is nothing to compare/)).toBeVisible();
+  await expect(admin.getByText("Name only, no account")).toBeVisible();
+  await expectAccessible(admin);
+
+  // Published again with one more item: the change summary names it.
+  const reopened = await api.post(`/api/v1/liturgies/${id}/reopen`, { data: {} });
+  expect(reopened.status(), await reopened.text()).toBe(200);
+  const now = (await (await api.get(`/api/v1/liturgies/${id}`)).json()) as { version: number };
+  const more = await api.post(`/api/v1/liturgies/${id}/items`, { data: { liturgy_version: now.version, title: "Penutup", item_type: "prayer" } });
+  expect(more.status(), await more.text()).toBe(201);
+  await publish();
+  await admin.reload();
+  await expect(admin.getByRole("textbox", { name: "Text for Change summary" })).toHaveValue(/\+ Penutup ditambahkan/);
+  await expectAccessible(admin);
+
+  // A member with no scope is refused, and has no link.
+  const link = await createInvite("Mia Member", "mia.member@example.org", []);
+  const anon = await request.newContext({ baseURL });
+  const accepted = await anon.post("/api/v1/invites/accept", { data: { token: tokenOf(link), name: "Mia Member", email: "mia.member@example.org", password: memberPassword } });
+  expect(accepted.status(), await accepted.text()).toBe(201);
+  await anon.dispose();
+  const mia = await logIn(browser, "mia.member@example.org", memberPassword);
+  await mia.goto(`/published/${id}`);
+  await expect(mia.getByRole("heading", { name: "Ibadah Pesan", level: 1 })).toBeVisible();
+  await expect(mia.getByRole("link", { name: "Send to the team" })).toHaveCount(0);
+  await mia.goto(`/published/${id}/messages`);
+  await expect(mia.getByRole("alert")).toBeVisible();
+  await expect(mia.getByRole("textbox")).toHaveCount(0);
+  await api.dispose();
+});

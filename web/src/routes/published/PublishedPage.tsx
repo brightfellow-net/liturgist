@@ -14,7 +14,8 @@ import { TextSizeControl } from "@/components/TextSizeControl";
 import { formatDateTime } from "@/lib/format";
 import { isCode } from "@/lib/errors";
 import { knownPublishedFormat, publishedQuery } from "@/lib/published";
-import { paths, publishedPath, publishedPrintPath, publishedReadPath } from "../paths";
+import { hasScope } from "@/lib/scopes";
+import { paths, publishedMessagesPath, publishedPath, publishedPrintPath, publishedReadPath } from "../paths";
 import { PublishedBody } from "./PublishedBody";
 
 // PublishedPage is the view every member reads: the newest published copy of a
@@ -63,6 +64,9 @@ export function PublishedPage() {
             <>
               <Link className={buttonVariants({ variant: "outline" })} to={publishedReadPath(id)}>{t("reading.enter")}</Link>
               <Link className={buttonVariants({ variant: "outline" })} to={publishedPrintPath(id)}>{t("published.print")}</Link>
+              {hasScope(me, "liturgy.approve") && (
+                <Link className={buttonVariants({ variant: "outline" })} to={publishedMessagesPath(id)}>{t("messages.link")}</Link>
+              )}
             </>
           )}
           {known && reading && (

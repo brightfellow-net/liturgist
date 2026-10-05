@@ -431,6 +431,9 @@ type PublishedRepo interface {
 	// Latest returns the newest version with its content; ErrNotFound when the
 	// liturgy has none.
 	Latest(ctx context.Context, liturgy domain.LiturgyID) (domain.PublishedVersion, error)
+	// Previous returns the version before the newest, with its content;
+	// ErrNotFound when the liturgy has fewer than two.
+	Previous(ctx context.Context, liturgy domain.LiturgyID) (domain.PublishedVersion, error)
 	// ListLatest lists the liturgies that have a version, newest date first
 	// (13 §5), with the number and time of their newest version, and the total.
 	ListLatest(ctx context.Context, f PublishedFilter) ([]PublishedRow, int, error)

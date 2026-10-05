@@ -197,6 +197,143 @@ func publishedContentView(c domain.PublishedContent) PublishedContentView {
 	return out
 }
 
+// SummarySongView is a song as the messages name it: no lyrics.
+type SummarySongView struct {
+	Title        string `json:"title"`
+	HymnalSource string `json:"hymnal_source"`
+	HymnalNumber string `json:"hymnal_number"`
+	Key          string `json:"key" doc:"letters; the display form is applied by the reader"`
+}
+
+// SummaryReadingView is a reading as the messages name it: no text.
+type SummaryReadingView struct {
+	ReferenceDisplay string `json:"reference_display"`
+	TranslationCode  string `json:"translation_code"`
+}
+
+// SummaryItemView is an item as the messages name it.
+type SummaryItemView struct {
+	Title   string              `json:"title"`
+	Type    string              `json:"type"`
+	Duty    *PublishedRefView   `json:"duty,omitempty"`
+	Songs   []SummarySongView   `json:"songs"`
+	Reading *SummaryReadingView `json:"reading,omitempty"`
+}
+
+// SummaryAssignmentView is the people on one duty.
+type SummaryAssignmentView struct {
+	Duty  PublishedRefView `json:"duty"`
+	Names []string         `json:"names"`
+}
+
+// SummaryRecipientView is a person to message. Phone is E.164, present only
+// here and only for a member who has one.
+type SummaryRecipientView struct {
+	Name   string   `json:"name"`
+	Duties []string `json:"duties"`
+	Phone  string   `json:"phone,omitempty" doc:"E.164; absent for free-text names and members with no number"`
+	Member bool     `json:"member" doc:"false for a free-text name"`
+}
+
+// ItemChangeView is a change to an item.
+type ItemChangeView struct {
+	Kind     string            `json:"kind" enum:"added,removed,moved,retitled,duty_changed"`
+	ItemID   string            `json:"item_id"`
+	Title    string            `json:"title"`
+	OldTitle string            `json:"old_title,omitempty"`
+	Duty     *PublishedRefView `json:"duty,omitempty"`
+	OldDuty  *PublishedRefView `json:"old_duty,omitempty"`
+}
+
+// SongChangeView is a change to a song of an item present in both versions.
+type SongChangeView struct {
+	Kind         string `json:"kind" enum:"added,removed,key_changed"`
+	ItemID       string `json:"item_id"`
+	ItemTitle    string `json:"item_title"`
+	Title        string `json:"title"`
+	HymnalSource string `json:"hymnal_source"`
+	HymnalNumber string `json:"hymnal_number"`
+	OldKey       string `json:"old_key"`
+	NewKey       string `json:"new_key"`
+	EntryKeys    bool   `json:"entry_keys" doc:"the key changes inside the song differ"`
+}
+
+// ReadingChangeView is a change of a reading's reference; an empty side means none.
+type ReadingChangeView struct {
+	ItemID    string `json:"item_id"`
+	ItemTitle string `json:"item_title"`
+	Old       string `json:"old"`
+	New       string `json:"new"`
+}
+
+// AssignmentChangeView is a person added to or removed from a duty.
+type AssignmentChangeView struct {
+	Kind string           `json:"kind" enum:"added,removed"`
+	Duty PublishedRefView `json:"duty"`
+	Name string           `json:"name"`
+}
+
+// ChangesView is what the new version changed for the team (13 §8).
+type ChangesView struct {
+	Items       []ItemChangeView       `json:"items"`
+	Songs       []SongChangeView       `json:"songs"`
+	Reading     []ReadingChangeView    `json:"reading"`
+	Assignments []AssignmentChangeView `json:"assignments"`
+}
+
+// PublishedSummaryView is the answer of GET /liturgies/{id}/published/summary.
+type PublishedSummaryView struct {
+	Number      int                     `json:"number"`
+	URL         string                  `json:"url"`
+	KeyDisplay  string                  `json:"key_display" enum:"do,letter"`
+	Liturgy     PublishedLiturgyView    `json:"liturgy"`
+	Items       []SummaryItemView       `json:"items"`
+	Assignments []SummaryAssignmentView `json:"assignments"`
+	Recipients  []SummaryRecipientView  `json:"recipients"`
+	Changes     *ChangesView            `json:"changes,omitempty" doc:"present when a previous version exists"`
+}
+
+func summaryView(r app.PublishedSummary) PublishedSummaryView {
+	out := PublishedSummaryView{Number: r.Number, URL: r.URL, KeyDisplay: r.KeyDisplay,
+		Liturgy: PublishedLiturgyView{Date: r.Liturgy.Date, Time: r.Liturgy.Time, ServiceName: r.Liturgy.ServiceName, Language: r.Liturgy.Language, ChurchName: r.Liturgy.ChurchName},
+		Items:   make([]SummaryItemView, len(r.Items)), Assignments: make([]SummaryAssignmentView, len(r.Assignments)), Recipients: make([]SummaryRecipientView, len(r.Recipients))}
+	for i, it := range r.Items {
+		v := SummaryItemView{Title: it.Title, Type: string(it.Type), Duty: refView(it.Duty), Songs: make([]SummarySongView, len(it.Songs))}
+		if it.Reading != nil {
+			v.Reading = &SummaryReadingView{ReferenceDisplay: it.Reading.ReferenceDisplay, TranslationCode: it.Reading.TranslationCode}
+		}
+		for j, s := range it.Songs {
+			v.Songs[j] = SummarySongView{Title: s.Title, HymnalSource: s.HymnalSource, HymnalNumber: s.HymnalNumber, Key: s.Key}
+		}
+		out.Items[i] = v
+	}
+	for i, a := range r.Assignments {
+		out.Assignments[i] = SummaryAssignmentView{Duty: PublishedRefView{ID: a.Duty.ID, Name: a.Duty.Name}, Names: a.Names}
+	}
+	for i, p := range r.Recipients {
+		out.Recipients[i] = SummaryRecipientView{Name: p.Name, Duties: p.Duties, Phone: p.Phone, Member: p.Member}
+	}
+	if c := r.Changes; c != nil {
+		cv := ChangesView{Items: make([]ItemChangeView, len(c.Items)), Songs: make([]SongChangeView, len(c.Songs)),
+			Reading: make([]ReadingChangeView, len(c.Reading)), Assignments: make([]AssignmentChangeView, len(c.Assignments))}
+		for i, x := range c.Items {
+			cv.Items[i] = ItemChangeView{Kind: x.Kind, ItemID: string(x.ItemID), Title: x.Title, OldTitle: x.OldTitle, Duty: refView(x.Duty), OldDuty: refView(x.OldDuty)}
+		}
+		for i, x := range c.Songs {
+			cv.Songs[i] = SongChangeView{Kind: x.Kind, ItemID: string(x.ItemID), ItemTitle: x.ItemTitle, Title: x.Song.Title, HymnalSource: x.Song.HymnalSource,
+				HymnalNumber: x.Song.HymnalNumber, OldKey: x.OldKey, NewKey: x.NewKey, EntryKeys: x.EntryKeys}
+		}
+		for i, x := range c.Reading {
+			cv.Reading[i] = ReadingChangeView{ItemID: string(x.ItemID), ItemTitle: x.ItemTitle, Old: x.Old, New: x.New}
+		}
+		for i, x := range c.Assignments {
+			cv.Assignments[i] = AssignmentChangeView{Kind: x.Kind, Duty: PublishedRefView{ID: x.Duty.ID, Name: x.Duty.Name}, Name: x.Assignment.Name}
+		}
+		out.Changes = &cv
+	}
+	return out
+}
+
 // registerPublished registers the three read routes of the published copy
 // (13 §5). They are open to every member of the church.
 func registerPublished(api huma.API, d LiturgyDeps) {
@@ -284,5 +421,20 @@ func registerPublished(api huma.API, d LiturgyDeps) {
 				out.Body.Items[i] = v
 			}
 			return out, nil
+		})
+
+	type summaryOutput struct {
+		CacheControl string `header:"Cache-Control"`
+		Body         PublishedSummaryView
+	}
+	huma.Register(api, pop("getPublishedSummary", "/liturgies/{id}/published/summary", "The data for the WhatsApp texts of the newest published version (needs liturgy.approve; carries phone numbers)"),
+		func(ctx context.Context, in *struct {
+			ID string `path:"id" maxLength:"26"`
+		}) (*summaryOutput, error) {
+			res, err := d.Liturgies.SummaryOfPublished(ctx, sess(ctx), domain.LiturgyID(in.ID))
+			if err != nil {
+				return nil, fail(ctx, err)
+			}
+			return &summaryOutput{CacheControl: noStore, Body: summaryView(res)}, nil
 		})
 }

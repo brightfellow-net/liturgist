@@ -70,6 +70,7 @@ export type ApplyResultView = Schemas["ApplyResultView"];
 
 // Published liturgies (13 §5).
 export type PublishedCopyView = Schemas["PublishedCopyView"];
+export type PublishedSummaryView = Schemas["PublishedSummaryView"];
 export type PublishedContentView = Schemas["PublishedContentView"];
 export type PublishedItemView = Schemas["PublishedItemView"];
 export type PublishedSongView = Schemas["PublishedSongView"];

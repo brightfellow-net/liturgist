@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { queryOptions } from "@tanstack/react-query";
 import { api, call } from "./api";
+import { summaryOf } from "./messages";
 
 // The page size of the published list (13 §5).
 export const publishedPageSize = 50;
@@ -35,3 +36,12 @@ export const assignmentsQuery = queryOptions({
 export function isReadingMode(pathname: string, search: string): boolean {
   return /^\/published\/[^/]+$/.test(pathname) && new URLSearchParams(search).get("read") === "1";
 }
+
+// The data of the WhatsApp texts (13 §8); it carries phone numbers, so it is
+// asked for only on the messages page.
+export const summaryQuery = (id: string) =>
+  queryOptions({
+    queryKey: ["published", id, "summary"],
+    queryFn: async () => summaryOf(await call(api.GET("/liturgies/{id}/published/summary", { params: { path: { id } } }))),
+    gcTime: 0, // not kept once the page is left
+  });

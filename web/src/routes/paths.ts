@@ -37,6 +37,7 @@ export const paths = {
   published: "/published",
   publishedView: "/published/:id",
   publishedPrint: "/published/:id/print",
+  publishedMessages: "/published/:id/messages",
 } as const;
 
 // songPath and songEditPath fill in a song's ID.
@@ -69,4 +70,5 @@ export const liturgyPath = (id: string) => paths.liturgy.replace(":id", encodeUR
 // publishedPath fills in a liturgy's ID.
 export const publishedPrintPath = (id: string) => paths.publishedPrint.replace(":id", encodeURIComponent(id));
 export const publishedPath = (id: string) => paths.publishedView.replace(":id", encodeURIComponent(id));
+export const publishedMessagesPath = (id: string) => paths.publishedMessages.replace(":id", encodeURIComponent(id));
 export const publishedReadPath = (id: string) => publishedPath(id) + "?read=1";

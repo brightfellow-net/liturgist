@@ -186,3 +186,99 @@ func TestPrintSettingsHTTP(t *testing.T) {
 		t.Errorf("team member reads: %d %s", rec.Code, rec.Body.String())
 	}
 }
+
+// IT-P-010: the summary route needs liturgy.approve, is never cached, names
+// songs and readings but carries no lyrics or Bible text, and shows the change
+// summary only once there is a previous version.
+func TestPublishedSummaryHTTP(t *testing.T) {
+	h := harnessWith(t)
+	admin := h.setupChurch()
+	team := h.invite(admin, "team@example.org")
+	send := func(c *http.Cookie, method, path string, body any) (int, map[string]any, string) {
+		t.Helper()
+		var cookies []*http.Cookie
+		if c != nil {
+			cookies = []*http.Cookie{c}
+		}
+		rec := h.do(req{method: method, path: "/api/v1" + path, cookies: cookies, body: body})
+		if rec.Body.Len() == 0 {
+			return rec.Code, nil, ""
+		}
+		return rec.Code, decode(t, rec), rec.Body.String()
+	}
+	_, me, _ := send(team, "GET", "/me", nil)
+	teamID := me["user"].(map[string]any)["id"].(string)
+	_, duties, _ := send(admin, "GET", "/duties", nil)
+	duty := duties["items"].([]any)[0].(map[string]any)["id"].(string)
+
+	code, body, _ := send(admin, "POST", "/liturgies", map[string]any{"date": "2099-11-01", "time": "09:00", "service_name": "Ibadah", "template_id": ""})
+	if code != 201 {
+		t.Fatalf("create: %d %v", code, body)
+	}
+	lid := body["id"].(string)
+	path := func(a string) string { return "/liturgies/" + lid + "/" + a }
+	if code, _, _ := send(admin, "GET", path("published/summary"), nil); code != 404 {
+		t.Errorf("no version: %d", code)
+	}
+	if code, body, _ = send(admin, "POST", path("items"), map[string]any{"liturgy_version": 1, "title": "Doa", "item_type": "prayer", "duty_id": duty, "text": "LYRICS-AND-WORDS-MUST-NOT-LEAK"}); code != 201 {
+		t.Fatalf("item: %d %v", code, body)
+	}
+	if code, body, _ = send(admin, "POST", path("assignments"), map[string]any{"duty_id": duty, "user_id": teamID}); code != 201 {
+		t.Fatalf("assign: %d %v", code, body)
+	}
+	publish := func() {
+		t.Helper()
+		_, b, _ := send(admin, "POST", path("submit"), map[string]any{})
+		_, b, _ = send(admin, "POST", path("approve"), map[string]any{"edit_seq": b["edit_seq"]})
+		if code, b, _ = send(admin, "POST", path("publish"), map[string]any{"edit_seq": b["edit_seq"]}); code != 200 {
+			t.Fatalf("publish: %d %v", code, b)
+		}
+	}
+	publish()
+
+	if code, _, _ := send(nil, "GET", path("published/summary"), nil); code != 401 {
+		t.Errorf("no session: %d", code)
+	}
+	if code, body, _ := send(team, "GET", path("published/summary"), nil); code != 403 {
+		t.Errorf("member with no scope: %d %v", code, body)
+	}
+	rec := h.do(req{method: "GET", path: "/api/v1" + path("published/summary"), cookies: []*http.Cookie{admin}})
+	sum := decode(t, rec)
+	if rec.Code != 200 || rec.Header().Get("Cache-Control") != "private, no-store" || rec.Header().Get("ETag") != "" {
+		t.Fatalf("summary: %d %v", rec.Code, rec.Header())
+	}
+	items := sum["items"].([]any)
+	if sum["number"] != 1.0 || len(items) != 1 || items[0].(map[string]any)["title"] != "Doa" || sum["changes"] != nil ||
+		sum["liturgy"].(map[string]any)["service_name"] != "Ibadah" || !strings.HasSuffix(sum["url"].(string), "/published/"+lid) {
+		t.Errorf("summary: %v", sum)
+	}
+	if strings.Contains(rec.Body.String(), "LYRICS-AND-WORDS-MUST-NOT-LEAK") {
+		t.Error("the summary carries the text of an item")
+	}
+	recips := sum["recipients"].([]any)
+	if len(recips) != 1 || recips[0].(map[string]any)["name"] != "Member" || recips[0].(map[string]any)["phone"] != nil {
+		t.Errorf("recipients: %v", recips)
+	}
+
+	// A phone number appears nowhere else.
+	for _, p := range []string{path("published"), "/published", "/me/assignments"} {
+		if _, _, raw := send(admin, "GET", p, nil); strings.Contains(raw, "phone") {
+			t.Errorf("%s mentions a phone number", p)
+		}
+	}
+
+	// Republished with another item: the summary now compares with version 1.
+	send(admin, "POST", path("reopen"), map[string]any{})
+	_, cur, _ := send(admin, "GET", "/liturgies/"+lid, nil)
+	if code, body, _ = send(admin, "POST", path("items"), map[string]any{"liturgy_version": cur["version"], "title": "Penutup", "item_type": "prayer"}); code != 201 {
+		t.Fatalf("second item: %d %v", code, body)
+	}
+	publish()
+	_, sum, _ = send(admin, "GET", path("published/summary"), nil)
+	changes, _ := sum["changes"].(map[string]any)
+	added := changes["items"].([]any)
+	if sum["number"] != 2.0 || len(added) != 1 || added[0].(map[string]any)["kind"] != "added" || added[0].(map[string]any)["title"] != "Penutup" ||
+		len(changes["songs"].([]any))+len(changes["reading"].([]any))+len(changes["assignments"].([]any)) != 0 {
+		t.Errorf("changes: %v", sum)
+	}
+}

@@ -30,6 +30,7 @@ import { PrivacyPage } from "./routes/PrivacyPage";
 import { ProfilePage } from "./routes/ProfilePage";
 import { PublishedListPage } from "./routes/published/PublishedListPage";
 import { PublishedPage } from "./routes/published/PublishedPage";
+import { MessagesPage } from "./routes/published/MessagesPage";
 import { PrintPage } from "./routes/published/PrintPage";
 import { ResetPage } from "./routes/ResetPage";
 import { ChurchSettingsPage } from "./routes/settings/ChurchSettingsPage";
@@ -83,6 +84,7 @@ export const router = createBrowserRouter([
       { path: paths.published, element: <PublishedListPage /> },
       { path: paths.publishedView, element: <PublishedPage /> },
       { path: paths.publishedPrint, element: <PrintPage /> },
+      { path: paths.publishedMessages, element: <MessagesPage /> },
       { path: paths.profile, element: <ProfilePage /> },
       {
         element: <SettingsLayout />,

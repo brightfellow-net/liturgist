@@ -1,17 +1,21 @@
 // Copyright 2026 Brightfellow contributors
 // SPDX-License-Identifier: Apache-2.0
 import { useState } from "react";
+import { Link } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { LiturgyView } from "@liturgist/api-client";
 import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { fieldClass } from "@/components/ui/input";
 import { ErrorAlert } from "@/components/ErrorAlert";
 import { Field } from "@/components/Field";
 import { api, call } from "@/lib/api";
 import { ApiError, isCode } from "@/lib/errors";
 import { liturgyQuery, problemText, stateChangesQuery } from "@/lib/liturgy";
+import { meQuery } from "@/lib/queries";
+import { hasScope } from "@/lib/scopes";
+import { publishedMessagesPath } from "../paths";
 import { ReviewComments } from "./Comments";
 
 type Action = "submit" | "approve" | "request_changes" | "reopen" | "publish";
@@ -28,6 +32,7 @@ export function Review({ liturgy, onChanged }: { liturgy: LiturgyView; onChanged
   const [asking, setAsking] = useState<Action | null>(null);
   const [note, setNote] = useState("");
   const [confirmed, setConfirmed] = useState(false);
+  const me = useQuery(meQuery).data;
   const reviewable = liturgy.open_comments !== undefined;
   const history = useQuery({ ...stateChangesQuery(liturgy.id), enabled: reviewable });
   const a = liturgy.actions;
@@ -125,6 +130,9 @@ export function Review({ liturgy, onChanged }: { liturgy: LiturgyView; onChanged
         {a.request_changes && <Button type="button" variant="outline" disabled={run.isPending} onClick={() => start("request_changes")}>{t("liturgy.review.request_changes")}</Button>}
         {a.publish && <Button type="button" variant={asking === "publish" ? "default" : "outline"} disabled={run.isPending} onClick={() => start("publish")}>{t("liturgy.review.publish")}</Button>}
         {a.reopen && <Button type="button" variant="outline" disabled={run.isPending} onClick={() => start("reopen")}>{t("liturgy.review.reopen")}</Button>}
+        {published && me && hasScope(me, "liturgy.approve") && (
+          <Link className={buttonVariants({ variant: "outline" })} to={publishedMessagesPath(liturgy.id)}>{t("messages.link")}</Link>
+        )}
         {a.archive && <Button type="button" variant="outline" disabled={archive.isPending} onClick={() => archive.mutate(false)}>{t("liturgy.review.archive")}</Button>}
         {a.unarchive && <Button type="button" variant="outline" disabled={archive.isPending} onClick={() => archive.mutate(true)}>{t("liturgy.review.unarchive")}</Button>}
       </div>

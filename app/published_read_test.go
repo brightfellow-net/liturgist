@@ -378,3 +378,99 @@ func TestPrintSettings(t *testing.T) {
 		}
 	})
 }
+
+// memberWithPhone adds a member with a phone number and no roles.
+func (e cenv) memberWithPhone(name, phone string) (*domain.Session, domain.UserID) {
+	e.t.Helper()
+	uid := domain.UserID(e.ids.NewID())
+	now := e.clock.Now()
+	e.write(func(s app.Store) error {
+		if err := s.Users().Create(e.ctx, domain.User{ID: uid, Name: name, Email: name + "@example.org", Phone: phone, PasswordHash: "x", CreatedAt: now, UpdatedAt: now}); err != nil {
+			return err
+		}
+		cs, err := s.ForChurch(e.ctx, e.church)
+		if err != nil {
+			return err
+		}
+		return cs.Memberships().Create(e.ctx, domain.Membership{ID: domain.MembershipID(e.ids.NewID()), UserID: uid, CreatedAt: now})
+	})
+	return &domain.Session{UserID: uid}, uid
+}
+
+// IT-P-010 (use case), TC-P-003 (through the use case): the data for the
+// WhatsApp texts, who may read it, who is a recipient, and the change summary.
+func TestSummaryOfPublished(t *testing.T) {
+	sqlstoretest.ForEachDialect(t, func(t *testing.T, db *sqlstore.DB) {
+		r := newReviewEnv(t, db)
+		L := r.liturgies
+		_, siti := r.memberWithPhone("siti", "+6281200000001")
+		_, gone := r.memberWithPhone("gone", "+6281200000002")
+		duty := r.duty()
+		r.rich()
+		for _, in := range []app.AssignmentInput{{DutyID: duty, UserID: siti}, {DutyID: duty, UserID: gone}} {
+			if _, err := L.AddAssignment(r.ctx, r.a, r.lid, in); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// No version yet: a 404 even for the publisher.
+		if _, err := L.SummaryOfPublished(r.ctx, r.a, r.lid); !isNotFound(err, app.ReasonMissing) {
+			t.Errorf("no version: %v", err)
+		}
+		r.approve()
+		r.mustPublish()
+
+		// Only liturgy.approve reads it: an editor and a member with no scope do not.
+		for name, sess := range map[string]*domain.Session{"editor": r.b, "team member": r.team} {
+			if _, err := L.SummaryOfPublished(r.ctx, sess, r.lid); !errors.Is(err, app.ErrForbidden) {
+				t.Errorf("%s: %v", name, err)
+			}
+		}
+
+		// A member who left after publishing is not a recipient; the free text is, with no phone.
+		r.write(func(s app.Store) error {
+			cs, err := s.ForChurch(r.ctx, r.church)
+			if err != nil {
+				return err
+			}
+			m, err := cs.Memberships().ByUser(r.ctx, gone)
+			if err != nil {
+				return err
+			}
+			return cs.Memberships().Delete(r.ctx, m.ID)
+		})
+		sum, err := L.SummaryOfPublished(r.ctx, r.a, r.lid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if sum.Number != 1 || sum.Changes != nil || sum.URL != "https://liturgi.example.org/published/"+string(r.lid) || sum.KeyDisplay != "do" {
+			t.Errorf("summary: %+v", sum)
+		}
+		if len(sum.Assignments) != 1 || len(sum.Assignments[0].Names) != 4 {
+			t.Errorf("assignments: %+v", sum.Assignments)
+		}
+		got := map[string]string{}
+		for _, p := range sum.Recipients {
+			got[p.Name] = p.Phone
+			if p.Member != (p.Name != "Pak Budi") {
+				t.Errorf("member flag of %q: %v", p.Name, p.Member)
+			}
+		}
+		if len(sum.Recipients) != 3 || got["siti"] != "+6281200000001" || got["Pak Budi"] != "" || got["a"] != "" {
+			t.Errorf("recipients: %+v", sum.Recipients)
+		}
+		if _, there := got["gone"]; there {
+			t.Error("a member who left is a recipient")
+		}
+
+		// Republished with a new item: the change summary compares with version 1.
+		r.must(r.a, domain.ActionReopen, nil, "")
+		r.pray("Closing prayer")
+		r.approve()
+		r.mustPublish()
+		sum, err = L.SummaryOfPublished(r.ctx, r.a, r.lid)
+		if err != nil || sum.Number != 2 || sum.Changes == nil || len(sum.Changes.Items) != 1 || sum.Changes.Items[0].Kind != domain.ItemAdded ||
+			sum.Changes.Items[0].Title != "Closing prayer" || len(sum.Changes.Songs)+len(sum.Changes.Reading)+len(sum.Changes.Assignments) != 0 {
+			t.Errorf("changes: %+v %v", sum.Changes, err)
+		}
+	})
+}

@@ -80,6 +80,10 @@ func seedLiturgies(a, b app.ChurchStore, now time.Time) error {
 		_, perr := c.cs.Published().Create(ctx, domain.PublishedVersion{ID: domain.PublishedVersionID(id("PV" + c.suffix)), LiturgyID: pl.ID,
 			Content: []byte(`{"format":1}`), PublishedBy: domain.UserID(id("U1")), PublishedAt: now}, []domain.UserID{domain.UserID(id("U1"))})
 		errs = append(errs, perr)
+		// A second version, so that the newest has one before it.
+		_, perr = c.cs.Published().Create(ctx, domain.PublishedVersion{ID: domain.PublishedVersionID(id("P2" + c.suffix)), LiturgyID: pl.ID,
+			Content: []byte(`{"format":1,"n":2}`), PublishedBy: domain.UserID(id("U1")), PublishedAt: now}, []domain.UserID{domain.UserID(id("U1"))})
+		errs = append(errs, perr)
 		errs = append(errs, err, c.cs.Edits().Append(ctx, domain.Edit{ID: domain.EditID(id("ED" + c.suffix)), LiturgyID: l.ID, Seq: seq,
 			UserID: domain.UserID(id("U1")), Command: domain.CmdLiturgyCreate, After: []byte(`{}`), LiturgyVersionAfter: 1,
 			Status: domain.EditDone, CreatedAt: now}))
@@ -193,7 +197,7 @@ func liturgyHarness(errRollback error, notFound func(error) error, unchanged fun
 			LiturgyID: domain.LiturgyID(id("LGPB")), Content: []byte(`{}`), PublishedBy: domain.UserID(id("U1")), PublishedAt: now}, nil)))
 	}
 	h["Published.Info"] = func(cs app.ChurchStore, _ time.Time) error {
-		if v, err := cs.Published().Info(ctx, domain.LiturgyID(id("LGPA"))); err != nil || v.ID != domain.PublishedVersionID(id("PVA")) || v.Number != 1 {
+		if v, err := cs.Published().Info(ctx, domain.LiturgyID(id("LGPA"))); err != nil || v.ID != domain.PublishedVersionID(id("P2A")) || v.Number != 2 {
 			return fmt.Errorf("own: %+v %w", v, err)
 		}
 		_, err := cs.Published().Info(ctx, domain.LiturgyID(id("LGPB")))
@@ -208,22 +212,29 @@ func liturgyHarness(errRollback error, notFound func(error) error, unchanged fun
 		return nil
 	}
 	h["Published.Latest"] = func(cs app.ChurchStore, _ time.Time) error {
-		if v, err := cs.Published().Latest(ctx, domain.LiturgyID(id("LGPA"))); err != nil || v.ID != domain.PublishedVersionID(id("PVA")) || string(v.Content) != `{"format":1}` {
+		if v, err := cs.Published().Latest(ctx, domain.LiturgyID(id("LGPA"))); err != nil || v.ID != domain.PublishedVersionID(id("P2A")) || string(v.Content) != `{"format":1,"n":2}` {
 			return fmt.Errorf("own: %+v %w", v, err)
 		}
 		_, err := cs.Published().Latest(ctx, domain.LiturgyID(id("LGPB")))
 		return notFound(err)
 	}
+	h["Published.Previous"] = func(cs app.ChurchStore, _ time.Time) error {
+		if v, err := cs.Published().Previous(ctx, domain.LiturgyID(id("LGPA"))); err != nil || v.ID != domain.PublishedVersionID(id("PVA")) || v.Number != 1 {
+			return fmt.Errorf("own: %+v %w", v, err)
+		}
+		_, err := cs.Published().Previous(ctx, domain.LiturgyID(id("LGPB")))
+		return notFound(err)
+	}
 	h["Published.ListLatest"] = func(cs app.ChurchStore, _ time.Time) error {
 		rows, total, err := cs.Published().ListLatest(ctx, app.PublishedFilter{Archived: app.ArchivedAll, Limit: 50})
-		if err != nil || total != 1 || len(rows) != 1 || rows[0].Liturgy.ID != domain.LiturgyID(id("LGPA")) || rows[0].Number != 1 {
+		if err != nil || total != 1 || len(rows) != 1 || rows[0].Liturgy.ID != domain.LiturgyID(id("LGPA")) || rows[0].Number != 2 {
 			return fmt.Errorf("list: %d %+v %w", total, rows, err)
 		}
 		return nil
 	}
 	h["Published.Upcoming"] = func(cs app.ChurchStore, _ time.Time) error {
 		rows, err := cs.Published().Upcoming(ctx, domain.UserID(id("U1")), "0001-01-01", 50)
-		if err != nil || len(rows) != 1 || rows[0].Liturgy.ID != domain.LiturgyID(id("LGPA")) || rows[0].Version.ID != domain.PublishedVersionID(id("PVA")) {
+		if err != nil || len(rows) != 1 || rows[0].Liturgy.ID != domain.LiturgyID(id("LGPA")) || rows[0].Version.ID != domain.PublishedVersionID(id("P2A")) {
 			return fmt.Errorf("upcoming: %+v %w", rows, err)
 		}
 		return nil

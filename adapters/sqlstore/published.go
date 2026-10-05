@@ -72,6 +72,22 @@ func (r publishedRepo) Latest(ctx context.Context, liturgy domain.LiturgyID) (do
 	return v, nil
 }
 
+func (r publishedRepo) Previous(ctx context.Context, liturgy domain.LiturgyID) (domain.PublishedVersion, error) {
+	var (
+		v       domain.PublishedVersion
+		content string
+		at      Time
+	)
+	err := r.tx.QueryRowContext(ctx, r.d.Rebind(`SELECT id, liturgy_id, number, content, published_by, published_at FROM published_versions
+		WHERE church_id = ? AND liturgy_id = ? ORDER BY number DESC LIMIT 1 OFFSET 1`), r.churchID, liturgy).
+		Scan(&v.ID, &v.LiturgyID, &v.Number, &content, &v.PublishedBy, &at)
+	if err != nil {
+		return domain.PublishedVersion{}, r.d.MapError(err)
+	}
+	v.Content, v.PublishedAt = []byte(content), at.Time
+	return v, nil
+}
+
 // newestVersion is true for the row of v that has the highest number of its liturgy.
 const newestVersion = `v.number = (SELECT MAX(x.number) FROM published_versions x WHERE x.church_id = v.church_id AND x.liturgy_id = v.liturgy_id)`
 

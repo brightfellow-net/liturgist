@@ -646,6 +646,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/liturgies/{id}/published/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The data for the WhatsApp texts of the newest published version (needs liturgy.approve; carries phone numbers) */
+        get: operations["getPublishedSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/liturgies/{id}/redo": {
         parameters: {
             query?: never;
@@ -1380,6 +1397,12 @@ export interface components {
             /** @enum {string} */
             status: "open" | "closed";
         };
+        AssignmentChangeView: {
+            duty: components["schemas"]["PublishedRefView"];
+            /** @enum {string} */
+            kind: "added" | "removed";
+            name: string;
+        };
         AssignmentView: {
             /**
              * Format: uri
@@ -1404,6 +1427,12 @@ export interface components {
             readonly $schema?: string;
             current_password: string;
             new_password: string;
+        };
+        ChangesView: {
+            assignments: components["schemas"]["AssignmentChangeView"][] | null;
+            items: components["schemas"]["ItemChangeView"][] | null;
+            reading: components["schemas"]["ReadingChangeView"][] | null;
+            songs: components["schemas"]["SongChangeView"][] | null;
         };
         ChurchActions: {
             edit: boolean;
@@ -1849,6 +1878,15 @@ export interface components {
         Item5: {
             name: string;
             user_id: string;
+        };
+        ItemChangeView: {
+            duty?: components["schemas"]["PublishedRefView"];
+            item_id: string;
+            /** @enum {string} */
+            kind: "added" | "removed" | "moved" | "retitled" | "duty_changed";
+            old_duty?: components["schemas"]["PublishedRefView"];
+            old_title?: string;
+            title: string;
         };
         ItemResultView: {
             /**
@@ -2551,9 +2589,34 @@ export interface components {
             song_id: string;
             title: string;
         };
+        PublishedSummaryView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/PublishedSummaryView.json
+             */
+            readonly $schema?: string;
+            assignments: components["schemas"]["SummaryAssignmentView"][] | null;
+            /** @description present when a previous version exists */
+            changes?: components["schemas"]["ChangesView"];
+            items: components["schemas"]["SummaryItemView"][] | null;
+            /** @enum {string} */
+            key_display: "do" | "letter";
+            liturgy: components["schemas"]["PublishedLiturgyView"];
+            /** Format: int64 */
+            number: number;
+            recipients: components["schemas"]["SummaryRecipientView"][] | null;
+            url: string;
+        };
         ReadingActions: {
             delete: boolean;
             edit: boolean;
+        };
+        ReadingChangeView: {
+            item_id: string;
+            item_title: string;
+            new: string;
+            old: string;
         };
         ReadingListOutputBody: {
             /**
@@ -2840,6 +2903,19 @@ export interface components {
             delete: boolean;
             edit: boolean;
         };
+        SongChangeView: {
+            /** @description the key changes inside the song differ */
+            entry_keys: boolean;
+            hymnal_number: string;
+            hymnal_source: string;
+            item_id: string;
+            item_title: string;
+            /** @enum {string} */
+            kind: "added" | "removed" | "key_changed";
+            new_key: string;
+            old_key: string;
+            title: string;
+        };
         SongDraftBody: {
             alt_titles: string[] | null;
             ccli_song_number?: string;
@@ -2967,6 +3043,36 @@ export interface components {
              */
             readonly $schema?: string;
             set_up: boolean;
+        };
+        SummaryAssignmentView: {
+            duty: components["schemas"]["PublishedRefView"];
+            names: string[] | null;
+        };
+        SummaryItemView: {
+            duty?: components["schemas"]["PublishedRefView"];
+            reading?: components["schemas"]["SummaryReadingView"];
+            songs: components["schemas"]["SummarySongView"][] | null;
+            title: string;
+            type: string;
+        };
+        SummaryReadingView: {
+            reference_display: string;
+            translation_code: string;
+        };
+        SummaryRecipientView: {
+            duties: string[] | null;
+            /** @description false for a free-text name */
+            member: boolean;
+            name: string;
+            /** @description E.164; absent for free-text names and members with no number */
+            phone?: string;
+        };
+        SummarySongView: {
+            hymnal_number: string;
+            hymnal_source: string;
+            /** @description letters; the display form is applied by the reader */
+            key: string;
+            title: string;
         };
         TeamMembersStruct: {
             /**
@@ -4893,6 +4999,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublishedCopyView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getPublishedSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublishedSummaryView"];
                 };
             };
             /** @description Error */

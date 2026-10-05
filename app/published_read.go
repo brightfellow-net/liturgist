@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/brightfellow-net/liturgist/domain"
@@ -208,4 +209,125 @@ func (u *Liturgies) MyAssignments(ctx context.Context, sess *domain.Session) (My
 		return nil
 	})
 	return res, err
+}
+
+// SummaryRecipient is a person to send a message to (13 §8): a member still in
+// the church, or a free-text name (no phone). Phone is present only in the
+// summary, and only when the member has one.
+type SummaryRecipient struct {
+	Name   string
+	Duties []string
+	Phone  string
+	Member bool // false for a free-text name
+}
+
+// SummaryAssignment is the people on one duty.
+type SummaryAssignment struct {
+	Duty  domain.PublishedRef
+	Names []string
+}
+
+// PublishedSummary is what the messages page builds the three texts from
+// (13 §8): structured data, never lyrics or reading text.
+type PublishedSummary struct {
+	Number      int
+	URL         string
+	KeyDisplay  string
+	Liturgy     domain.PublishedLiturgy
+	Items       []domain.PublishedItem // the page uses titles, duties, song headings and reading references only
+	Assignments []SummaryAssignment
+	Recipients  []SummaryRecipient
+	Changes     *domain.Changes // nil when there is no previous version
+}
+
+// SummaryOfPublished returns the data for the WhatsApp texts of the newest
+// version. It needs liturgy.approve, the scope that publishes, because it
+// carries phone numbers.
+func (u *Liturgies) SummaryOfPublished(ctx context.Context, sess *domain.Session, id domain.LiturgyID) (PublishedSummary, error) {
+	var res PublishedSummary
+	err := u.Tx.Read(ctx, func(s Store) error {
+		sc, err := actorIn(ctx, s, sess, false)
+		if err != nil {
+			return err
+		}
+		if err := sc.actor.Require(domain.ScopeLiturgyApprove); err != nil {
+			return err
+		}
+		v, err := sc.cs.Published().Latest(ctx, id)
+		if err != nil {
+			return missing(err)
+		}
+		content, err := decodeContent(v)
+		if err != nil {
+			return err
+		}
+		church, err := sc.cs.Church().Get(ctx)
+		if err != nil {
+			return err
+		}
+		res = PublishedSummary{Number: v.Number, KeyDisplay: church.Settings.KeyDisplay, Liturgy: content.Liturgy, Items: content.Items,
+			Assignments: []SummaryAssignment{}, Recipients: []SummaryRecipient{}}
+		if u.URLs != nil {
+			res.URL = u.URLs.AppURL(ctx, "/published/"+string(id))
+		}
+		if prev, err := sc.cs.Published().Previous(ctx, id); err == nil {
+			old, err := decodeContent(prev)
+			if err != nil {
+				return err
+			}
+			ch := domain.Compare(old, content)
+			res.Changes = &ch
+		} else if !errors.Is(err, ErrNotFound) {
+			return err
+		}
+		return summarisePeople(ctx, sc, content, &res)
+	})
+	return res, err
+}
+
+// summarisePeople groups the assignments by duty and by person. A member who
+// has left the church gets no entry in the recipients (and no phone is read).
+func summarisePeople(ctx context.Context, sc churchScope, content domain.PublishedContent, res *PublishedSummary) error {
+	byDuty := map[string]int{}
+	for _, a := range content.Assignments {
+		i, ok := byDuty[a.Duty.ID]
+		if !ok {
+			i = len(res.Assignments)
+			byDuty[a.Duty.ID] = i
+			res.Assignments = append(res.Assignments, SummaryAssignment{Duty: a.Duty, Names: []string{}})
+		}
+		res.Assignments[i].Names = append(res.Assignments[i].Names, a.Name)
+	}
+	at := map[string]int{} // person key -> index in Recipients
+	for _, a := range content.Assignments {
+		key := "n:" + strings.ToLower(strings.TrimSpace(a.Name))
+		phone := ""
+		if a.UserID != "" {
+			key = "u:" + string(a.UserID)
+			if _, ok := at[key]; !ok {
+				if _, err := sc.cs.Memberships().ByUser(ctx, a.UserID); errors.Is(err, ErrNotFound) {
+					at[key] = -1
+					continue
+				} else if err != nil {
+					return err
+				}
+				u, err := sc.users.ByID(ctx, a.UserID)
+				if err != nil && !errors.Is(err, ErrNotFound) {
+					return err
+				}
+				phone = u.Phone
+			}
+		}
+		i, ok := at[key]
+		if i < 0 {
+			continue
+		}
+		if !ok {
+			i = len(res.Recipients)
+			at[key] = i
+			res.Recipients = append(res.Recipients, SummaryRecipient{Name: a.Name, Duties: []string{}, Phone: phone, Member: a.UserID != ""})
+		}
+		res.Recipients[i].Duties = append(res.Recipients[i].Duties, a.Duty.Name)
+	}
+	return nil
 }
