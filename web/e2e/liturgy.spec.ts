@@ -493,3 +493,66 @@ test("E2E-W-018 print settings and the print view", async ({ browser }) => {
   expect(church.print).toMatchObject({ lyrics: "full", paper: "f4" });
   await api.dispose();
 });
+
+// E2E-W-019: reading mode, then the saved copy when the network is gone, and logging out clears it.
+test("E2E-W-019 reading mode and offline use", async ({ browser }) => {
+  const api = await adminApi();
+  const link = await createInvite("Ola Offline", "ola.offline@example.org", []);
+  const anon = await request.newContext({ baseURL });
+  const accepted = await anon.post("/api/v1/invites/accept", { data: { token: tokenOf(link), name: "Ola Offline", email: "ola.offline@example.org", password: memberPassword } });
+  expect(accepted.status(), await accepted.text()).toBe(201);
+  await anon.dispose();
+
+  const created = await api.post("/api/v1/liturgies", { data: { service_name: "Ibadah Luring", date: dateAhead(62), time: "09:00", template_id: "", language: "id" } });
+  expect(created.status(), await created.text()).toBe(201);
+  const { id, version } = (await created.json()) as { id: string; version: number };
+  const duties = (await (await api.get("/api/v1/duties")).json()) as { items: { id: string }[] };
+  const item = await api.post(`/api/v1/liturgies/${id}/items`, { data: { liturgy_version: version, title: "Doa Syafaat", item_type: "prayer", duty_id: duties.items[0].id } });
+  expect(item.status(), await item.text()).toBe(201);
+  const assignable = (await (await api.get("/api/v1/liturgies/assignable")).json()) as { items: { user_id: string; name: string }[] };
+  const olaID = assignable.items.find((m) => m.name === "Ola Offline")!.user_id;
+  const assigned = await api.post(`/api/v1/liturgies/${id}/assignments`, { data: { duty_id: duties.items[0].id, user_id: olaID } });
+  expect(assigned.status(), await assigned.text()).toBe(201);
+  let step = await (await api.post(`/api/v1/liturgies/${id}/submit`, { data: {} })).json();
+  step = await (await api.post(`/api/v1/liturgies/${id}/approve`, { data: { edit_seq: step.edit_seq } })).json();
+  const published = await api.post(`/api/v1/liturgies/${id}/publish`, { data: { edit_seq: step.edit_seq } });
+  expect(published.status(), await published.text()).toBe(200);
+  await api.dispose();
+
+  const ola = await logIn(browser, "ola.offline@example.org", memberPassword);
+  const context = ola.context();
+  // The worker takes control of the page once it is active; wait for that.
+  await ola.goto("/");
+  await ola.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
+  await ola.reload();
+  await expect.poll(() => ola.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+  await expect(ola.getByRole("listitem").filter({ hasText: "Ibadah Luring" })).toBeVisible();
+
+  // Reading mode: no menus, her part marked in words, "Go to my part" moves focus.
+  await ola.goto(`/published/${id}`);
+  await expect(ola.getByRole("heading", { name: "Ibadah Luring", level: 1 })).toBeVisible();
+  await ola.getByRole("link", { name: "Reading mode" }).click();
+  await expect(ola.getByText("Your part")).toBeVisible();
+  await expect(ola.getByRole("navigation")).toHaveCount(0);
+  await ola.getByRole("button", { name: "Go to my part" }).click();
+  await expect(ola.getByRole("heading", { name: "Doa Syafaat" })).toBeFocused();
+  await expectAccessible(ola);
+
+  // The network goes: the saved view still opens, and says what it is.
+  await context.setOffline(true);
+  await ola.reload();
+  await expect(ola.getByRole("heading", { name: "Ibadah Luring", level: 1 })).toBeVisible();
+  await expect(ola.getByText(/Offline — showing the last saved copy, published/)).toBeVisible();
+  // The app opens offline too: "My assignments" from the saved copy, nothing else.
+  await ola.goto("/");
+  await expect(ola.getByText("Offline — showing the last saved copy.")).toBeVisible();
+  await expect(ola.getByRole("listitem").filter({ hasText: "Ibadah Luring" })).toBeVisible();
+  await expect(ola.getByRole("link", { name: "Library" })).toHaveCount(0);
+  await expectAccessible(ola);
+
+  // Logging out offline clears the saved copies first.
+  await ola.getByRole("button", { name: "Log out" }).click();
+  await expect(ola.getByRole("heading", { name: /Log in/i })).toBeVisible();
+  expect(await ola.evaluate(async () => (await caches.keys()).filter((n) => n.startsWith("pub-")))).toEqual([]);
+  expect(await ola.evaluate(() => localStorage.getItem("liturgist.user"))).toBeNull();
+});

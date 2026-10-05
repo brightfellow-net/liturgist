@@ -10,7 +10,7 @@ export function PrivacyPage() {
   const { t } = useTranslation();
   const me = useQuery({ ...meQuery, retry: false, meta: { public: true } });
   const contact = me.data?.church?.privacy_contact;
-  const sections = ["what", "ip", "why", "who"] as const;
+  const sections = ["what", "ip", "why", "who", "phones", "offline"] as const;
   return (
     <PublicLayout title={t("privacy.title")}>
       {sections.map((s) => (

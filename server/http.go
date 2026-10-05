@@ -77,6 +77,9 @@ func newHandler(cfg Config, o options, ready func(context.Context) error, d deps
 		return nil, err
 	}
 	r.Handle("/assets/*", spaApp.assets())
+	for _, name := range rootFiles {
+		r.Get("/"+name, spaApp.rootFile(name))
+	}
 	r.NotFound(spaApp.index)
 	r.MethodNotAllowed(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -295,6 +298,27 @@ func (s *spa) assets() http.Handler {
 		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		files.ServeHTTP(w, r)
 	})
+}
+
+// rootFiles are the built files served at the root of the site: the service
+// worker (it must sit at the root to control every page), the manifest and
+// the home-screen icons. They are not content-hashed, so they are revalidated
+// on every use (13 §7).
+var rootFiles = []string{"sw.js", "manifest.webmanifest", "icon-192.png", "icon-512.png"}
+
+func (s *spa) rootFile(name string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !s.built {
+			http.NotFound(w, r)
+			return
+		}
+		if _, err := fs.Stat(s.dist, name); err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-cache")
+		http.ServeFileFS(w, r, s.dist, name)
+	}
 }
 
 const notBuiltPage = `<!doctype html><meta charset="utf-8"><title>Liturgist</title>

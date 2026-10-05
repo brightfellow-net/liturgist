@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import type { Me } from "@liturgist/api-client";
 import { buttonVariants } from "@/components/ui/button";
 import { ErrorAlert } from "@/components/ErrorAlert";
+import { OfflineNotice } from "@/components/OfflineNotice";
 import { longDate } from "@/lib/liturgy";
 import { assignmentsQuery } from "@/lib/published";
 import { paths, publishedPath } from "./paths";
@@ -20,9 +21,10 @@ export function HomePage() {
   const cards = mine.data?.items ?? [];
   return (
     <div className="max-w-3xl space-y-6">
-      <h1 className="text-2xl font-semibold">{t("home.title", { name: me.user.name })}</h1>
+      <h1 className="text-2xl font-semibold">{me.user.name ? t("home.title", { name: me.user.name }) : t("nav.assignments")}</h1>
       <section aria-labelledby="assignments-title" className="space-y-3">
         <h2 id="assignments-title" className="text-xl font-semibold">{t("home.assignments_title")}</h2>
+        <OfflineNotice path="/me/assignments" />
         <ErrorAlert error={mine.error} onRetry={() => void mine.refetch()} />
         {mine.isPending && <p role="status">{t("app.loading")}</p>}
         {mine.data && cards.length === 0 && <p>{t("home.assignments_empty")}</p>}

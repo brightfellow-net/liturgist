@@ -15,6 +15,7 @@ import { Field } from "@/components/Field";
 import { LoginForm } from "@/components/LoginForm";
 import { PasswordInput } from "@/components/PasswordInput";
 import { api, call } from "@/lib/api";
+import { clearOffline } from "@/lib/offline";
 import { fieldErrors, isCode } from "@/lib/errors";
 import { useFragmentToken } from "@/lib/fragmentToken";
 import { meQuery } from "@/lib/queries";
@@ -100,7 +101,10 @@ export function InvitePage() {
     meta: { public: true },
   });
   const logOut = useMutation({
-    mutationFn: () => call(api.POST("/auth/logout")),
+    mutationFn: async () => {
+      await clearOffline();
+      return call(api.POST("/auth/logout"));
+    },
     onSettled: () => queryClient.resetQueries({ queryKey: meQuery.queryKey }),
     meta: { public: true },
   });

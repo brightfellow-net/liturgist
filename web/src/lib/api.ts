@@ -3,6 +3,7 @@
 import createClient, { type Middleware } from "openapi-fetch";
 import type { paths } from "@liturgist/api-client";
 import { ApiError, NetworkError } from "./errors";
+import { trackSavedCopies } from "./offline";
 
 // jsonBody sends every unsafe request as JSON, with "{}" when it has no body,
 // as the CSRF rules require (03 §6, 05 §4).
@@ -24,6 +25,7 @@ export const api = createClient<paths>({
   fetch: (request) => globalThis.fetch(request),
 });
 api.use(jsonBody);
+api.use(trackSavedCopies);
 
 type Result<T> = { data?: T; error?: unknown; response: Response };
 

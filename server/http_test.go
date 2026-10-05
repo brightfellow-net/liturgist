@@ -142,6 +142,7 @@ func TestFrontendBuilt(t *testing.T) {
 	dist := fstest.MapFS{
 		"index.html":      {Data: []byte("<!doctype html><title>app</title>")},
 		"assets/app-1.js": {Data: []byte("console.log(1)")},
+		"sw.js":           {Data: []byte("self.skipWaiting()")},
 	}
 	h := testHandler(t, testConfig(t, "http://localhost:8080", nil), withDist(dist))
 
@@ -153,6 +154,17 @@ func TestFrontendBuilt(t *testing.T) {
 	rec = do(h, http.MethodGet, "/assets/app-1.js", "localhost", nil)
 	if rec.Code != http.StatusOK || rec.Header().Get("Cache-Control") != "public, max-age=31536000, immutable" {
 		t.Errorf("asset: %d %q", rec.Code, rec.Header().Get("Cache-Control"))
+	}
+	// The service worker is a real file at the root, never the index page, and
+	// is revalidated on every start so a new build reaches the phones (13 §7).
+	rec = do(h, http.MethodGet, "/sw.js", "localhost", nil)
+	if rec.Code != http.StatusOK || rec.Body.String() != "self.skipWaiting()" ||
+		rec.Header().Get("Cache-Control") != "no-cache" || !strings.Contains(rec.Header().Get("Content-Type"), "javascript") {
+		t.Errorf("sw.js: %d %q %q %q", rec.Code, rec.Body.String(), rec.Header().Get("Cache-Control"), rec.Header().Get("Content-Type"))
+	}
+	// A root file the build did not produce is a 404, not the index page.
+	if rec = do(h, http.MethodGet, "/manifest.webmanifest", "localhost", nil); rec.Code != http.StatusNotFound {
+		t.Errorf("missing manifest: got %d, want 404", rec.Code)
 	}
 }
 

@@ -29,3 +29,9 @@ export const assignmentsQuery = queryOptions({
   queryKey: ["assignments"],
   queryFn: () => call(api.GET("/me/assignments")),
 });
+
+// isReadingMode tells whether an address is the reading mode of a published
+// view (13 §7): "/published/{id}?read=1". AppLayout then drops its menus.
+export function isReadingMode(pathname: string, search: string): boolean {
+  return /^\/published\/[^/]+$/.test(pathname) && new URLSearchParams(search).get("read") === "1";
+}

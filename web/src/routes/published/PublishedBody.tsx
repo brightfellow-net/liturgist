@@ -8,7 +8,7 @@ type Render = { key_display: string; show_credits: boolean };
 
 // PublishedBody shows a stored copy and nothing else (13 §3): every text is
 // plain text, so it is escaped by React and never taken as HTML.
-export function PublishedBody({ content, render }: { content: PublishedContentView; render: Render }) {
+export function PublishedBody({ content, render, mine }: { content: PublishedContentView; render: Render; mine?: ReadonlySet<string> }) {
   const { t, i18n } = useTranslation();
   const { liturgy } = content;
   const items = content.items ?? [];
@@ -24,9 +24,17 @@ export function PublishedBody({ content, render }: { content: PublishedContentVi
         <p>{longDate(liturgy.date, i18n.language)}{liturgy.time && ` · ${liturgy.time}`}</p>
         <p className="text-muted-foreground">{liturgy.church_name}</p>
       </header>
-      {items.map((item) => (
-        <section key={item.id} aria-labelledby={`item-${item.id}`} className="space-y-2 border-t border-border pt-4">
-          <h2 id={`item-${item.id}`} className="text-lg font-semibold">{item.title}</h2>
+      {items.map((item) => {
+        const yours = !!item.duty && !!mine?.has(item.duty.id);
+        return (
+        <section
+          key={item.id}
+          aria-labelledby={`item-${item.id}`}
+          className={"space-y-2 border-t border-border pt-4" + (yours ? " border-l-4 border-l-primary pl-3" : "")}
+        >
+          {/* Marked in words as well as by the bar, so colour is not the only cue. */}
+          {yours && <p className="text-sm font-semibold uppercase">{t("reading.your_part")}</p>}
+          <h2 id={`item-${item.id}`} tabIndex={yours ? -1 : undefined} className="text-lg font-semibold">{item.title}</h2>
           {item.duty && (
             <p className="text-muted-foreground">
               {item.duty.name}{people(item.duty.id) && `: ${people(item.duty.id)}`}
@@ -46,7 +54,8 @@ export function PublishedBody({ content, render }: { content: PublishedContentVi
             <Song key={`${song.song_id}-${i}`} song={song} render={render} />
           ))}
         </section>
-      ))}
+        );
+      })}
       {others.length > 0 && (
         <section aria-labelledby="team" className="space-y-2 border-t border-border pt-4">
           <h2 id="team" className="text-lg font-semibold">{t("published.team")}</h2>

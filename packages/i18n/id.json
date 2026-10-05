@@ -397,7 +397,11 @@
     "who": "Anggota yang diizinkan melihat daftar anggota bisa melihat kontak. Administrator server bisa melihat semua yang tersimpan di server.",
     "contact_title": "Pertanyaan",
     "contact_default": "Tanyakan kepada admin gereja Anda.",
-    "contact_church": "Kontak: {{contact}}"
+    "contact_church": "Kontak: {{contact}}",
+    "phones_title": "Nomor telepon",
+    "phones": "Anggota yang dapat menyetujui liturgi dapat melihat nomor telepon orang yang bertugas dalam suatu liturgi, untuk mengirimkan rincian ibadah lewat WhatsApp. Anggota lain tidak pernah melihatnya.",
+    "offline_title": "Tersimpan di ponsel Anda",
+    "offline": "Agar Anda tetap bisa membaca tanpa jaringan, aplikasi ini menyimpan liturgi terbitan terakhir dan tugas Anda (sampai lima liturgi) di ponsel Anda. Semuanya dihapus saat Anda keluar. Di ponsel bersama, keluarlah setelah selesai."
   },
   "not_found": {
     "title": "Halaman tidak ditemukan",
@@ -1063,5 +1067,17 @@
     "variant_musician": "Lembar pemusik",
     "include": "Sertakan",
     "print": "Cetak / Simpan sebagai PDF"
+  },
+  "offline": {
+    "saved_copy": "Luring — menampilkan salinan terakhir yang tersimpan.",
+    "saved_copy_at": "Luring — menampilkan salinan terakhir yang tersimpan, diterbitkan {{date}}."
+  },
+  "reading": {
+    "enter": "Mode baca",
+    "exit": "Keluar dari mode baca",
+    "keep_on": "Biarkan layar menyala",
+    "keep_on_refused": "Layar tidak dapat dibiarkan menyala. Akan dicoba lagi saat Anda kembali ke halaman ini.",
+    "your_part": "Bagian Anda",
+    "go_to_my_part": "Ke bagian saya"
   }
 }

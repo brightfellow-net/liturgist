@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 import { ApiError, isCode } from "./lib/errors";
+import { clearOffline } from "./lib/offline";
 import { router } from "./router";
 import { loginWithNext, paths } from "./routes/paths";
 
@@ -12,6 +13,7 @@ function onError(err: unknown, isPublic: boolean) {
   if (isPublic) return;
   const here = router.state.location;
   if (isCode(err, "unauthenticated") && here.pathname !== paths.login) {
+    void clearOffline();
     queryClient.clear();
     void router.navigate(loginWithNext(here.pathname + here.search), { replace: true });
   } else if (isCode(err, "not_set_up")) {
@@ -19,9 +21,10 @@ function onError(err: unknown, isPublic: boolean) {
   }
 }
 
-// Reads are retried twice, but not after a 4xx answer (05 §10).
+// Reads are retried twice, but not after a 4xx answer (05 §10), and not at
+// all while the phone knows it is offline (13 §7).
 function retry(failures: number, err: unknown) {
-  return failures < 2 && !(err instanceof ApiError && err.status < 500);
+  return navigator.onLine !== false && failures < 2 && !(err instanceof ApiError && err.status < 500);
 }
 
 export const queryClient = new QueryClient({

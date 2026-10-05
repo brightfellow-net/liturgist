@@ -401,7 +401,11 @@
     "who": "Members who are allowed to see the member list can see contact details. The server's administrator can see everything stored on the server.",
     "contact_title": "Questions",
     "contact_default": "Ask your church admin.",
-    "contact_church": "Contact: {{contact}}"
+    "contact_church": "Contact: {{contact}}",
+    "phones_title": "Phone numbers",
+    "phones": "Members who can approve liturgies can see the phone numbers of the people assigned to a liturgy, to send them the service details by WhatsApp. Other members never see them.",
+    "offline_title": "Saved on your phone",
+    "offline": "To let you read when there is no network, this app saves the last published liturgies and your assignments (up to five liturgies) on your phone. They are deleted when you log out. On a shared phone, log out when you are done."
   },
   "not_found": {
     "title": "Page not found",
@@ -1076,5 +1080,17 @@
     "variant_musician": "Musician sheet",
     "include": "Include",
     "print": "Print / Save as PDF"
+  },
+  "offline": {
+    "saved_copy": "Offline — showing the last saved copy.",
+    "saved_copy_at": "Offline — showing the last saved copy, published {{date}}."
+  },
+  "reading": {
+    "enter": "Reading mode",
+    "exit": "Leave reading mode",
+    "keep_on": "Keep screen on",
+    "keep_on_refused": "The screen could not be kept on. It will try again when you return to this page.",
+    "your_part": "Your part",
+    "go_to_my_part": "Go to my part"
   }
 }

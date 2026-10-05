@@ -7,6 +7,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import "./lib/i18n";
 import "./index.css";
 import { queryClient } from "./queryClient";
+import { registerWorker } from "./lib/offline";
 import { router } from "./router";
 
 createRoot(document.getElementById("root")!).render(
@@ -16,3 +17,5 @@ createRoot(document.getElementById("root")!).render(
     </QueryClientProvider>
   </StrictMode>,
 );
+
+registerWorker();

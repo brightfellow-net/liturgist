@@ -69,3 +69,4 @@ export const liturgyPath = (id: string) => paths.liturgy.replace(":id", encodeUR
 // publishedPath fills in a liturgy's ID.
 export const publishedPrintPath = (id: string) => paths.publishedPrint.replace(":id", encodeURIComponent(id));
 export const publishedPath = (id: string) => paths.publishedView.replace(":id", encodeURIComponent(id));
+export const publishedReadPath = (id: string) => publishedPath(id) + "?read=1";

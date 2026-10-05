@@ -70,3 +70,6 @@ body {
   }
   html { font-size: 100%; }
 }
+
+/* Reading mode (13 §7): the lighter greys of the page become full contrast. */
+.reading-mode .text-muted-foreground { color: var(--foreground); }
