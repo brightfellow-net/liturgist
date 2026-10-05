@@ -7,10 +7,12 @@ package sqlstore
 
 import "golang.org/x/sys/unix"
 
-func freeBytes(dir string) (int64, error) {
+func diskUsage(dir string) (free, total int64, err error) {
 	var st unix.Statfs_t
 	if err := unix.Statfs(dir, &st); err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	return int64(st.Bavail) * int64(st.Bsize), nil //nolint:gosec,unconvert // field types differ per platform
+	free = int64(st.Bavail) * int64(st.Bsize)  //nolint:gosec,unconvert // field types differ per platform
+	total = int64(st.Blocks) * int64(st.Bsize) //nolint:gosec,unconvert // field types differ per platform
+	return free, total, nil
 }

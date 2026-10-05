@@ -23,7 +23,27 @@ import (
 var ErrAlreadyRunning = errors.New("another Liturgist process is using this data folder")
 
 // FreeBytes returns the free disk space available to the program in dir.
-func FreeBytes(dir string) (int64, error) { return freeBytes(dir) }
+func FreeBytes(dir string) (int64, error) {
+	free, _, err := diskUsage(dir)
+	return free, err
+}
+
+// DiskUsage returns the free and the total size of the disk holding dir.
+func DiskUsage(dir string) (free, total int64, err error) { return diskUsage(dir) }
+
+// freeBytes is the free space of dir, for the pre-upgrade copy.
+func freeBytes(dir string) (int64, error) { return FreeBytes(dir) }
+
+// SizeBytes is the size of the database: the SQLite file and its WAL, or what
+// PostgreSQL reports for the database.
+func (db *DB) SizeBytes(ctx context.Context) (int64, error) {
+	if db.path != "" {
+		return fileSize(db.path) + fileSize(db.path+"-wal"), nil
+	}
+	var n int64
+	err := db.reader.QueryRowContext(ctx, "SELECT pg_database_size(current_database())").Scan(&n)
+	return n, err
+}
 
 // SnapshotSpace is the free space a copy of the SQLite file at path needs:
 // the database and its WAL, plus 20 %.

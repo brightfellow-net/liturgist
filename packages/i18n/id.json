@@ -152,7 +152,8 @@
     "title": "Pengaturan",
     "church": "Gereja",
     "members": "Anggota",
-    "roles": "Peran"
+    "roles": "Peran",
+    "system": "Sistem"
   },
   "church": {
     "read_only": "Hanya anggota yang boleh mengubah pengaturan gereja yang bisa mengubah ini.",
@@ -628,7 +629,9 @@
     "unpublished_limit": "Paket Anda mengizinkan {{max}} liturgi yang belum diterbitkan. Selesaikan atau hapus satu dahulu.",
     "liturgy_archived": "Liturgi ini diarsipkan. Aktifkan lagi dahulu.",
     "not_archived": "Liturgi ini tidak diarsipkan.",
-    "publish_too_large": "Liturgi ini terlalu besar untuk diterbitkan. Butir terpanjang adalah “{{title}}”."
+    "publish_too_large": "Liturgi ini terlalu besar untuk diterbitkan. Butir terpanjang adalah “{{title}}”.",
+    "backup_running": "Pencadangan sedang berjalan. Coba lagi sebentar lagi.",
+    "not_supported": "Ini tidak didukung dengan basis data ini."
   },
   "import": {
     "title": "Impor lagu",
@@ -1137,5 +1140,44 @@
     "not_member": "Bukan anggota",
     "free_text": "Hanya nama, tanpa akun",
     "link": "Kirim ke tim"
+  },
+  "system": {
+    "title": "Sistem",
+    "intro": "Keterangan tentang server tempat gereja ini berjalan. Hanya yang boleh mengubah pengaturan gereja yang melihat halaman ini.",
+    "not_available": "Halaman ini tidak tersedia di edisi ini.",
+    "version": "Versi",
+    "database": "Basis data",
+    "database_value": "{{driver}}, {{size}}, skema {{schema}}",
+    "disk": "Ruang disk kosong",
+    "disk_value": "{{free}} dari {{total}}",
+    "last_backup": "Cadangan terakhir",
+    "last_backup_none": "Belum ada",
+    "kind_auto": "otomatis",
+    "kind_manual": "manual",
+    "backups_scheduled": "Cadangan otomatis menyala.",
+    "backups_unscheduled": "Cadangan otomatis mati.",
+    "last_copy": "Salinan terakhir yang dibawa keluar",
+    "last_copy_none": "Belum pernah",
+    "email": "Email",
+    "email_on": "Sudah diatur",
+    "email_off": "Belum diatur",
+    "https": "HTTPS",
+    "https_plain_http": "HTTP biasa",
+    "https_behind_proxy": "HTTPS lewat proxy",
+    "update": "Pembaruan",
+    "update_off": "Pemeriksaan pembaruan mati.",
+    "update_unknown": "Belum diperiksa.",
+    "update_available": "Versi {{latest}} tersedia.",
+    "update_current": "Ini versi terbaru.",
+    "download": "Unduh cadangan",
+    "download_hint": "Satu berkas berisi semua data Anda, termasuk hash kata sandi. Simpan dengan rahasia, dan simpan salinan di luar server ini.",
+    "download_unsupported": "Cadangan PostgreSQL dibuat dengan pg_dump; lihat panduan cadangan.",
+    "warn_disk_low": "Penyimpanan server hampir penuh: tersisa {{free}}. Segera kosongkan ruang, atau penyimpanan dan pencadangan bisa gagal.",
+    "warn_backup_stale": "Sudah 2 hari tanpa cadangan.",
+    "warn_backup_not_copied": "Dalam 30 hari terakhir tidak ada cadangan yang diunduh atau disalin keluar dari server ini.",
+    "warn_plain_http": "Liturgist dapat dibuka lewat HTTP biasa: kata sandi bisa terbaca di jaringan. Gunakan HTTPS.",
+    "warn_proxy_missing": "Alamatnya https, tetapi belum ada proxy tepercaya yang diatur.",
+    "open_page": "Buka halaman sistem",
+    "dismiss": "Tutup"
   }
 }

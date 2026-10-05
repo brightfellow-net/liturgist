@@ -22,6 +22,7 @@ export function SettingsLayout() {
           <NavLink to={paths.members} className={tab}>{t("settings.members")}</NavLink>
         )}
         {hasScope(me, "roles.manage") && <NavLink to={paths.roles} className={tab}>{t("settings.roles")}</NavLink>}
+        {hasScope(me, "church.settings") && <NavLink to={paths.system} className={tab}>{t("settings.system")}</NavLink>}
       </nav>
       <Outlet context={me} />
     </div>

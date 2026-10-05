@@ -7,14 +7,14 @@ package sqlstore
 
 import "golang.org/x/sys/windows"
 
-func freeBytes(dir string) (int64, error) {
+func diskUsage(dir string) (free, total int64, err error) {
 	p, err := windows.UTF16PtrFromString(dir)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	var avail uint64
-	if err := windows.GetDiskFreeSpaceEx(p, &avail, nil, nil); err != nil {
-		return 0, err
+	var avail, all uint64
+	if err := windows.GetDiskFreeSpaceEx(p, &avail, &all, nil); err != nil {
+		return 0, 0, err
 	}
-	return int64(avail), nil //nolint:gosec // free space fits in int64
+	return int64(avail), int64(all), nil //nolint:gosec // sizes fit in int64
 }

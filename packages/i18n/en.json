@@ -152,7 +152,8 @@
     "title": "Settings",
     "church": "Church",
     "members": "Members",
-    "roles": "Roles"
+    "roles": "Roles",
+    "system": "System"
   },
   "church": {
     "read_only": "Only members allowed to change church settings can edit these.",
@@ -633,7 +634,9 @@
     "unpublished_limit": "Your plan allows {{max}} liturgies that are not published yet. Finish or delete one first.",
     "liturgy_archived": "This liturgy is archived. Unarchive it first.",
     "not_archived": "This liturgy is not archived.",
-    "publish_too_large": "This liturgy is too large to publish. The longest item is “{{title}}”."
+    "publish_too_large": "This liturgy is too large to publish. The longest item is “{{title}}”.",
+    "backup_running": "A backup is running. Try again in a minute.",
+    "not_supported": "This is not supported with this database."
   },
   "import": {
     "title": "Import songs",
@@ -1150,5 +1153,44 @@
     "not_member": "Not a member",
     "free_text": "Name only, no account",
     "link": "Send to the team"
+  },
+  "system": {
+    "title": "System",
+    "intro": "Facts about the server this church runs on. Only people who can change church settings see this page.",
+    "not_available": "This page is not available in this edition.",
+    "version": "Version",
+    "database": "Database",
+    "database_value": "{{driver}}, {{size}}, schema {{schema}}",
+    "disk": "Free disk space",
+    "disk_value": "{{free}} of {{total}}",
+    "last_backup": "Last backup",
+    "last_backup_none": "None yet",
+    "kind_auto": "automatic",
+    "kind_manual": "manual",
+    "backups_scheduled": "Automatic backups are on.",
+    "backups_unscheduled": "Automatic backups are off.",
+    "last_copy": "Last copy taken away",
+    "last_copy_none": "Never",
+    "email": "Email",
+    "email_on": "Set up",
+    "email_off": "Not set up",
+    "https": "HTTPS",
+    "https_plain_http": "Plain HTTP",
+    "https_behind_proxy": "HTTPS through a proxy",
+    "update": "Updates",
+    "update_off": "The update check is off.",
+    "update_unknown": "Not checked yet.",
+    "update_available": "Version {{latest}} is available.",
+    "update_current": "This is the newest version.",
+    "download": "Download backup",
+    "download_hint": "One file with all your data, including password hashes. Keep it private, and keep a copy away from this server.",
+    "download_unsupported": "Backups of PostgreSQL are made with pg_dump; see the backup guide.",
+    "warn_disk_low": "Server storage is almost full: {{free}} left. Free some space soon, or saving and backups may fail.",
+    "warn_backup_stale": "There has been no backup in the last 2 days.",
+    "warn_backup_not_copied": "No backup has been downloaded or copied away from this server in the last 30 days.",
+    "warn_plain_http": "Liturgist is reachable over plain HTTP: passwords can be read on the network. Use HTTPS.",
+    "warn_proxy_missing": "The address says https, but no trusted proxy is set up.",
+    "open_page": "Open the system page",
+    "dismiss": "Dismiss"
   }
 }

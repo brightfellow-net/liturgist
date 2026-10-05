@@ -99,6 +99,7 @@ func WithNotifier(n app.Notifier) Option { return func(o *options) { o.notifier 
 type Server struct {
 	cfg      Config
 	db       *sqlstore.DB
+	updates  *updateChecker
 	backupMu sync.Mutex // one backup at a time (14 §4)
 	handler  http.Handler
 	single   *tenancy.SingleChurch // nil when the SaaS supplies a resolver
@@ -126,6 +127,7 @@ type useCases struct {
 	seed      *app.Seed
 	operator  *app.Operator
 	cleanup   *app.Cleanup
+	system    *app.System // community edition only
 }
 
 // wire builds the use cases on db with the options' adapters.
@@ -214,6 +216,12 @@ func New(ctx context.Context, cfg Config, opts ...Option) (*Server, error) {
 		}
 	}
 	s.uc = wire(cfg, db, &o, refresh)
+	if s.single != nil { // the community edition: the system page (14 §5)
+		if cfg.UpdateCheck {
+			s.updates = newUpdateChecker(cfg)
+		}
+		s.uc.system = &app.System{Tx: db, Info: &systemInfo{cfg: cfg, db: db, mo: mo, mu: &s.backupMu, updates: s.updates, now: time.Now}}
+	}
 	if err := s.uc.seed.Run(ctx); err != nil { // 09 §3: defaults for churches that have none
 		cfg.Logger.Error("seeding the defaults failed; the church works without them", "error", err)
 	}
@@ -228,6 +236,8 @@ func New(ctx context.Context, cfg Config, opts ...Option) (*Server, error) {
 		liturgy:  httpapi.LiturgyDeps{Liturgies: s.uc.liturgies, Log: cfg.Logger},
 		session:  httpapi.SessionMiddleware(s.uc.auth, cookies, s.uc.auth.Clock, cfg.Logger),
 		resolver: o.resolver,
+		system:   httpapi.SystemDeps{System: s.uc.system, Log: cfg.Logger},
+		hosted:   s.single == nil,
 	}
 	if s.handler, err = newHandler(cfg, o, readyCheck(db, mo), d); err != nil {
 		_ = db.Close()
@@ -257,6 +267,9 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 	go s.cleanupLoop(ctx)
 	s.startBackups(ctx)
+	if s.updates != nil {
+		go s.updates.run(ctx)
+	}
 
 	srv := &http.Server{
 		Addr:              s.cfg.Listen,
@@ -358,6 +371,6 @@ func OpenAPI(opts ...Option) ([]byte, error) {
 	for _, opt := range opts {
 		opt(&o)
 	}
-	api := newAPI(nil, o, deps{})
+	api := newAPI(nil, o, deps{hosted: o.resolver != nil})
 	return api.OpenAPI().MarshalJSON()
 }

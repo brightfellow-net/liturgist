@@ -358,6 +358,7 @@ func TestTenancyDeclarations(t *testing.T) {
 		"publishLiturgy": "church", "archiveLiturgy": "church", "unarchiveLiturgy": "church",
 		"listPublished": "church", "getPublished": "church", "listMyAssignments": "church", "getPublishedSummary": "church",
 		"listLiturgyStateChanges": "church", "listLiturgyComments": "church", "addLiturgyComment": "church", "setLiturgyCommentResolved": "church",
+		"getSystemStatus": "church", "downloadBackup": "church", // community edition only (14 §5)
 		"saasExtra": "church", // added through WithRoutes without a declaration
 	}
 	extra := WithRoutes(func(api huma.API) {

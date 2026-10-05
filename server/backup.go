@@ -27,7 +27,7 @@ var (
 	ErrNoDatabase     = errors.New("there is no database in the data folder")
 	ErrBackupExists   = errors.New("that file already exists")
 	ErrNotEnoughSpace = errors.New("not enough free disk space")
-	ErrStorageFull    = errors.New("server storage is full")
+	ErrStorageFull    = app.ErrStorageFull
 	ErrServerRunning  = errors.New("stop the server first: another Liturgist process is using this data folder")
 	ErrDeclined       = errors.New("nothing was changed")
 	ErrBackupDamaged  = backup.ErrDamaged
@@ -94,7 +94,11 @@ func Backup(ctx context.Context, cfg Config, dest string) (BackupResult, error) 
 	if _, err := os.Lstat(dest); err == nil {
 		return BackupResult{}, ErrBackupExists
 	}
-	return writeBackup(ctx, cfg, dest)
+	res, err := writeBackup(ctx, cfg, dest)
+	if err == nil && !insideBackups(dataDir, dest) {
+		markCopied(dataDir) // a copy outside the data folder counts for the system page's warning
+	}
+	return res, err
 }
 
 // writeBackup is Backup after the checks: space, snapshot, integrity, archive.

@@ -281,6 +281,8 @@ var conflicts = map[error]*Problem{
 	app.ErrReviewStale:         problem(http.StatusConflict, "review_stale", "The liturgy changed after you opened it. Read it again."),
 	app.ErrCommentLimit:        problem(http.StatusUnprocessableEntity, "comment_limit", "This liturgy has reached its limit of comments."),
 	app.ErrEmptyLiturgy:        problem(http.StatusUnprocessableEntity, "empty_liturgy", "Add at least one item before submitting."),
+	app.ErrBackupRunning:       problem(http.StatusConflict, "backup_running", "A backup is running. Try again in a minute."),
+	app.ErrNotSupported:        problem(http.StatusBadRequest, "not_supported", "This is not supported with this database."),
 	app.ErrInviteMismatch: problem(http.StatusForbidden, "invite_identifier_mismatch",
 		"This invite is for another account. Log out and log in as that person."),
 }

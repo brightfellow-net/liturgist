@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { expect, request, test } from "@playwright/test";
 import { baseURL, churchName } from "./env";
-import { adminPage, createMember, logIn, memberPassword } from "./helpers";
+import fs from "node:fs";
+import { adminPage, createMember, expectAccessible, logIn, memberPassword } from "./helpers";
 
 test("E2E-W-002 invite and accept", async ({ browser }) => {
   const admin = await adminPage(browser);
@@ -85,4 +86,31 @@ test("E2E-W-006 role editor", async ({ browser }) => {
   await expect(tabs.getByRole("link")).toHaveText(["Church", "Members"]); // no Roles
   await tabs.getByRole("link", { name: "Members" }).click();
   await expect(page.getByText("Lukas", { exact: true })).toBeVisible();
+});
+
+test("E2E-W-021 the system page and the backup download", async ({ browser }) => {
+  const admin = await adminPage(browser);
+  await admin.goto("/settings/church");
+  await admin.getByRole("navigation", { name: "Settings" }).getByRole("link", { name: "System" }).click();
+  await expect(admin.getByRole("heading", { name: "System" })).toBeVisible();
+  await expect(admin.getByText(/^sqlite, .*schema \d+$/)).toBeVisible();
+  await expect(admin.getByText("The update check is off.")).toBeVisible();
+  await expectAccessible(admin);
+
+  const download = admin.waitForEvent("download");
+  await admin.getByRole("link", { name: "Download backup" }).click();
+  const file = await download;
+  expect(file.suggestedFilename()).toMatch(/^liturgist-.+-\d{4}-\d{2}-\d{2}\.zip$/);
+  const bytes = fs.readFileSync(await file.path());
+  expect(bytes.subarray(0, 2).toString()).toBe("PK"); // a zip
+
+  // Downloading counts as taking a copy away.
+  await admin.reload();
+  await expect(admin.getByText("Never")).toHaveCount(0);
+
+  // A team member has no System tab and the API refuses them.
+  await createMember("Dewi", "dewi@example.org");
+  const member = await logIn(browser, "dewi@example.org", memberPassword);
+  const res = await member.request.get("/api/v1/system/status");
+  expect(res.status()).toBe(403);
 });

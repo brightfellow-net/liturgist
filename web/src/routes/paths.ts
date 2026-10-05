@@ -12,6 +12,7 @@ export const paths = {
   churchSettings: "/settings/church",
   members: "/settings/members",
   roles: "/settings/roles",
+  system: "/settings/system",
   privacy: "/privacy",
   library: "/library",
   songNew: "/library/songs/new",

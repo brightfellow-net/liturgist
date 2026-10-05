@@ -75,6 +75,7 @@ func Load(getenv func(string) string) (server.Config, LogOptions, error) {
 	cfg.AutoMigrate = parseBool(get("LITURGIST_AUTO_MIGRATE", "true"), "LITURGIST_AUTO_MIGRATE", fail)
 	cfg.RequirePreUpgradeCopy = parseBool(get("LITURGIST_REQUIRE_PREUPGRADE_COPY", "false"), "LITURGIST_REQUIRE_PREUPGRADE_COPY", fail)
 
+	cfg.UpdateCheck = parseBool(get("LITURGIST_UPDATE_CHECK", "false"), "LITURGIST_UPDATE_CHECK", fail)
 	cfg.BackupTime, cfg.BackupKeepDaily, cfg.BackupKeepWeekly = parseBackup(get, fail)
 
 	cfg.SessionTTL = parseDuration(get("LITURGIST_SESSION_TTL", "2160h"), "LITURGIST_SESSION_TTL", fail)

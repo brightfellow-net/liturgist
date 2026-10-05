@@ -435,3 +435,26 @@ func TestStorageErr(t *testing.T) {
 		t.Errorf("other error changed: %v", err)
 	}
 }
+
+// A backup written outside the data folder counts as a copy taken away (H-5);
+// one in backups/ does not.
+func TestBackupMarksCopiesTakenAway(t *testing.T) {
+	cfg := seeded(t)
+	ctx := context.Background()
+	marker := filepath.Join(cfg.DataDir, "backups", copyMarker)
+	if _, err := Backup(ctx, cfg, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Backup(ctx, cfg, filepath.Join(cfg.DataDir, "backups", "named.zip")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(marker); err == nil {
+		t.Error("a backup inside backups/ was counted as a copy taken away")
+	}
+	if _, err := Backup(ctx, cfg, filepath.Join(t.TempDir(), "usb.zip")); err != nil {
+		t.Fatal(err)
+	}
+	if lastCopied(cfg.DataDir) == nil {
+		t.Error("a backup written elsewhere was not counted")
+	}
+}

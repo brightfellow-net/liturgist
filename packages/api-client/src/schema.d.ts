@@ -1240,6 +1240,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/system/backup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download a backup archive (church.settings) */
+        get: operations["downloadBackup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/system/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The system page: version, disk, backups, HTTPS (church.settings) */
+        get: operations["getSystemStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/templates": {
         parameters: {
             query?: never;
@@ -3073,6 +3107,78 @@ export interface components {
             /** @description letters; the display form is applied by the reader */
             key: string;
             title: string;
+        };
+        SystemStatusView: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/SystemStatusView.json
+             */
+            readonly $schema?: string;
+            backup: components["schemas"]["SystemStatusViewBackupStruct"];
+            commit: string;
+            database: components["schemas"]["SystemStatusViewDatabaseStruct"];
+            disk: components["schemas"]["SystemStatusViewDiskStruct"];
+            email_configured: boolean;
+            https: components["schemas"]["SystemStatusViewHTTPSStruct"];
+            update: components["schemas"]["SystemStatusViewUpdateStruct"];
+            version: string;
+        };
+        SystemStatusViewBackupStruct: {
+            /**
+             * Format: date-time
+             * @description the newest automatic or manual backup; null when there is none
+             */
+            last_at: string | null;
+            /**
+             * Format: date-time
+             * @description the last download, or backup written outside the data folder
+             */
+            last_copied_at: string | null;
+            /**
+             * @description empty when there is none
+             * @enum {string}
+             */
+            last_kind: "auto" | "manual" | "";
+            /** @description automatic backups are on */
+            scheduled: boolean;
+            /** @description false with PostgreSQL: use pg_dump */
+            supported: boolean;
+            /**
+             * @description stale: no backup in 48 hours; not_copied: no copy taken away in 30 days
+             * @enum {string}
+             */
+            warning: "stale" | "not_copied" | "";
+        };
+        SystemStatusViewDatabaseStruct: {
+            /** @enum {string} */
+            driver: "sqlite" | "postgres";
+            /** Format: int64 */
+            schema_version: number;
+            /** Format: int64 */
+            size_bytes: number;
+        };
+        SystemStatusViewDiskStruct: {
+            /** Format: int64 */
+            free_bytes: number;
+            /** @description under 1 GiB or 5 % free, whichever is larger */
+            low: boolean;
+            /** Format: int64 */
+            total_bytes: number;
+        };
+        SystemStatusViewHTTPSStruct: {
+            /** @enum {string} */
+            mode: "plain_http" | "behind_proxy";
+            /** @description reachable on the network over plain HTTP */
+            plain_http_warning: boolean;
+            /** @description BASE_URL says https but no trusted proxy is configured */
+            proxy_missing_warning: boolean;
+        };
+        SystemStatusViewUpdateStruct: {
+            available: boolean;
+            enabled: boolean;
+            /** @description newest release tag seen; empty before the first check */
+            latest: string;
         };
         TeamMembersStruct: {
             /**
@@ -6604,6 +6710,62 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    downloadBackup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getSystemStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemStatusView"];
+                };
             };
             /** @description Error */
             default: {

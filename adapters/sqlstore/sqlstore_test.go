@@ -410,3 +410,13 @@ func TestStorageFullMapping(t *testing.T) {
 		}
 	})
 }
+
+// The system page's database size on both dialects.
+func TestSizeBytes(t *testing.T) {
+	sqlstoretest.ForEachDialect(t, func(t *testing.T, db *sqlstore.DB) {
+		n, err := db.SizeBytes(ctx)
+		if err != nil || n <= 0 {
+			t.Errorf("size %d, error %v", n, err)
+		}
+	})
+}

@@ -15,9 +15,10 @@ import { isReadingMode } from "@/lib/published";
 import i18n, { chooseLanguage } from "@/lib/i18n";
 import { meQuery } from "@/lib/queries";
 import { showPlanning, showSettings } from "@/lib/scopes";
+import { SystemBanners } from "@/components/SystemBanners";
 import { loginWithNext, paths } from "./paths";
 
-const settingsPaths: string[] = [paths.churchSettings, paths.members, paths.roles];
+const settingsPaths: string[] = [paths.churchSettings, paths.members, paths.roles, paths.system];
 
 // AppLayout is the frame of every page for logged-in members: it loads
 // GET /me, applies the user's language and text size, and shows the menu.
@@ -108,6 +109,7 @@ export function AppLayout() {
           <Button variant="ghost" onClick={() => void logOut()}>{t("nav.log_out")}</Button>
         </div>
       </header>
+      <SystemBanners me={me.data} />
       <main id="main" className="mx-auto max-w-4xl px-4 py-6 print:max-w-none print:p-0">
         <Outlet context={me.data} />
       </main>

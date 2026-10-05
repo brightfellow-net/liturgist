@@ -27,6 +27,7 @@ func TestDefaults(t *testing.T) {
 		"DBDriver":      {cfg.DBDriver, "sqlite"},
 		"AutoMigrate":   {cfg.AutoMigrate, true},
 		"StrictCopy":    {cfg.RequirePreUpgradeCopy, false},
+		"UpdateCheck":   {cfg.UpdateCheck, false},
 		"BackupTime":    {cfg.BackupTime, "02:00"},
 		"BackupDaily":   {cfg.BackupKeepDaily, 7},
 		"BackupWeekly":  {cfg.BackupKeepWeekly, 4},
@@ -145,5 +146,15 @@ func TestBackupSettings(t *testing.T) {
 		if !strings.Contains(err.Error(), key) {
 			t.Errorf("error does not mention %s: %v", key, err)
 		}
+	}
+}
+
+// H-13: the update check is off unless asked for.
+func TestUpdateCheckSetting(t *testing.T) {
+	if cfg, _, err := Load(env(map[string]string{"LITURGIST_UPDATE_CHECK": "true"})); err != nil || !cfg.UpdateCheck {
+		t.Errorf("true: %v %v", cfg.UpdateCheck, err)
+	}
+	if _, _, err := Load(env(map[string]string{"LITURGIST_UPDATE_CHECK": "maybe"})); err == nil || !strings.Contains(err.Error(), "LITURGIST_UPDATE_CHECK") {
+		t.Errorf("maybe: %v", err)
 	}
 }

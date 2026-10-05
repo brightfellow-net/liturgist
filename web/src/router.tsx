@@ -37,6 +37,7 @@ import { ChurchSettingsPage } from "./routes/settings/ChurchSettingsPage";
 import { MembersPage } from "./routes/settings/MembersPage";
 import { RolesPage } from "./routes/settings/RolesPage";
 import { SettingsLayout } from "./routes/settings/SettingsLayout";
+import { SystemPage } from "./routes/settings/SystemPage";
 import { SetupPage } from "./routes/SetupPage";
 import { paths } from "./routes/paths";
 
@@ -92,6 +93,7 @@ export const router = createBrowserRouter([
           { path: paths.churchSettings, element: <ChurchSettingsPage /> },
           { path: paths.members, element: <MembersPage /> },
           { path: paths.roles, element: <RolesPage /> },
+          { path: paths.system, element: <SystemPage /> },
         ],
       },
     ],

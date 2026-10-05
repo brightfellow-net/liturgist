@@ -35,6 +35,8 @@ type Config struct {
 	AutoMigrate           bool
 	AllowNewerSchema      bool // --allow-newer-schema: only skips the refusal to start (02 §5.1)
 	RequirePreUpgradeCopy bool
+	UpdateCheck           bool   // ask GitHub once a day for the newest release (14 §5, H-13)
+	UpdateURL             string // the releases endpoint; "" = the project's
 	BackupTime            string // "HH:MM" daily automatic backup; "" = none (14 §4)
 	BackupKeepDaily       int    // 0 = 7
 	BackupKeepWeekly      int    // 0 = 4; set BackupKeepWeekly to -1 for none
@@ -70,15 +72,22 @@ func withDefaults(cfg Config) Config {
 // StartupWarnings returns the configuration warnings of 01 §5 (logged, never fatal).
 func StartupWarnings(cfg Config) []string {
 	var w []string
-	httpBase := cfg.BaseURL.Scheme == "http"
-	noProxies := len(cfg.TrustedProxies) == 0
-	if !isLoopbackListen(cfg.Listen) && httpBase && noProxies {
+	plainHTTP, proxyMissing := httpWarnings(cfg)
+	if plainHTTP {
 		w = append(w, "Liturgist is reachable on the network over plain HTTP. Passwords and session cookies can be read on the network; use HTTPS (see the install guide).")
 	}
-	if !httpBase && noProxies {
+	if proxyMissing {
 		w = append(w, "BASE_URL says https, but nothing here terminates TLS; configure the TLS proxy as a trusted proxy.")
 	}
 	return w
+}
+
+// httpWarnings are the two conditions of StartupWarnings: reachable over
+// plain HTTP, and a BASE_URL that says https with no trusted proxy.
+func httpWarnings(cfg Config) (plainHTTP, proxyMissing bool) {
+	httpBase := cfg.BaseURL.Scheme == "http"
+	noProxies := len(cfg.TrustedProxies) == 0
+	return !isLoopbackListen(cfg.Listen) && httpBase && noProxies, !httpBase && noProxies
 }
 
 func isLoopbackListen(listen string) bool {

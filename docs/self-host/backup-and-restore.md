@@ -31,6 +31,23 @@ With SQLite, the server makes a backup every day at 02:00 (in the church's time 
 - These backups are on the same disk as the database: **also copy them somewhere else**.
 - A save that fails because the disk is full shows "Server storage is full. Ask the person who runs the server to free some space."
 
+## Download a backup from the browser
+
+People who can change church settings (the Church admin role) see **Settings → System**. It shows the version, database size, free disk space, the last backup, whether a copy was taken away, HTTPS and updates, and has a **Download backup** button. The download is the same zip as `liturgist backup`, made on the spot; it is logged (`backup_downloaded`, with who and how big, never the content). Treat the file like the database: it contains everyone's data and password hashes.
+
+The page and a banner at the top of every page warn church admins when:
+
+- the disk has under 1 GiB free, or under 5 % free if that is more;
+- there has been no backup for 2 days;
+- no backup was downloaded, or written outside the data folder with `liturgist backup /somewhere/else.zip`, for 30 days (a copy on the same disk does not survive the disk). A church younger than these limits is not warned yet;
+- Liturgist is reachable over plain HTTP, or its address says https but no trusted proxy is set.
+
+With PostgreSQL the download is not offered; use `pg_dump` (below).
+
+### Update check (optional)
+
+`LITURGIST_UPDATE_CHECK=true` makes the server ask `api.github.com` once a day for the newest release, and the System page then says whether an update is available. The request sends only the program name and version (`User-Agent: liturgist/<version>`), no data about your church. It is **off by default**, and nothing is ever installed automatically.
+
 ## Restore a backup
 
 1. **Stop the server** (`systemctl stop liturgist`, close the console window, or stop the container). `restore` refuses to run while the server is running.

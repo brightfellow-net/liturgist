@@ -36,6 +36,8 @@ type deps struct {
 	liturgy  httpapi.LiturgyDeps
 	session  func(http.Handler) http.Handler // nil: no session middleware (OpenAPI only)
 	resolver httpapi.TenantResolver          // nil: no tenant middleware (OpenAPI only)
+	system   httpapi.SystemDeps
+	hosted   bool // a tenant resolver was supplied: the system routes are not registered (14 §5, H-8)
 }
 
 func newHandler(cfg Config, o options, ready func(context.Context) error, d deps) (http.Handler, error) {
@@ -106,6 +108,9 @@ func newAPI(router chi.Router, o options, d deps) huma.API {
 	httpapi.RegisterLibrary(api, d.library)
 	httpapi.RegisterPlanning(api, d.planning)
 	httpapi.RegisterLiturgies(api, d.liturgy)
+	if !d.hosted {
+		httpapi.RegisterSystem(api, d.system)
+	}
 	for _, fn := range o.routes {
 		fn(api)
 	}

@@ -26,6 +26,7 @@ export type ProviderTextView = Schemas["ProviderTextView"];
 export type TemplateView = Schemas["TemplateView"];
 export type TemplateSummaryView = Schemas["TemplateSummaryView"];
 export type ServiceView = Schemas["ServiceView"];
+export type SystemStatusView = Schemas["SystemStatusView"];
 
 // Liturgies (10 §4).
 export type LiturgyView = Schemas["LiturgyView"];
