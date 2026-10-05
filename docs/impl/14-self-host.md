@@ -284,7 +284,7 @@ Merged to `main` as `edb4182`. Code: `server/https.go` (`builtInHTTPS`, `redirec
 | With a domain | `LITURGIST_LISTEN` is ignored (the Docker image sets it); `LITURGIST_BASE_URL` defaults to `https://<domain>` and must equal it if set; `LITURGIST_TRUSTED_PROXIES` is a configuration error; no start-up warnings |
 | Listeners | HTTPS (app) on the HTTPS port; the plain port answers ACME HTTP-01, `/healthz`, `/readyz` and 308-redirects the rest. The TLS-ALPN challenge is answered on the HTTPS port. `AltHTTPPort`/`AltTLSALPNPort` are set to the configured ports so certmagic starts no listener of its own |
 | Certificates | `<data>/certs` (certmagic file storage); not in backups (a test checks it) |
-| Agreement | Setting the domain counts as accepting the CA's subscriber agreement (`Agreed = true`); the guide says so |
+| Agreement | Changed in [§21](#21-liturgist_acme_agree-is-required-2026-10-05): the operator must set `LITURGIST_ACME_AGREE=true` |
 | Health check | uses the plain port, no certificate needed |
 | Dependency | `certmagic` v0.25.6 with 9 new modules (zerossl, cpuid, libdns, acmez, miekg/dns, blake3, zap, zap/exp) and `golang.org/x/net` v0.58 to v0.59; the binary grows about 1.8 MB (29.4 to 31.2 MB) |
 
@@ -295,3 +295,9 @@ Verified: a run against a Pebble test ACME server (certificate issued, HTTP/2 se
 A follow-up to 6D, which left commands typed by hand unaware of the service's settings. `loadServiceSettings` (`cmd/liturgist/envfile.go`) runs first in `run`: when `%ProgramData%\Liturgist\liturgist.env` exists it is read into the environment (variables already set win) and `LITURGIST_DATA_DIR` defaults to the service's `data` folder. Skipped for `service`, `version` and `openapi`; a malformed file stops the command and names the line; nothing happens when the file does not exist, and on Linux there is no service folder. `runService` uses the same `applySettings` and `defaultDataDir`; a settings file that exists but cannot be opened now stops the service with a logged error instead of being ignored. The guide `install-windows.md` says so, and warns not to run `serve` by hand beside the service. No line says which file was used (kept quiet so `backup` output stays clean).
 
 Tests: TC-611 (read, environment wins, explicit data folder kept, no file, skipped commands, bad file), four mutations caught. **Not verified:** on a real Windows machine, including a folder that needs administrator rights to read.
+
+## 21. LITURGIST_ACME_AGREE is required (2026-10-05)
+
+Replaces the "agreement" row of §19: setting `LITURGIST_DOMAIN` no longer counts as accepting the certificate authority's subscriber agreement. With a domain, `LITURGIST_ACME_AGREE=true` (case-insensitive; any other value is refused) is required; without it `envconfig.Load` fails with the setting's name and the Let's Encrypt agreement URL (exit code 2). `Config.ACMEAgreed` carries it, and `acmeTLS` refuses to run without it, so a `Config` built in code cannot skip it. Without a domain the setting is not read. Chosen by the owner on 2026-10-05 because nothing was released yet, so the extra line breaks no one. The guides (`https-builtin.md`, `configuration.md`) show the line.
+
+Tests: TC-612 (the setting is required, `""`, `false`, `yes` and `1` refused; the server refuses without it), the domain tests pass the agreement so each rejection has its own reason; three mutations caught. The certmagic flow itself was not rerun against Pebble; it sets `Agreed` as before, behind the check.
