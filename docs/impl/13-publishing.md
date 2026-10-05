@@ -233,6 +233,20 @@ Merged as `ec7f4c4`. Differences and additions to the text above:
 - **Tests.** `TestReadPublished`, `TestListPublished`, `TestMyAssignments` (church time zone, a person removed in version 2), `TestMyAssignmentsMore` (cut at 50), `TestReadPublishedHTTP`, 12 Vitest tests (WT-P-002, WT-P-003), E2E-W-017 extended. Dropping the newest-version condition of `Upcoming`, or reading the copy through `openLiturgy`, each fails a test. Go on both dialects; Vitest 237; Playwright 37 (the whole suite once, then E2E-W-017 again after a locator fix).
 - **Not run:** golangci-lint (the v1/v2 config mismatch of step 3 still stands).
 
+### 11.4 Slice 5C as built (2026-10-05)
+
+Merged as `d7cae7c`. Differences and additions to the text above:
+
+- **Settings.** `domain.ChurchSettings` gains `ShowCredits *bool` (not set reads as true), `LicenceFooter` and `Print *PrintDefaults`; a known key of the wrong type, or a `print` object with a value outside the lists, reads as not set. `ValidateChurch` trims the footer and checks 200 characters and the `print` values. `PATCH /church` and `GET /church` carry the three keys; `GET` always shows the defaults filled in. 04 §6 already lists them.
+- **Footer.** `buildPublished` copies the church's footer into the copy at publish. A changed footer reaches old copies only at their next version; `show_credits` and the `print` defaults reach them at once through `render`.
+- **Print page.** `/published/:id/print` (`PrintPage`, `PrintBody`, `lib/print.ts`). The options are in the query string (`variant`, `paper`, `lyrics`, `size`, and `readings`, `assignments`, `keys`, `notes` as `1` / `0`); an invalid value falls back to the church default. `@page` is `A4` or `215mm 330mm`, margin 15 mm. The menu, footer and controls are `print:hidden`; paper is always dark on white.
+- **Musician sheet.** It always prints the first line of each section, whatever `lyrics` says, and the Lyrics control is hidden for it. Readings and assignments do not apply to it. The licence line is printed on it when credits are on; the copyright lines are not.
+- **Readings off** prints the reference line and leaves out the reading text.
+- **Header** date and time are printed as stored, without conversion.
+- **Layout rules** are `break-after-avoid` on the song heading and notes, and `break-inside-avoid` on a heading with its first row and on every row of the sequence; tests check the classes, not page counts.
+- **Tests.** TC `TestChurchPrintSettings`; `TestPrintSettings` (render, footer at publish, replace, clear, refusal, scope); IT-P-016 `TestPrintSettingsHTTP`; WT-P-004 (`PrintPage.test.tsx`), WT-P-005 (settings page); E2E-W-018. Showing credits on the musician sheet, ignoring `show_credits`, not copying the footer, and skipping the print validation each fails a test. Go on both dialects; Vitest 252; Playwright 38.
+- **Not run:** golangci-lint (the v1/v2 config mismatch of step 3 still stands). The Indonesian texts of the Printing section, the sheets and the options are drafts for the owner.
+
 ## 12. Anti-patterns (DO NOT)
 
 | ❌ Don't | ✅ Do instead | Why |
