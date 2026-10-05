@@ -202,6 +202,21 @@ Applied 2026-10-05 in the commit that approved this document.
 | [12 §2](12-review.md#2-states-and-transitions-p-68) | `reopen` from `published`; the re-read order with the archived branch; `Transition` also requires `archived_at IS NULL` |
 | [SPEC.md §8.2.1](../SPEC.md#821-usage-limits-saas-free-plan) rule 3 and §11 | A liturgy that has been published cannot be deleted even after a reopen (decision-log row) |
 
+### 11.2 Slice 5A as built (2026-10-05)
+
+Merged as `bb3d6cc`. Differences and additions to the text above:
+
+- **Migration** `00010_published.sql` (both dialects): `published_versions` (foreign key to `liturgies` `NO ACTION`) and `published_assignees`. `published_assignees` is written now and read from slice 5B on.
+- **Code.** `domain/published.go` (the content types, `SectionLabelIn`), `domain.ActionPublish` and `reopen` from `published` in the transition table, `app/liturgy_publish.go` (`buildPublished`, `Archive`, `Unarchive`), `PublishedRepo` (`Create`, `Info`, `Exists`; `Latest`, `Previous`, `Upcoming` come with 5B and 5E), `LiturgyRepo.Archive` / `Unarchive`, `Transition` requires `archived_at IS NULL`, `Delete` is conditional, `List` takes an `Archived` filter and reports `HasVersions`, `Liturgies.PrepareCreateArchiving`.
+- **Song reads.** The song row and its sections are two statements, not one join; the sections (the text) are one statement, so the text of a song is consistent as a set.
+- **Licence footer.** `licence_footer` is stored empty until slice 5C adds the church setting.
+- **Archived liturgies in the list.** `GET /liturgies` hides them unless `archived=true` or `all` is given (§10 wins over the "as before" of §4); the page has a "Show archived" switch.
+- **Archive-and-create.** The page archives the oldest published liturgies dated before the week's Monday (the doc said "last week's"); the server checks every ID. `archive_ids` and the response field `archived` are on `POST /liturgies/prepare`.
+- **Logs.** `liturgy_published`, `liturgy_reopened`, `liturgy_archived`, `liturgy_unarchived` carry the actor and the liturgy ID; the state left and the content size are not logged.
+- **Messages.** The per-limit texts replace the old liturgy-limit message on every path, create included. The Indonesian texts and the Indonesian section words (Bait, Pra-refren, Refren, Jembatan, Tag, Intro, Penutup, Bagian) are drafts for the owner.
+- **Tests.** TC-P-001; IT-P-001, 002, 003, 004 (free-running delete race and the foreign-key backstop, not forced interleavings for reopen and library delete), 005, 006 (including the forced PostgreSQL interleaving `TestReopenLimitForced`), 007, 008, 011, 013, 015; `TestReviewVisibility` rewritten for P-79; WT-P-001 and the prepare button tests; E2E-W-017. Removing the church lock on reopen, the conditional delete (the foreign key still refuses), the `published` exception in `openLiturgy`, or the version insert each fails a test. Go on both dialects; Vitest 225; Playwright 37. Not covered by their own test: the `archived_at IS NULL` condition of `Transition` (the use case checks first). `SelectForTest` is a new test hook; the scoped-repository snapshot also covers comments and state changes now.
+- **Not run:** golangci-lint (the v1/v2 config mismatch of step 3 still stands).
+
 ## 12. Anti-patterns (DO NOT)
 
 | ❌ Don't | ✅ Do instead | Why |

@@ -49,7 +49,7 @@
 
 ## 1d. Documents for step 5
 
-[SPEC.md §10](../SPEC.md#10-suggested-build-order), step 5: publishing with `PublishedVersion`, the published view, "my assignments", the print view, reading mode with offline use, and WhatsApp messages. **Status: decisions Approved** 2026-10-05 (Spec Gate 9.0/10, self-scored; adversarial review round 5 done). Built in five slices: 5A publishing, 5B reading views, 5C print, 5D reading mode and offline, 5E WhatsApp messages.
+[SPEC.md §10](../SPEC.md#10-suggested-build-order), step 5: publishing with `PublishedVersion`, the published view, "my assignments", the print view, reading mode with offline use, and WhatsApp messages. **Status: decisions Approved** 2026-10-05 (Spec Gate 9.0/10, self-scored; adversarial review round 5 done). Built in five slices: 5A publishing (**merged** 2026-10-05, [13 §11.2](13-publishing.md#112-slice-5a-as-built-2026-10-05)), 5B reading views, 5C print, 5D reading mode and offline, 5E WhatsApp messages.
 
 | Document | Covers |
 |---|---|
