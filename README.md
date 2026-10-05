@@ -1,6 +1,6 @@
 # Liturgist
 
-Liturgist helps a church plan its services: the order of worship, songs and Scripture readings, a review step, and publishing the result to the people who serve. It is free software for a single church to run on its own computer, with an Indonesian-first interface and English.
+Liturgist helps a church plan its services: the order of worship, songs and Scripture readings, a review step, and publishing the result to the people who serve. It is free software for a single church to run on its own computer, with an English and Indonesian interface (English first).
 
 Status: before version 1.0. The pilot church is GKY Citragarden.
 
