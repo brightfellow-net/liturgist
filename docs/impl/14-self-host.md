@@ -123,7 +123,7 @@ Runs with the server stopped (H-2). Order, each step before the next:
 | Slice | Content | Decisions needed first |
 |---|---|---|
 | **6A** (**merged** 2026-10-05, [§14](#14-slice-6a-as-built-2026-10-05)) | `serve` run lock; `backup`; `restore`; the zip format; shared free-space helper; `backup-and-restore.md` (first draft) | H-1, H-2, H-6 |
-| **6B** | Scheduler, retention, config; `storage_full` 507 and its strings | H-3, H-4 |
+| **6B** (**merged** 2026-10-05, [§15](#15-slice-6b-as-built-2026-10-05)) | Scheduler, retention, config; `storage_full` 507 and its strings | H-3, H-4 |
 | **6C** | System routes, system page, banners, download | H-5, H-8, H-9, H-14 (+ H-13 if built) |
 | **6D** | Dockerfile, GoReleaser, release workflow, systemd unit, Windows service, `healthcheck` | H-10, H-11, H-12 |
 | **6E** | The rest of the guides and the README | none |
@@ -213,3 +213,18 @@ Merged to `main` as `2ac8faf`. Code: `internal/backup` (zip, manifest, entry che
 | Sessions stay in a restored database (as H-14) | Not changed by restore |
 
 Tests: TC-601, 602, 603, 604, 605, 608, 609 (mapping), IT-601 (server and CLI), IT-603, plus restore over a damaged database, a manifest that understates the schema, and the CLI exit code 3. TC-606, 607, 610 and IT-602, 604 to 606 belong to later slices. Go suite green on SQLite and PostgreSQL; golangci-lint not run.
+
+## 15. Slice 6B as built (2026-10-05)
+
+Merged to `main` as `9184097`. Code: `server/backup_scheduler.go` (scheduler, retention, stale-temp cleanup), `server/config.go` and `internal/envconfig` (`LITURGIST_BACKUP_TIME`, `_KEEP_DAILY`, `_KEEP_WEEKLY`), `app.ErrStorageFull` with its mappings in `adapters/sqlstore` and the 507 problem in `adapters/httpapi/problem.go`, the web messages in `packages/i18n`. Guide: the "Automatic backups" section of [backup-and-restore.md](../self-host/backup-and-restore.md).
+
+| Deviation from §2 and §4 | Why |
+|---|---|
+| `LITURGIST_BACKUP_KEEP_WEEKLY=0` means no weekly backups; `Config.BackupKeepWeekly` is `-1` for that and `0` for the default 4 | Zero in a hand-built `Config` means "the default" |
+| A hand-built `Config{}` has automatic backups off; `02:00` is the default only from the environment | Tests and the hosted edition must not back up by accident |
+| Weeks are ISO weeks in the church's time zone | Matches the 02:00 slot |
+| A week that already has a kept backup (daily or an earlier weekly pick) keeps nothing more | Makes "the newest one of each of the 4 ISO weeks before them" exact |
+| `storage_full` is a new `app.ErrStorageFull`, no longer a kind of `ErrUnavailable`; 507 is added to [01 §10](01-foundation.md); it is not declared per operation in the OpenAPI document | A full disk and a busy database need different messages |
+| 6A fix: `storageErr` tested `ErrUnavailable` (also a busy database); it now tests `ErrStorageFull` and `ENOSPC` | Wrong message for a busy database |
+
+Tests: TC-606, TC-607, TC-609 (all parts), the scheduler wiring (community, SQLite, time set), the church time zone lookup, the env settings. TC-610 and IT-602, 604 to 606 belong to later slices. Go suite green on SQLite and PostgreSQL; Vitest 302; golangci-lint not run.

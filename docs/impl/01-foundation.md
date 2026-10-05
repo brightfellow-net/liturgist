@@ -282,6 +282,7 @@ RFC 9457 problem details (`application/problem+json`, Huma's default) extended w
 | `too_many_streams` | 429 | The member already has 5 live-update streams open on this liturgy; `Retry-After` (seconds) ([11 §7.1](11-liturgy-editor.md#71-server-sent-events-p-66)) |
 | `internal` | 500 | Unexpected error; details only in the log |
 | `unavailable` | 503 | Database unreachable; also the live-update stream cap of the server (with `Retry-After`) |
+| `storage_full` | 507 | The disk holding the database is full (SQLite `SQLITE_FULL`, PostgreSQL `53100`); the message tells the user to ask whoever runs the server to free space |
 
 ## 11. CI (GitHub Actions)
 
