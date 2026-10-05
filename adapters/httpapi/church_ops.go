@@ -216,12 +216,28 @@ func RegisterChurch(api huma.API, d ChurchDeps) {
 				KeyDisplay             *string   `json:"key_display,omitempty" maxLength:"10"`
 				FeedbackURL            OptString `json:"feedback_url,omitempty" required:"false" doc:"null or \"\" clears"`
 				PrivacyContact         OptString `json:"privacy_contact,omitempty" required:"false" doc:"null or \"\" clears"`
+				ShowCredits            *bool     `json:"show_credits,omitempty"`
+				LicenceFooter          *string   `json:"licence_footer,omitempty" maxLength:"1000" doc:"\"\" clears; at most 200 characters"`
+				Print                  *struct {
+					Paper       string `json:"paper" enum:"a4,f4"`
+					Lyrics      string `json:"lyrics" enum:"full,first_lines"`
+					Readings    bool   `json:"readings"`
+					Assignments bool   `json:"assignments"`
+					Keys        bool   `json:"keys"`
+					Notes       bool   `json:"notes"`
+					Size        string `json:"size" enum:"normal,large"`
+				} `json:"print,omitempty" doc:"A complete object that replaces the old one"`
 			}
 		}) (*churchOutput, error) {
 			b := in.Body
 			ch := app.ChurchChange{Name: b.Name, DefaultUILanguage: b.DefaultUILanguage, DefaultLanguage: b.DefaultLanguage,
 				DefaultTranslationCode: b.DefaultTranslationCode, TimeZone: b.TimeZone, KeyDisplay: b.KeyDisplay,
-				FeedbackURL: b.FeedbackURL.ptr(), PrivacyContact: b.PrivacyContact.ptr()}
+				FeedbackURL: b.FeedbackURL.ptr(), PrivacyContact: b.PrivacyContact.ptr(),
+				ShowCredits: b.ShowCredits, LicenceFooter: b.LicenceFooter}
+			if p := b.Print; p != nil {
+				ch.Print = &domain.PrintDefaults{Paper: p.Paper, Lyrics: p.Lyrics, Readings: p.Readings, Assignments: p.Assignments,
+					Keys: p.Keys, Notes: p.Notes, Size: p.Size}
+			}
 			res, err := d.Churches.Update(ctx, sess(ctx), ch)
 			if err != nil {
 				return nil, fail(ctx, err)

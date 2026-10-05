@@ -1433,8 +1433,11 @@ export interface components {
             id: string;
             /** @enum {string} */
             key_display: "do" | "letter";
+            licence_footer: string;
             name: string;
+            print: components["schemas"]["PrintDefaultsView"];
             privacy_contact: string | null;
+            show_credits: boolean;
             time_zone: string;
         };
         CommentListView: {
@@ -2355,6 +2358,30 @@ export interface components {
             template_name: string | null;
             time: string;
         };
+        PrintDefaultsView: {
+            assignments: boolean;
+            keys: boolean;
+            /** @enum {string} */
+            lyrics: "full" | "first_lines";
+            notes: boolean;
+            /** @enum {string} */
+            paper: "a4" | "f4";
+            readings: boolean;
+            /** @enum {string} */
+            size: "normal" | "large";
+        };
+        PrintStruct: {
+            assignments: boolean;
+            keys: boolean;
+            /** @enum {string} */
+            lyrics: "full" | "first_lines";
+            notes: boolean;
+            /** @enum {string} */
+            paper: "a4" | "f4";
+            readings: boolean;
+            /** @enum {string} */
+            size: "normal" | "large";
+        };
         Problem: {
             /**
              * Format: uri
@@ -2498,6 +2525,7 @@ export interface components {
         PublishedRenderView: {
             /** @enum {string} */
             key_display: "do" | "letter";
+            print: components["schemas"]["PrintDefaultsView"];
             show_credits: boolean;
         };
         PublishedSectionView: {
@@ -3050,9 +3078,14 @@ export interface components {
             /** @description null or "" clears */
             feedback_url?: string | null;
             key_display?: string;
+            /** @description "" clears; at most 200 characters */
+            licence_footer?: string;
             name?: string;
+            /** @description A complete object that replaces the old one */
+            print?: components["schemas"]["PrintStruct"];
             /** @description null or "" clears */
             privacy_contact?: string | null;
+            show_credits?: boolean;
             time_zone?: string;
         };
         UpdateImportCandidateRequest: {

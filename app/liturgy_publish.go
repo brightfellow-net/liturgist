@@ -62,7 +62,8 @@ func buildPublished(ctx context.Context, sc churchScope, l domain.Liturgy) (cont
 		return &domain.PublishedRef{ID: id, Name: m[id]}
 	}
 	c := domain.PublishedContent{Format: domain.PublishedFormat, Items: make([]domain.PublishedItem, 0, len(items)),
-		Liturgy: domain.PublishedLiturgy{Date: l.Date, Time: l.Time, ServiceName: l.ServiceName, Language: l.Language, ChurchName: church.Name}}
+		Liturgy:       domain.PublishedLiturgy{Date: l.Date, Time: l.Time, ServiceName: l.ServiceName, Language: l.Language, ChurchName: church.Name},
+		LicenceFooter: church.Settings.LicenceFooter}
 	songs := map[domain.SongID]domain.Song{}
 	sizes := make([]int, len(items))
 	for i, it := range items {

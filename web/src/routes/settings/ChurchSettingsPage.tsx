@@ -27,6 +27,15 @@ const schema = z.object({
   key_display: z.enum(["do", "letter"]),
   feedback_url: z.string().trim().refine((v) => v === "" || v.startsWith("https://"), "church.feedback_url_invalid"),
   privacy_contact: z.string().trim().max(500),
+  show_credits: z.boolean(),
+  licence_footer: z.string().trim().max(200, "church.licence_footer_long"),
+  print_paper: z.enum(["a4", "f4"]),
+  print_lyrics: z.enum(["full", "first_lines"]),
+  print_readings: z.boolean(),
+  print_assignments: z.boolean(),
+  print_keys: z.boolean(),
+  print_notes: z.boolean(),
+  print_size: z.enum(["normal", "large"]),
 });
 type Values = z.infer<typeof schema>;
 type FieldName = keyof Values;
@@ -36,6 +45,18 @@ function valuesOf(c: ChurchView): Values {
     name: c.name, default_ui_language: c.default_ui_language, default_language: c.default_language,
     default_translation_code: c.default_translation_code, time_zone: c.time_zone, key_display: c.key_display,
     feedback_url: c.feedback_url ?? "", privacy_contact: c.privacy_contact ?? "",
+    show_credits: c.show_credits, licence_footer: c.licence_footer,
+    print_paper: c.print.paper, print_lyrics: c.print.lyrics, print_readings: c.print.readings,
+    print_assignments: c.print.assignments, print_keys: c.print.keys, print_notes: c.print.notes, print_size: c.print.size,
+  };
+}
+
+// The print settings go out as one complete object that replaces the old one (13 §6).
+function bodyOf(v: Values) {
+  const { print_paper, print_lyrics, print_readings, print_assignments, print_keys, print_notes, print_size, ...rest } = v;
+  return {
+    ...rest,
+    print: { paper: print_paper, lyrics: print_lyrics, readings: print_readings, assignments: print_assignments, keys: print_keys, notes: print_notes, size: print_size },
   };
 }
 
@@ -55,7 +76,7 @@ function ChurchForm({ church }: { church: ChurchView }) {
   const translations = useQuery(translationsQuery);
   const form = useForm<Values>({ resolver: zodResolver(schema), values: valuesOf(church) });
   const save = useMutation({
-    mutationFn: (v: Values) => call(api.PATCH("/church", { body: v })),
+    mutationFn: (v: Values) => call(api.PATCH("/church", { body: bodyOf(v) })),
     onSuccess: async (updated) => {
       queryClient.setQueryData(churchQuery.queryKey, updated);
       await queryClient.invalidateQueries({ queryKey: meQuery.queryKey }); // name and default language
@@ -115,6 +136,37 @@ function ChurchForm({ church }: { church: ChurchView }) {
         <Field label={t("church.privacy_contact")} hint={t("church.privacy_contact_hint")} error={msg(e.privacy_contact?.message)}>
           <Input {...form.register("privacy_contact")} />
         </Field>
+        <fieldset className="space-y-4">
+          <legend className="text-lg font-semibold">{t("church.printing")}</legend>
+          <label className="flex min-h-12 items-center gap-3">
+            <input type="checkbox" className="size-5" {...form.register("show_credits")} />
+            {t("church.show_credits")}
+          </label>
+          <Field label={t("church.licence_footer")} hint={t("church.licence_footer_hint")} error={msg(e.licence_footer?.message)}>
+            <Input {...form.register("licence_footer")} />
+          </Field>
+          <Field label={t("print.paper")}>
+            <Select {...form.register("print_paper")}>
+              {(["a4", "f4"] as const).map((v) => <option key={v} value={v}>{t(`print.paper_${v}`)}</option>)}
+            </Select>
+          </Field>
+          <Field label={t("print.lyrics")}>
+            <Select {...form.register("print_lyrics")}>
+              {(["full", "first_lines"] as const).map((v) => <option key={v} value={v}>{t(`print.lyrics_${v}`)}</option>)}
+            </Select>
+          </Field>
+          {(["readings", "assignments", "keys", "notes"] as const).map((k) => (
+            <label key={k} className="flex min-h-12 items-center gap-3">
+              <input type="checkbox" className="size-5" {...form.register(`print_${k}`)} />
+              {t(`print.${k}`)}
+            </label>
+          ))}
+          <Field label={t("print.size")}>
+            <Select {...form.register("print_size")}>
+              {(["normal", "large"] as const).map((v) => <option key={v} value={v}>{t(`print.size_${v}`)}</option>)}
+            </Select>
+          </Field>
+        </fieldset>
         {canEdit && <Button type="submit" disabled={save.isPending}>{t("profile.save")}</Button>}
       </fieldset>
     </form>

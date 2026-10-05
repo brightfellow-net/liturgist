@@ -58,3 +58,15 @@ body {
   font-family: system-ui, sans-serif;
   line-height: 1.5;
 }
+
+/* Paper is always dark on white, whatever the screen setting (13 §6). */
+@media print {
+  :root {
+    --background: #ffffff;
+    --foreground: #000000;
+    --muted-foreground: #333333;
+    --border: #999999;
+    color-scheme: light;
+  }
+  html { font-size: 100%; }
+}

@@ -25,16 +25,64 @@ type Church struct {
 	UpdatedAt            time.Time
 }
 
+// PrintDefaults are the church's defaults for the print view (13 §6).
+type PrintDefaults struct {
+	Paper       string `json:"paper"`  // a4 | f4
+	Lyrics      string `json:"lyrics"` // full | first_lines
+	Readings    bool   `json:"readings"`
+	Assignments bool   `json:"assignments"`
+	Keys        bool   `json:"keys"`
+	Notes       bool   `json:"notes"`
+	Size        string `json:"size"` // normal | large
+}
+
+// DefaultPrint is what a church that never set the options gets.
+var DefaultPrint = PrintDefaults{Paper: "a4", Lyrics: "full", Readings: true, Assignments: true, Keys: true, Notes: true, Size: "normal"}
+
+// Allowed print values (13 §6).
+var (
+	PrintPapers = []string{"a4", "f4"}
+	PrintLyrics = []string{"full", "first_lines"}
+	PrintSizes  = []string{"normal", "large"}
+)
+
+// Validate checks the values of a complete print object.
+func (p PrintDefaults) Validate(field string) error {
+	switch {
+	case !slices.Contains(PrintPapers, p.Paper):
+		return &InvalidInputError{Field: field + ".paper", Message: "Must be a4 or f4."}
+	case !slices.Contains(PrintLyrics, p.Lyrics):
+		return &InvalidInputError{Field: field + ".lyrics", Message: "Must be full or first_lines."}
+	case !slices.Contains(PrintSizes, p.Size):
+		return &InvalidInputError{Field: field + ".size", Message: "Must be normal or large."}
+	}
+	return nil
+}
+
 // ChurchSettings is the settings JSON object. Keys this version doesn't know
 // are kept in Extra and written back unchanged (schema churches.settings).
 type ChurchSettings struct {
-	KeyDisplay     string // do | letter
-	FeedbackURL    string // "" = none
-	PrivacyContact string // "" = none
+	KeyDisplay     string         // do | letter
+	FeedbackURL    string         // "" = none
+	PrivacyContact string         // "" = none
+	ShowCredits    *bool          // nil = not set = true (13 §6)
+	LicenceFooter  string         // "" = none
+	Print          *PrintDefaults // nil = DefaultPrint
 	Extra          map[string]json.RawMessage
 }
 
-var knownSettings = []string{"key_display", "feedback_url", "privacy_contact"}
+// CreditsShown is show_credits with its default.
+func (s ChurchSettings) CreditsShown() bool { return s.ShowCredits == nil || *s.ShowCredits }
+
+// PrintOrDefault is the print options with their defaults.
+func (s ChurchSettings) PrintOrDefault() PrintDefaults {
+	if s.Print == nil {
+		return DefaultPrint
+	}
+	return *s.Print
+}
+
+var knownSettings = []string{"key_display", "feedback_url", "privacy_contact", "show_credits", "licence_footer", "print"}
 
 // MarshalJSON writes known keys (omitting empty ones) plus the preserved extras.
 func (s ChurchSettings) MarshalJSON() ([]byte, error) {
@@ -42,29 +90,52 @@ func (s ChurchSettings) MarshalJSON() ([]byte, error) {
 	for k, v := range s.Extra {
 		m[k] = v
 	}
-	for k, v := range map[string]string{"key_display": s.KeyDisplay, "feedback_url": s.FeedbackURL, "privacy_contact": s.PrivacyContact} {
+	for _, k := range knownSettings {
+		delete(m, k)
+	}
+	for k, v := range map[string]string{"key_display": s.KeyDisplay, "feedback_url": s.FeedbackURL, "privacy_contact": s.PrivacyContact, "licence_footer": s.LicenceFooter} {
 		if v != "" {
 			m[k] = v
-		} else {
-			delete(m, k)
 		}
+	}
+	if s.ShowCredits != nil {
+		m["show_credits"] = *s.ShowCredits
+	}
+	if s.Print != nil {
+		m["print"] = *s.Print
 	}
 	return json.Marshal(m)
 }
 
-// UnmarshalJSON reads known keys and keeps the rest.
+// UnmarshalJSON reads known keys and keeps the rest. A known key of the wrong
+// type reads as not set.
 func (s *ChurchSettings) UnmarshalJSON(b []byte) error {
 	var m map[string]json.RawMessage
 	if err := json.Unmarshal(b, &m); err != nil {
 		return err
 	}
 	*s = ChurchSettings{}
-	dst := map[string]*string{"key_display": &s.KeyDisplay, "feedback_url": &s.FeedbackURL, "privacy_contact": &s.PrivacyContact}
+	dst := map[string]*string{"key_display": &s.KeyDisplay, "feedback_url": &s.FeedbackURL, "privacy_contact": &s.PrivacyContact, "licence_footer": &s.LicenceFooter}
 	for _, k := range knownSettings {
-		if raw, ok := m[k]; ok {
-			_ = json.Unmarshal(raw, dst[k]) // a non-string value reads as empty
-			delete(m, k)
+		raw, ok := m[k]
+		if !ok {
+			continue
 		}
+		switch k {
+		case "show_credits":
+			var v bool
+			if json.Unmarshal(raw, &v) == nil {
+				s.ShowCredits = &v
+			}
+		case "print":
+			var v PrintDefaults
+			if json.Unmarshal(raw, &v) == nil && v.Validate("print") == nil {
+				s.Print = &v
+			}
+		default:
+			_ = json.Unmarshal(raw, dst[k]) // a non-string value reads as empty
+		}
+		delete(m, k)
 	}
 	if len(m) > 0 {
 		s.Extra = m
@@ -103,6 +174,15 @@ func ValidateChurch(c *Church, fieldPrefix string) error {
 	}
 	if utf8.RuneCountInString(c.Settings.PrivacyContact) > 500 {
 		return &InvalidInputError{Field: fieldPrefix + "privacy_contact", Message: "At most 500 characters."}
+	}
+	c.Settings.LicenceFooter = strings.TrimSpace(c.Settings.LicenceFooter)
+	if utf8.RuneCountInString(c.Settings.LicenceFooter) > 200 {
+		return &InvalidInputError{Field: fieldPrefix + "licence_footer", Message: "At most 200 characters."}
+	}
+	if c.Settings.Print != nil {
+		if err := c.Settings.Print.Validate(fieldPrefix + "print"); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -431,3 +431,65 @@ test("E2E-W-017 publish, archive, unarchive and reopen", async ({ browser }) => 
   expect(del.status()).toBe(409);
   await api.dispose();
 });
+
+// E2E-W-018: the church's print settings, then the print view of a published liturgy.
+test("E2E-W-018 print settings and the print view", async ({ browser }) => {
+  const admin = await adminPage(browser);
+  await admin.goto("/settings/church");
+  await admin.getByLabel("Licence line").fill("CCLI License #7654321");
+  await admin.getByLabel("Paper").selectOption("f4");
+  await admin.getByLabel("Show notes").uncheck();
+  await expectAccessible(admin);
+  await admin.getByRole("button", { name: "Save" }).click();
+  await expect(admin.getByText("Saved.")).toBeVisible();
+  await admin.reload();
+  await expect(admin.getByLabel("Licence line")).toHaveValue("CCLI License #7654321");
+  await expect(admin.getByLabel("Paper")).toHaveValue("f4");
+  await expect(admin.getByLabel("Show notes")).not.toBeChecked();
+
+  const songId = await createSong({ title: "Besar Setia-Mu", hymnal_source: "KJ", hymnal_number: "12", sections: [{ kind: "verse", number: 1, text: "Besar setia-Mu\nTak berkesudahan" }] });
+  const api = await adminApi();
+  const created = await api.post("/api/v1/liturgies", { data: { service_name: "Ibadah Cetak", date: dateAhead(61), time: "08:00", template_id: "", language: "id" } });
+  expect(created.status(), await created.text()).toBe(201);
+  const { id, version } = (await created.json()) as { id: string; version: number };
+  const duties = (await (await api.get("/api/v1/duties")).json()) as { items: { id: string }[] };
+  const item = await api.post(`/api/v1/liturgies/${id}/items`, { data: { liturgy_version: version, title: "Pujian", item_type: "song", duty_id: duties.items[0].id } });
+  expect(item.status(), await item.text()).toBe(201);
+  const made = (await item.json()) as { item: { id: string; version: number } };
+  const added = await api.post(`/api/v1/liturgies/${id}/items/${made.item.id}/songs`, { data: { version: made.item.version, song_id: songId } });
+  expect(added.status(), await added.text()).toBe(201);
+  let step = await (await api.post(`/api/v1/liturgies/${id}/submit`, { data: {} })).json();
+  step = await (await api.post(`/api/v1/liturgies/${id}/approve`, { data: { edit_seq: step.edit_seq } })).json();
+  const published = await api.post(`/api/v1/liturgies/${id}/publish`, { data: { edit_seq: step.edit_seq } });
+  expect(published.status(), await published.text()).toBe(200);
+
+  // From the published view to the print view; the church defaults are the starting point.
+  await admin.goto(`/published/${id}`);
+  await admin.getByRole("link", { name: "Print" }).click();
+  await expect(admin.getByRole("heading", { name: "Ibadah Cetak", level: 1 })).toBeVisible();
+  await expect(admin.getByLabel("Paper")).toHaveValue("f4");
+  await expect(admin.getByText("CCLI License #7654321")).toBeVisible();
+  await expect(admin.getByText("Tak berkesudahan")).toBeVisible();
+  await expectAccessible(admin);
+
+  // Choosing changes this page and its address, and keeps after a reload.
+  await admin.getByLabel("Lyrics").selectOption("first_lines");
+  await expect(admin.getByText("Tak berkesudahan")).toHaveCount(0);
+  await admin.reload();
+  await expect(admin.getByLabel("Lyrics")).toHaveValue("first_lines");
+  expect(admin.url()).toContain("lyrics=first_lines");
+  await admin.getByLabel("Sheet").selectOption("musician");
+  await expect(admin.getByRole("heading", { name: /Besar Setia-Mu/, level: 3 })).toBeVisible();
+
+  // On paper: no menu, no controls, and the paper size of the page.
+  await admin.emulateMedia({ media: "print" });
+  await expect(admin.getByRole("navigation")).toBeHidden();
+  await expect(admin.getByRole("button", { name: "Print / Save as PDF" })).toBeHidden();
+  await expect(admin.getByRole("heading", { name: "Ibadah Cetak", level: 1 })).toBeVisible();
+  await admin.emulateMedia({ media: "screen" });
+
+  // The church defaults did not change by choosing here.
+  const church = (await (await api.get("/api/v1/church")).json()) as { print: { lyrics: string; paper: string } };
+  expect(church.print).toMatchObject({ lyrics: "full", paper: "f4" });
+  await api.dispose();
+});

@@ -23,7 +23,25 @@ type ChurchView struct {
 	KeyDisplay             string            `json:"key_display" enum:"do,letter"`
 	FeedbackURL            *string           `json:"feedback_url"`
 	PrivacyContact         *string           `json:"privacy_contact"`
+	ShowCredits            bool              `json:"show_credits"`
+	LicenceFooter          string            `json:"licence_footer"`
+	Print                  PrintDefaultsView `json:"print"`
 	Actions                app.ChurchActions `json:"actions"`
+}
+
+// PrintDefaultsView is the church's print options with their defaults filled in (13 §6).
+type PrintDefaultsView struct {
+	Paper       string `json:"paper" enum:"a4,f4"`
+	Lyrics      string `json:"lyrics" enum:"full,first_lines"`
+	Readings    bool   `json:"readings"`
+	Assignments bool   `json:"assignments"`
+	Keys        bool   `json:"keys"`
+	Notes       bool   `json:"notes"`
+	Size        string `json:"size" enum:"normal,large"`
+}
+
+func printDefaultsView(p domain.PrintDefaults) PrintDefaultsView {
+	return PrintDefaultsView{Paper: p.Paper, Lyrics: p.Lyrics, Readings: p.Readings, Assignments: p.Assignments, Keys: p.Keys, Notes: p.Notes, Size: p.Size}
 }
 
 func churchView(r app.ChurchResult) ChurchView {
@@ -31,7 +49,8 @@ func churchView(r app.ChurchResult) ChurchView {
 	return ChurchView{ID: string(c.ID), Name: c.Name, DefaultUILanguage: c.DefaultUILanguage,
 		DefaultLanguage: c.DefaultLanguage, DefaultTranslationCode: r.TranslationCode, TimeZone: c.TimeZone,
 		KeyDisplay: c.Settings.KeyDisplay, FeedbackURL: optional(c.Settings.FeedbackURL),
-		PrivacyContact: optional(c.Settings.PrivacyContact), Actions: r.Actions}
+		PrivacyContact: optional(c.Settings.PrivacyContact), ShowCredits: c.Settings.CreditsShown(),
+		LicenceFooter: c.Settings.LicenceFooter, Print: printDefaultsView(c.Settings.PrintOrDefault()), Actions: r.Actions}
 }
 
 // RoleRef names a role.

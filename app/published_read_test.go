@@ -4,6 +4,8 @@
 package app_test
 
 import (
+	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -310,6 +312,69 @@ func TestMyAssignmentsMore(t *testing.T) {
 		res, err := e.liturgies.MyAssignments(e.ctx, me)
 		if err != nil || len(res.Items) != 50 || !res.More || res.Items[0].Liturgy.Date != "2026-11-01" || res.Items[49].Liturgy.Date != "2026-12-20" {
 			t.Fatalf("%d cards, more=%v, %v", len(res.Items), res.More, err)
+		}
+	})
+}
+
+// 13 §6, P-81: the print settings change the render of the next read, the
+// licence footer is part of the copy as published, and the print object
+// replaces the old one.
+func TestPrintSettings(t *testing.T) {
+	sqlstoretest.ForEachDialect(t, func(t *testing.T, db *sqlstore.DB) {
+		r := newReviewEnv(t, db)
+		r.rich()
+		r.approve()
+		r.mustPublish() // before any setting: no footer
+		read := func() app.PublishedCopy {
+			t.Helper()
+			c, err := r.liturgies.ReadPublished(r.ctx, r.team, r.lid)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return c
+		}
+		if c := read(); !c.Render.ShowCredits || c.Render.Print != domain.DefaultPrint || c.Content.LicenceFooter != "" {
+			t.Errorf("defaults: %+v", c.Render)
+		}
+		off, footer := false, "CCLI License #1234567"
+		p := domain.PrintDefaults{Paper: "f4", Lyrics: "first_lines", Readings: false, Assignments: true, Keys: false, Notes: true, Size: "large"}
+		if _, err := r.churches.Update(r.ctx, r.a, app.ChurchChange{ShowCredits: &off, LicenceFooter: &footer, Print: &p}); err != nil {
+			t.Fatal(err)
+		}
+		// The render follows the settings at once; the footer of an old copy does not change.
+		if c := read(); c.Render.ShowCredits || c.Render.Print != p || c.Content.LicenceFooter != "" {
+			t.Errorf("after the change: %+v footer %q", c.Render, c.Content.LicenceFooter)
+		}
+		// A new copy carries the footer.
+		r.must(r.a, domain.ActionReopen, nil, "again")
+		r.approve()
+		r.mustPublish()
+		if c := read(); c.Number != 2 || c.Content.LicenceFooter != footer {
+			t.Errorf("second copy: %d %q", c.Number, c.Content.LicenceFooter)
+		}
+		// Other keys of the settings are kept when only one is sent; "" clears the footer.
+		empty := ""
+		res, err := r.churches.Update(r.ctx, r.a, app.ChurchChange{LicenceFooter: &empty})
+		if err != nil || res.Church.Settings.CreditsShown() || res.Church.Settings.PrintOrDefault() != p || res.Church.Settings.LicenceFooter != "" {
+			t.Errorf("clear the footer: %+v %v", res.Church.Settings, err)
+		}
+		// Bad values are refused and change nothing.
+		bad := p
+		bad.Paper = "a3"
+		long := strings.Repeat("x", 201)
+		var invalid *domain.InvalidInputError
+		if _, err := r.churches.Update(r.ctx, r.a, app.ChurchChange{Print: &bad}); !errors.As(err, &invalid) || invalid.Field != "print.paper" {
+			t.Errorf("paper a3: %v", err)
+		}
+		if _, err := r.churches.Update(r.ctx, r.a, app.ChurchChange{LicenceFooter: &long}); !errors.As(err, &invalid) || invalid.Field != "licence_footer" {
+			t.Errorf("footer of 201 characters: %v", err)
+		}
+		if got, _ := r.churches.Get(r.ctx, r.a); got.Church.Settings.PrintOrDefault() != p {
+			t.Errorf("a refused update changed the settings: %+v", got.Church.Settings)
+		}
+		// Only church.settings may change them.
+		if _, err := r.churches.Update(r.ctx, r.team, app.ChurchChange{ShowCredits: &off}); !errors.Is(err, app.ErrForbidden) {
+			t.Errorf("team member: %v", err)
 		}
 	})
 }

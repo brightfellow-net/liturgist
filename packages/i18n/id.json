@@ -160,7 +160,12 @@
     "feedback_url_hint": "Opsional. Tautan yang diawali https:// untuk jemaat mengirim masukan.",
     "feedback_url_invalid": "Tautan harus diawali https://.",
     "privacy_contact": "Kontak privasi",
-    "privacy_contact_hint": "Opsional. Tampil di halaman privasi, misalnya nama dan nomor HP."
+    "privacy_contact_hint": "Opsional. Tampil di halaman privasi, misalnya nama dan nomor HP.",
+    "printing": "Cetak",
+    "show_credits": "Tampilkan keterangan hak cipta lagu pada liturgi yang dicetak dan diterbitkan",
+    "licence_footer": "Baris lisensi",
+    "licence_footer_hint": "Opsional. Dicetak di kaki setiap liturgi, mis. CCLI License #1234567. Disalin ke liturgi saat diterbitkan.",
+    "licence_footer_long": "Paling banyak 200 karakter."
   },
   "members": {
     "title": "Anggota",
@@ -1034,6 +1039,29 @@
     "not_published": "Liturgi ini belum diterbitkan.",
     "update_app": "Perbarui aplikasi untuk membaca liturgi ini.",
     "team": "Tim",
-    "ccli": "CCLI {{number}}"
+    "ccli": "CCLI {{number}}",
+    "print": "Cetak"
+  },
+  "print": {
+    "paper": "Kertas",
+    "paper_a4": "A4",
+    "paper_f4": "F4 (215 × 330 mm)",
+    "lyrics": "Syair",
+    "lyrics_full": "Syair lengkap",
+    "lyrics_first_lines": "Baris pertama saja",
+    "readings": "Tampilkan bacaan",
+    "assignments": "Tampilkan petugas",
+    "keys": "Tampilkan nada dasar",
+    "notes": "Tampilkan catatan",
+    "size": "Ukuran huruf",
+    "size_normal": "Normal",
+    "size_large": "Besar",
+    "title": "Cetak",
+    "back": "Kembali ke liturgi",
+    "variant": "Lembar",
+    "variant_team": "Lembar tim",
+    "variant_musician": "Lembar pemusik",
+    "include": "Sertakan",
+    "print": "Cetak / Simpan sebagai PDF"
   }
 }

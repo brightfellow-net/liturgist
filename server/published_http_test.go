@@ -136,3 +136,53 @@ func TestReadPublishedHTTP(t *testing.T) {
 		t.Errorf("revising card: %d %v", code, body)
 	}
 }
+
+// IT-P-016: PATCH /church takes the print settings; the print object is
+// complete or refused, and GET /church always shows the defaults filled in.
+func TestPrintSettingsHTTP(t *testing.T) {
+	h := harnessWith(t)
+	admin := h.setupChurch()
+	team := h.invite(admin, "team@example.org")
+	patch := func(c *http.Cookie, body any) (int, map[string]any) {
+		rec := h.do(req{method: "PATCH", path: "/api/v1/church", cookies: []*http.Cookie{c}, body: body})
+		return rec.Code, decode(t, rec)
+	}
+	code, church := patch(admin, map[string]any{})
+	pr, _ := church["print"].(map[string]any)
+	if code != 200 || church["show_credits"] != true || church["licence_footer"] != "" || pr["paper"] != "a4" || pr["lyrics"] != "full" ||
+		pr["readings"] != true || pr["size"] != "normal" {
+		t.Fatalf("defaults: %d %v", code, church)
+	}
+	full := map[string]any{"paper": "f4", "lyrics": "first_lines", "readings": false, "assignments": true, "keys": true, "notes": false, "size": "large"}
+	code, church = patch(admin, map[string]any{"show_credits": false, "licence_footer": "CCLI License #1234567", "print": full})
+	pr, _ = church["print"].(map[string]any)
+	if code != 200 || church["show_credits"] != false || church["licence_footer"] != "CCLI License #1234567" || pr["paper"] != "f4" || pr["notes"] != false {
+		t.Fatalf("set: %d %v", code, church)
+	}
+	// A sub-key missing, or a value outside the list: 422, nothing changes.
+	for name, p := range map[string]map[string]any{
+		"missing size": {"paper": "a4", "lyrics": "full", "readings": true, "assignments": true, "keys": true, "notes": true},
+		"bad paper":    {"paper": "a3", "lyrics": "full", "readings": true, "assignments": true, "keys": true, "notes": true, "size": "normal"},
+		"bad lyrics":   {"paper": "a4", "lyrics": "some", "readings": true, "assignments": true, "keys": true, "notes": true, "size": "normal"},
+		"bad size":     {"paper": "a4", "lyrics": "full", "readings": true, "assignments": true, "keys": true, "notes": true, "size": "huge"},
+	} {
+		if code, _ := patch(admin, map[string]any{"print": p}); code != 422 {
+			t.Errorf("%s: %d", name, code)
+		}
+	}
+	if code, _ := patch(admin, map[string]any{"licence_footer": strings.Repeat("x", 201)}); code != 422 {
+		t.Errorf("footer of 201 characters: %d", code)
+	}
+	code, church = patch(admin, map[string]any{"licence_footer": ""})
+	pr, _ = church["print"].(map[string]any)
+	if code != 200 || church["licence_footer"] != "" || church["show_credits"] != false || pr["paper"] != "f4" {
+		t.Errorf("clear the footer, keep the rest: %d %v", code, church)
+	}
+	if code, _ := patch(team, map[string]any{"show_credits": true}); code != 403 {
+		t.Errorf("team member: %d", code)
+	}
+	// A member reads the settings through GET /church.
+	if rec := h.get("/api/v1/church", team); rec.Code != 200 || decode(t, rec)["show_credits"] != false {
+		t.Errorf("team member reads: %d %s", rec.Code, rec.Body.String())
+	}
+}

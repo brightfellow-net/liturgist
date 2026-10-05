@@ -67,8 +67,8 @@ export function AppLayout() {
     "inline-flex min-h-12 items-center rounded-md px-3 " + (isActive ? "bg-muted font-semibold" : "hover:bg-muted");
   return (
     <div className="min-h-screen">
-      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:p-2">{t("app.skip_to_content")}</a>
-      <header className="border-b border-border">
+      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:p-2 print:hidden">{t("app.skip_to_content")}</a>
+      <header className="border-b border-border print:hidden">
         <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-2 px-4 py-2">
           <p className="mr-4 font-semibold">{me.data.church?.name ?? t("app.name")}</p>
           <nav aria-label={t("nav.label")} className="flex flex-1 flex-wrap gap-1">
@@ -86,10 +86,10 @@ export function AppLayout() {
           <Button variant="ghost" onClick={() => void logOut()}>{t("nav.log_out")}</Button>
         </div>
       </header>
-      <main id="main" className="mx-auto max-w-4xl px-4 py-6">
+      <main id="main" className="mx-auto max-w-4xl px-4 py-6 print:max-w-none print:p-0">
         <Outlet context={me.data} />
       </main>
-      <footer className="mx-auto max-w-4xl px-4 py-6">
+      <footer className="mx-auto max-w-4xl px-4 py-6 print:hidden">
         <NavLink className="underline" to={paths.privacy}>{t("nav.privacy")}</NavLink>
       </footer>
     </div>

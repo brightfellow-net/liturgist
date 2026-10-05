@@ -11,7 +11,7 @@ import { TextSizeControl } from "@/components/TextSizeControl";
 import { formatDateTime } from "@/lib/format";
 import { isCode } from "@/lib/errors";
 import { knownPublishedFormat, publishedQuery } from "@/lib/published";
-import { paths } from "../paths";
+import { paths, publishedPrintPath } from "../paths";
 import { PublishedBody } from "./PublishedBody";
 
 // PublishedPage is the view every member reads: the newest published copy of a
@@ -37,7 +37,12 @@ export function PublishedPage() {
     <article className="max-w-3xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Link className="underline" to={paths.published}>{t("published.back")}</Link>
-        <TextSizeControl me={me} />
+        <div className="flex flex-wrap items-center gap-2">
+          {c.content.format <= knownPublishedFormat && (
+            <Link className={buttonVariants({ variant: "outline" })} to={publishedPrintPath(id)}>{t("published.print")}</Link>
+          )}
+          <TextSizeControl me={me} />
+        </div>
       </div>
       {c.revising && <Alert>{t("published.revising", { date: when })}</Alert>}
       {c.archived && <Alert>{t("published.archived")}</Alert>}

@@ -97,6 +97,48 @@ func TestChurchSettingsKeepUnknownKeys(t *testing.T) {
 	}
 }
 
+// 13 §6: the print settings are known keys; a wrong type reads as not set and
+// unknown keys survive a round trip.
+func TestChurchPrintSettings(t *testing.T) {
+	var s ChurchSettings
+	in := `{"show_credits":false,"licence_footer":"CCLI #1","print":{"paper":"f4","lyrics":"first_lines","readings":false,"assignments":true,"keys":true,"notes":false,"size":"large"},"theme":1}`
+	if err := json.Unmarshal([]byte(in), &s); err != nil {
+		t.Fatal(err)
+	}
+	if s.CreditsShown() || s.LicenceFooter != "CCLI #1" || s.PrintOrDefault().Paper != "f4" || s.PrintOrDefault().Readings || string(s.Extra["theme"]) != "1" {
+		t.Errorf("read: %+v", s)
+	}
+	b, _ := json.Marshal(s)
+	var back ChurchSettings
+	if err := json.Unmarshal(b, &back); err != nil || back.PrintOrDefault() != s.PrintOrDefault() || back.CreditsShown() || string(back.Extra["theme"]) != "1" {
+		t.Errorf("round trip: %s %v", b, err)
+	}
+	var bad ChurchSettings
+	_ = json.Unmarshal([]byte(`{"show_credits":"no","licence_footer":3,"print":{"paper":"a3"}}`), &bad)
+	if !bad.CreditsShown() || bad.LicenceFooter != "" || bad.PrintOrDefault() != DefaultPrint {
+		t.Errorf("wrong types read as not set: %+v", bad)
+	}
+	var none ChurchSettings
+	if b, _ := json.Marshal(none); string(b) != "{}" || !none.CreditsShown() || none.PrintOrDefault() != DefaultPrint {
+		t.Errorf("defaults: %s", b)
+	}
+	c := Church{Name: "X", DefaultUILanguage: "id", DefaultLanguage: "id", Settings: ChurchSettings{KeyDisplay: "do", LicenceFooter: " " + strings.Repeat("x", 201)}}
+	if err := ValidateChurch(&c, ""); err == nil {
+		t.Error("a footer of 201 characters")
+	}
+	c.Settings.LicenceFooter = strings.Repeat("é", 200)
+	p := DefaultPrint
+	p.Size = "huge"
+	c.Settings.Print = &p
+	if err := ValidateChurch(&c, ""); err == nil {
+		t.Error("print size huge")
+	}
+	p.Size = "large"
+	if err := ValidateChurch(&c, ""); err != nil {
+		t.Errorf("200 characters and a valid print: %v", err)
+	}
+}
+
 func TestValidateChurch(t *testing.T) {
 	ok := Church{Name: " GKY ", DefaultUILanguage: "id", DefaultLanguage: "zh-Hans", Settings: ChurchSettings{KeyDisplay: "do"}}
 	if err := ValidateChurch(&ok, ""); err != nil || ok.Name != "GKY" {

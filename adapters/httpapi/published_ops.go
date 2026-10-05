@@ -104,8 +104,9 @@ type PublishedContentView struct {
 
 // PublishedRenderView is how the church wants the copy shown now.
 type PublishedRenderView struct {
-	KeyDisplay  string `json:"key_display" enum:"do,letter"`
-	ShowCredits bool   `json:"show_credits"`
+	KeyDisplay  string            `json:"key_display" enum:"do,letter"`
+	ShowCredits bool              `json:"show_credits"`
+	Print       PrintDefaultsView `json:"print"`
 }
 
 // PublishedCopyView is the answer of GET /liturgies/{id}/published.
@@ -250,7 +251,7 @@ func registerPublished(api huma.API, d LiturgyDeps) {
 			}
 			return &copyOutput{CacheControl: noStore, Body: PublishedCopyView{Number: c.Number, PublishedAt: c.PublishedAt,
 				PublishedBy: UserRefView{ID: string(c.PublishedByID), Name: c.PublishedBy}, Revising: c.Revising, Archived: c.Archived,
-				Content: publishedContentView(c.Content), Render: PublishedRenderView{KeyDisplay: c.Render.KeyDisplay, ShowCredits: c.Render.ShowCredits}, URL: c.URL}}, nil
+				Content: publishedContentView(c.Content), Render: PublishedRenderView{KeyDisplay: c.Render.KeyDisplay, ShowCredits: c.Render.ShowCredits, Print: printDefaultsView(c.Render.Print)}, URL: c.URL}}, nil
 		})
 
 	type mineOutput struct {

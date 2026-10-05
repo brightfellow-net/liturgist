@@ -23,12 +23,12 @@ const MaxPublishedPage = 100
 // myAssignmentsMax is the number of cards of "my assignments" (13 §5, P-80).
 const myAssignmentsMax = 50
 
-// PublishedRender is how the church wants the copy shown now (13 §5). The
-// credits switch and the print defaults come with the church print settings
-// (slice 5C); until then credits are shown.
+// PublishedRender is how the church wants the copy shown now (13 §5): the
+// key display, the credits switch and the print defaults.
 type PublishedRender struct {
 	KeyDisplay  string
 	ShowCredits bool
+	Print       domain.PrintDefaults
 }
 
 // PublishedCopy is the newest published version of a liturgy.
@@ -94,7 +94,7 @@ func (u *Liturgies) ReadPublished(ctx context.Context, sess *domain.Session, id 
 		res = PublishedCopy{
 			Number: v.Number, PublishedAt: v.PublishedAt, PublishedByID: v.PublishedBy,
 			Revising: l.State != domain.StatePublished, Archived: l.ArchivedAt != nil, Content: content,
-			Render: PublishedRender{KeyDisplay: church.Settings.KeyDisplay, ShowCredits: true},
+			Render: PublishedRender{KeyDisplay: church.Settings.KeyDisplay, ShowCredits: church.Settings.CreditsShown(), Print: church.Settings.PrintOrDefault()},
 		}
 		switch by, err := sc.users.ByID(ctx, v.PublishedBy); {
 		case err == nil:

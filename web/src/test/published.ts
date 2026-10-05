@@ -32,7 +32,7 @@ export function copy(changes: Partial<PublishedCopyView> = {}): PublishedCopyVie
       ],
       licence_footer: "CCLI License #1234567",
     },
-    render: { key_display: "do", show_credits: true },
+    render: { key_display: "do", show_credits: true, print: { paper: "a4", lyrics: "full", readings: true, assignments: true, keys: true, notes: true, size: "normal" } },
     url: "https://liturgi.example.org/published/l1",
     ...changes,
   };

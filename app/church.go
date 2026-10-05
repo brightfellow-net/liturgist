@@ -33,6 +33,11 @@ type ChurchResult struct {
 type ChurchChange struct {
 	Name, DefaultUILanguage, DefaultLanguage, DefaultTranslationCode, TimeZone, KeyDisplay *string
 	FeedbackURL, PrivacyContact                                                            *string
+	// ShowCredits, LicenceFooter ("" clears) and Print (a complete object that
+	// replaces the old one) are the print settings (13 §6).
+	ShowCredits   *bool
+	LicenceFooter *string
+	Print         *domain.PrintDefaults
 }
 
 // Get returns the tenant church (baseline: every member).
@@ -100,6 +105,13 @@ func (c *Churches) Update(ctx context.Context, sess *domain.Session, ch ChurchCh
 		set(&church.Settings.KeyDisplay, ch.KeyDisplay)
 		set(&church.Settings.FeedbackURL, ch.FeedbackURL)
 		set(&church.Settings.PrivacyContact, ch.PrivacyContact)
+		set(&church.Settings.LicenceFooter, ch.LicenceFooter)
+		if ch.ShowCredits != nil {
+			church.Settings.ShowCredits = ch.ShowCredits
+		}
+		if ch.Print != nil {
+			church.Settings.Print = ch.Print
+		}
 		if err := domain.ValidateChurch(&church, ""); err != nil {
 			return err
 		}

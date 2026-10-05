@@ -160,7 +160,12 @@
     "feedback_url_hint": "Optional. A link starting with https:// where the congregation can send feedback.",
     "feedback_url_invalid": "The link must start with https://.",
     "privacy_contact": "Privacy contact",
-    "privacy_contact_hint": "Optional. Shown on the privacy page, e.g. a name and phone number."
+    "privacy_contact_hint": "Optional. Shown on the privacy page, e.g. a name and phone number.",
+    "printing": "Printing",
+    "show_credits": "Show song credits (copyright lines) on printed and published liturgies",
+    "licence_footer": "Licence line",
+    "licence_footer_hint": "Optional. Printed at the foot of each liturgy, e.g. CCLI License #1234567. Copied into a liturgy when it is published.",
+    "licence_footer_long": "At most 200 characters."
   },
   "members": {
     "title": "Members",
@@ -1047,6 +1052,29 @@
     "not_published": "This liturgy has not been published.",
     "update_app": "Update the app to read this liturgy.",
     "team": "Team",
-    "ccli": "CCLI {{number}}"
+    "ccli": "CCLI {{number}}",
+    "print": "Print"
+  },
+  "print": {
+    "paper": "Paper",
+    "paper_a4": "A4",
+    "paper_f4": "F4 (215 × 330 mm)",
+    "lyrics": "Lyrics",
+    "lyrics_full": "Full lyrics",
+    "lyrics_first_lines": "First lines only",
+    "readings": "Show readings",
+    "assignments": "Show who leads",
+    "keys": "Show keys",
+    "notes": "Show notes",
+    "size": "Text size",
+    "size_normal": "Normal",
+    "size_large": "Large",
+    "title": "Print",
+    "back": "Back to the liturgy",
+    "variant": "Sheet",
+    "variant_team": "Team sheet",
+    "variant_musician": "Musician sheet",
+    "include": "Include",
+    "print": "Print / Save as PDF"
   }
 }

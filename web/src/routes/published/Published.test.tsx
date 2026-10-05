@@ -46,7 +46,7 @@ describe("PublishedPage", () => {
   });
 
   it("shows keys as letters, and no credits, as the church setting says", async () => {
-    mockApi(published(copy({ render: { key_display: "letter", show_credits: false } })));
+    mockApi(published(copy({ render: { ...copy().render, key_display: "letter", show_credits: false } })));
     view();
     const pujian = await screen.findByRole("region", { name: "Pujian" });
     expect(within(pujian).getByRole("heading", { level: 3 })).toHaveTextContent("Besar Setia-Mu — KJ 12 · G");
