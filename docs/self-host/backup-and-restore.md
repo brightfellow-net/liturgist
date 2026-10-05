@@ -48,6 +48,22 @@ With PostgreSQL the download is not offered; use `pg_dump` (below).
 
 `LITURGIST_UPDATE_CHECK=true` makes the server ask `api.github.com` once a day for the newest release, and the System page then says whether an update is available. The request sends only the program name and version (`User-Agent: liturgist/<version>`), no data about your church. It is **off by default**, and nothing is ever installed automatically.
 
+## Keep a copy somewhere else
+
+Pick one. All three keep the newest nightly backup away from the server's disk.
+
+- **By hand:** once a month, **Settings → System → Download backup** on your own computer.
+- **A second disk or USB stick:** a nightly job (cron on Linux, Task Scheduler on Windows) that runs `liturgist backup /mnt/usb/liturgist-$(date +%F).zip`. A backup written outside the data folder counts as "taken away" for the System page warning.
+- **Cloud storage with [rclone](https://rclone.org/):** after setting up a remote with `rclone config`, a nightly job such as
+
+  ```
+  rclone copy /var/lib/liturgist/backups remote:liturgist-backups --include "auto-*.zip"
+  ```
+
+  copies the automatic backups. The System page cannot see what rclone does, so it keeps warning after 30 days; the warning only reminds you, and the page is wrong in this case, not your copy. Check once in a while that the files are there.
+
+Whichever you choose, do the [restore test](#test-your-backup-once) with a copy that came back from the other place.
+
 ## Restore a backup
 
 1. **Stop the server** (`systemctl stop liturgist`, close the console window, or stop the container). `restore` refuses to run while the server is running.
