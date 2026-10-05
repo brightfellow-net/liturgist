@@ -93,7 +93,7 @@ Runs with the server stopped (H-2). Order, each step before the next:
 | `GET /api/v1/system/status` | `church.settings`, community tenancy only | `{ version, commit, database: { driver, size_bytes, schema_version }, disk: { free_bytes, total_bytes, low }, backup: { last_at, last_kind, last_downloaded_at, warning }, email_configured, https: { mode, base_url_scheme, plain_http_warning }, update: { enabled, latest, available } }` |
 | `GET /api/v1/system/backup` | same | the archive of §3.1, streamed, `Content-Type: application/zip`, `Content-Disposition: attachment; filename="liturgist-<church slug>-<date>.zip"`, `Cache-Control: no-store`; takes the backup mutex; 409 `backup_running` if one is in progress; 400 `not_supported` on PostgreSQL |
 
-- **Last download** is recorded as the empty file `backups/.last-download` (its mtime); no migration. `last_at` is the newest mtime of `auto-*`, `manual-*` files.
+- **Last copy taken away** (a download, or `liturgist backup` to a path outside `backups/`) is recorded as the empty file `backups/.last-copy` (its mtime); no migration. `last_at` is the newest mtime of `auto-*`, `manual-*` files.
 - **HTTPS status** `mode` is `behind_proxy` (trusted proxies configured), `plain_http`, or, from 6F, `built_in`. `plain_http_warning` reuses `StartupWarnings` (`server/config.go`).
 - **Web:** page `/settings/system` (church admins; link in the settings menu) with the facts above and the **Download backup** button; a **banner** in the app shell for church admins when `disk.low` or `backup.warning` (dismissable for the session, back on next load). All strings in `en` and `id`.
 - **Tenancy:** the two operations are declared community-only in `TestTenancyDeclarations` and are not registered in the hosted build (H-8).
@@ -124,7 +124,7 @@ Runs with the server stopped (H-2). Order, each step before the next:
 |---|---|---|
 | **6A** (**merged** 2026-10-05, [§14](#14-slice-6a-as-built-2026-10-05)) | `serve` run lock; `backup`; `restore`; the zip format; shared free-space helper; `backup-and-restore.md` (first draft) | H-1, H-2, H-6 |
 | **6B** (**merged** 2026-10-05, [§15](#15-slice-6b-as-built-2026-10-05)) | Scheduler, retention, config; `storage_full` 507 and its strings | H-3, H-4 |
-| **6C** | System routes, system page, banners, download | H-5, H-8, H-9, H-14 (+ H-13 if built) |
+| **6C** (**merged** 2026-10-05, [§16](#16-slice-6c-as-built-2026-10-05)) | System routes, system page, banners, download | H-5, H-8, H-9, H-14 (+ H-13 if built) |
 | **6D** | Dockerfile, GoReleaser, release workflow, systemd unit, Windows service, `healthcheck` | H-10, H-11, H-12 |
 | **6E** | The rest of the guides and the README | none |
 | **6F** | Built-in HTTPS with `certmagic` (deferred) | H-7 |
@@ -228,3 +228,20 @@ Merged to `main` as `9184097`. Code: `server/backup_scheduler.go` (scheduler, re
 | 6A fix: `storageErr` tested `ErrUnavailable` (also a busy database); it now tests `ErrStorageFull` and `ENOSPC` | Wrong message for a busy database |
 
 Tests: TC-606, TC-607, TC-609 (all parts), the scheduler wiring (community, SQLite, time set), the church time zone lookup, the env settings. TC-610 and IT-602, 604 to 606 belong to later slices. Go suite green on SQLite and PostgreSQL; Vitest 302; golangci-lint not run.
+
+## 16. Slice 6C as built (2026-10-05)
+
+Merged to `main` as `e5b0639`. Code: `app/system.go` (`System`, the `SystemInfo` port), `server/system.go` (`systemInfo`: facts, thresholds, the download stream), `server/updatecheck.go`, `adapters/httpapi/system_ops.go`, `adapters/sqlstore` (`DiskUsage`, `DB.SizeBytes`), web `SystemPage`, `SystemBanners`, the System tab. Guide: "Download a backup from the browser" in [backup-and-restore.md](../self-host/backup-and-restore.md).
+
+| Deviation from §2 and §5 | Why |
+|---|---|
+| The marker is `backups/.last-copy`, touched by a download and by `liturgist backup` to a path outside `backups/` (H-5 wording: "downloaded or written by `liturgist backup` to another path") | One marker for both; a copy made by hand (rclone) is not seen |
+| "No backup" and "no copy" count from the later of the last event and the church's creation date | A new church is not warned in its first 48 hours or 30 days |
+| `https.proxy_missing_warning` is added beside `plain_http_warning` | The existing start-up warning has two conditions |
+| `last_at` is the newest `auto-*` or `manual-*` file by its name; the "backup" warning is `stale` (over 48 hours) or `not_copied` (over 30 days), `stale` first | Definition left open in §5 |
+| The download makes its snapshot before sending; a full disk is 507 `storage_full`, a running backup 409 `backup_running`, PostgreSQL 400 `not_supported` (new codes `backup_running`, `not_supported`, with web messages) | A broken download would not show a message |
+| The system routes are registered unless a tenant resolver is given (`deps.hosted`); both operations are declared `church` in `TestTenancyDeclarations` | H-8 |
+| `email_configured` is always false | There is no email feature yet |
+| The update check starts one minute after start, then daily; a `dev` build is never out of date; a release tag suffix (`-5-gabc`) is ignored in the comparison | H-13 details |
+
+Tests: TC-610, IT-604, IT-605, E2E-W-021, plus the update check, `SizeBytes` on both dialects and the copy marker. IT-602 and IT-606 belong to later slices. Go suite green on SQLite and PostgreSQL; Vitest 315; Playwright 41; golangci-lint not run.
