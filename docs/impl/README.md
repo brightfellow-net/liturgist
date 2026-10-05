@@ -54,6 +54,7 @@
 | Document | Covers |
 |---|---|
 | [13-publishing.md](13-publishing.md) | Publish, versions, reopen and archive, published routes, print, reading mode, messages, pages |
+| [14-self-host.md](14-self-host.md) | Step 6: backup and restore, scheduled backups, system page, releases, guides |
 | [../reference/schema.md](../reference/schema.md#step-5-tables) | Step 5 tables (Reference) |
 
 ## 2. How to use these documents
