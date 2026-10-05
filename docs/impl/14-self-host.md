@@ -126,7 +126,7 @@ Runs with the server stopped (H-2). Order, each step before the next:
 | **6B** (**merged** 2026-10-05, [§15](#15-slice-6b-as-built-2026-10-05)) | Scheduler, retention, config; `storage_full` 507 and its strings | H-3, H-4 |
 | **6C** (**merged** 2026-10-05, [§16](#16-slice-6c-as-built-2026-10-05)) | System routes, system page, banners, download | H-5, H-8, H-9, H-14 (+ H-13 if built) |
 | **6D** (**merged** 2026-10-05, [§17](#17-slice-6d-as-built-2026-10-05)) | Dockerfile, GoReleaser, release workflow, systemd unit, Windows service, `healthcheck` | H-10, H-11, H-12 |
-| **6E** | The rest of the guides and the README | none |
+| **6E** (**merged** 2026-10-05, [§18](#18-slice-6e-as-built-2026-10-05)) | The rest of the guides and the README | none |
 | **6F** | Built-in HTTPS with `certmagic` (deferred) | H-7 |
 
 Each slice is drafted in a worktree, shown to the owner with its deviations, and merged only on explicit approval. A docs commit with the as-built notes follows each, as in step 5.
@@ -260,3 +260,16 @@ Deviations from §7:
 | Archives | The Linux archive has the systemd unit; the Windows zip does not |
 
 Verified: the image builds (31.7 MB), is healthy, runs as 65532, backs up into the volume and stops with exit 0; `goreleaser check` and a snapshot build; Windows and arm64 cross-builds. **Not verified:** the release workflow, cosign signing, the ghcr push (need a real tag), the Windows service (needs Windows), the unit's hardening under real systemd. Before the first release: try `service install/start/stop/uninstall` on Windows and add a `## 0.1.0` section to `CHANGELOG.md`.
+
+## 18. Slice 6E as built (2026-10-05)
+
+Merged to `main` as the commit after `dfc72da`. Files: `README.md` and, in `docs/self-host/`, `install-docker.md`, `install-linux.md`, `install-windows.md`, `https-caddy.md`, `https-nginx.md`, `https-cloudflare-tunnel.md`, `https-tailscale.md`, `upgrading.md`, `configuration.md`, and a new "Keep a copy somewhere else" section in `backup-and-restore.md`.
+
+Deviations from §8:
+
+| Plan | As built |
+|---|---|
+| Litestream off-site copies | Left out (untested, and it does not cover `files/`); rclone, a USB copy and a manual download are described instead |
+| Every guide's commands run on a clean machine | Run: the README Docker quick start, the Compose file (`config`), the Caddy and nginx proxy settings (against a live server), the Linux `serve`/`setup-link` output, link and anchor check. **Not run:** Windows, Cloudflare Tunnel, Tailscale, certbot, rclone, cosign verification, systemd. The Windows, Cloudflare and Tailscale guides say so at the top |
+
+Open points found while writing: `liturgist.exe` run by hand does not read `liturgist.env` (the guide sets `LITURGIST_DATA_DIR` first); behind Docker a proxy on the same host appears as Docker's gateway address, so the guide tells the reader to trust that range, unconfirmed on a real setup; the System page's "not taken away" warning cannot see rclone copies.
