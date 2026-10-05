@@ -125,7 +125,7 @@ Runs with the server stopped (H-2). Order, each step before the next:
 | **6A** (**merged** 2026-10-05, [§14](#14-slice-6a-as-built-2026-10-05)) | `serve` run lock; `backup`; `restore`; the zip format; shared free-space helper; `backup-and-restore.md` (first draft) | H-1, H-2, H-6 |
 | **6B** (**merged** 2026-10-05, [§15](#15-slice-6b-as-built-2026-10-05)) | Scheduler, retention, config; `storage_full` 507 and its strings | H-3, H-4 |
 | **6C** (**merged** 2026-10-05, [§16](#16-slice-6c-as-built-2026-10-05)) | System routes, system page, banners, download | H-5, H-8, H-9, H-14 (+ H-13 if built) |
-| **6D** | Dockerfile, GoReleaser, release workflow, systemd unit, Windows service, `healthcheck` | H-10, H-11, H-12 |
+| **6D** (**merged** 2026-10-05, [§17](#17-slice-6d-as-built-2026-10-05)) | Dockerfile, GoReleaser, release workflow, systemd unit, Windows service, `healthcheck` | H-10, H-11, H-12 |
 | **6E** | The rest of the guides and the README | none |
 | **6F** | Built-in HTTPS with `certmagic` (deferred) | H-7 |
 
@@ -245,3 +245,18 @@ Merged to `main` as `e5b0639`. Code: `app/system.go` (`System`, the `SystemInfo`
 | The update check starts one minute after start, then daily; a `dev` build is never out of date; a release tag suffix (`-5-gabc`) is ignored in the comparison | H-13 details |
 
 Tests: TC-610, IT-604, IT-605, E2E-W-021, plus the update check, `SizeBytes` on both dialects and the copy marker. IT-602 and IT-606 belong to later slices. Go suite green on SQLite and PostgreSQL; Vitest 315; Playwright 41; golangci-lint not run.
+
+## 17. Slice 6D as built (2026-10-05)
+
+Merged to `main` as `62b9015`. Code: `cmd/liturgist/healthcheck.go`, `envfile.go`, `service_windows.go`, `service_other.go`; `Dockerfile`, `.dockerignore`, `.goreleaser.yaml`, `.github/workflows/release.yml`, `deploy/liturgist.service`, `scripts/release-notes.sh`.
+
+Deviations from §7:
+
+| Plan | As built |
+|---|---|
+| GoReleaser builds the image | The workflow builds the multi-arch image from the `Dockerfile` with buildx (the Dockerfile cross-compiles, no emulation). GoReleaser makes only the archives and `checksums.txt` |
+| Windows service settings | `service run` reads `%ProgramData%\Liturgist\liturgist.env` (`KEY=VALUE`; real environment variables win). `install` writes a commented sample. Default data folder `%ProgramData%\Liturgist\data`; the log is `liturgist.log` there, **not rotated** |
+| Release notes | `scripts/release-notes.sh vX.Y.Z` prints the `## X.Y.Z` section of `CHANGELOG.md` and fails if absent |
+| Archives | The Linux archive has the systemd unit; the Windows zip does not |
+
+Verified: the image builds (31.7 MB), is healthy, runs as 65532, backs up into the volume and stops with exit 0; `goreleaser check` and a snapshot build; Windows and arm64 cross-builds. **Not verified:** the release workflow, cosign signing, the ghcr push (need a real tag), the Windows service (needs Windows), the unit's hardening under real systemd. Before the first release: try `service install/start/stop/uninstall` on Windows and add a `## 0.1.0` section to `CHANGELOG.md`.
