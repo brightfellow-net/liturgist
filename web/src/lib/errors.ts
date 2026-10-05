@@ -14,7 +14,7 @@ export const errorCodes = [
   "liturgy_exists", "liturgy_locked", "liturgy_not_deletable", "assignment_exists", "undo_refused",
   "invalid_transition", "review_stale", "empty_liturgy", "has_problems", "comment_limit",
   "liturgy_archived", "not_archived", "publish_too_large",
-  "internal", "unavailable",
+  "internal", "unavailable", "storage_full",
 ] as const;
 
 // Problem is the error body (RFC 9457 with "code", 01 §10).

@@ -93,7 +93,9 @@ func (postgresDialect) MapError(err error) error {
 		return fmt.Errorf("%w: %w", app.ErrReferenced, err)
 	case "23514":
 		return fmt.Errorf("%w: %w", app.ErrInvalid, err)
-	case "53100", "57014": // disk full, statement timeout
+	case "53100": // disk_full
+		return fmt.Errorf("%w: %w", app.ErrStorageFull, err)
+	case "57014": // statement timeout
 		return fmt.Errorf("%w: %w", app.ErrUnavailable, err)
 	}
 	return err

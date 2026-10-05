@@ -17,6 +17,7 @@ var (
 	ErrReferenced  = errors.New("referenced row missing or still in use")
 	ErrInvalid     = errors.New("database rejected the row (check constraint)")
 	ErrUnavailable = errors.New("database unavailable")
+	ErrStorageFull = errors.New("server storage is full") // the disk holding the database is full (14 §4); 507 storage_full
 
 	ErrInvalidCredentials = errors.New("invalid credentials") // 401 invalid_credentials
 	ErrUnauthenticated    = errors.New("not logged in")       // 401 unauthenticated

@@ -586,6 +586,7 @@
     "reading_in_use": "Bacaan ini dipakai di liturgi yang belum diterbitkan, jadi tidak bisa dihapus.",
     "internal": "Terjadi kesalahan di server.",
     "unavailable": "Server sedang sibuk. Silakan coba lagi.",
+    "storage_full": "Penyimpanan server penuh. Mintalah orang yang mengelola server untuk mengosongkan ruang.",
     "too_large": "Terlalu banyak sekaligus. Impor lebih sedikit berkas.",
     "import_unreadable": {
       "unknown": "Ini tidak bisa dibaca sebagai lagu.",

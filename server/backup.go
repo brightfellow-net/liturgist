@@ -49,7 +49,7 @@ func IsBackupNewer(err error) bool {
 
 // storageErr turns "the disk is full" into ErrStorageFull.
 func storageErr(err error) error {
-	if errors.Is(err, app.ErrUnavailable) || errors.Is(err, syscall.ENOSPC) {
+	if errors.Is(err, app.ErrStorageFull) || errors.Is(err, syscall.ENOSPC) {
 		return fmt.Errorf("%w: %w", ErrStorageFull, err)
 	}
 	return err

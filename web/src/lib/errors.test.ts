@@ -26,6 +26,12 @@ describe("TC-W-002 error messages", () => {
     expect(errorText(t, apiError(403, { code: "limit_reached", max: 12 }))).toContain("12 team members");
   });
 
+  it("says that the server storage is full, in both languages (14 §4)", () => {
+    const err = apiError(507, { code: "storage_full", detail: "Server storage is full." });
+    expect(errorText(t, err)).toBe("Server storage is full. Ask the person who runs the server to free some space.");
+    expect(errorText(i18n.getFixedT("id"), err)).toBe("Penyimpanan server penuh. Mintalah orang yang mengelola server untuk mengosongkan ruang.");
+  });
+
   it("explains the planning errors", () => {
     expect(errorText(t, apiError(409, { code: "name_taken", reason: "template" }))).toBe("There is already a template with this name.");
     expect(errorText(t, apiError(409, { code: "name_taken" }))).toBe("This name is already used.");

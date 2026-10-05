@@ -19,6 +19,7 @@ import (
 	"github.com/brightfellow-net/liturgist/adapters/sqlstore/sqlstoretest"
 	"github.com/brightfellow-net/liturgist/app"
 	"github.com/gofrs/flock"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -375,4 +376,37 @@ func TestMigrationLockFile(t *testing.T) {
 	if _, err := db.Migrate(short, opts(testMigrations(1))); err == nil || !strings.Contains(err.Error(), "another Liturgist process") {
 		t.Errorf("expected lock error, got %v", err)
 	}
+}
+
+// TC-609: a full disk is app.ErrStorageFull on both dialects, and only then.
+func TestStorageFullMapping(t *testing.T) {
+	t.Run("postgres codes", func(t *testing.T) {
+		if err := sqlstore.PostgresMapError(&pgconn.PgError{Code: "53100"}); !errors.Is(err, app.ErrStorageFull) || errors.Is(err, app.ErrUnavailable) {
+			t.Errorf("disk_full: %v", err)
+		}
+		if err := sqlstore.PostgresMapError(&pgconn.PgError{Code: "57014"}); !errors.Is(err, app.ErrUnavailable) || errors.Is(err, app.ErrStorageFull) {
+			t.Errorf("statement timeout: %v", err)
+		}
+	})
+	t.Run("sqlite", func(t *testing.T) {
+		db, err := sqlstore.Open(ctx, sqlstore.Config{Driver: "sqlite", DataDir: t.TempDir()})
+		if err != nil {
+			t.Skip(err)
+		}
+		defer func() { _ = db.Close() }()
+		if err := db.ExecForTest(ctx, "CREATE TABLE t_full (b BLOB)"); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.ExecForTest(ctx, "PRAGMA max_page_count = 20"); err != nil { // a 20-page database: a tiny disk
+			t.Fatal(err)
+		}
+		for range 100 {
+			if err = db.ExecForTest(ctx, "INSERT INTO t_full VALUES (zeroblob(4000))"); err != nil {
+				break
+			}
+		}
+		if !errors.Is(err, app.ErrStorageFull) || errors.Is(err, app.ErrUnavailable) {
+			t.Fatalf("a write to a full database: %v", err)
+		}
+	})
 }

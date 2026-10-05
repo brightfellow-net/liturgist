@@ -16,6 +16,21 @@ liturgist backup /mnt/usb/church.zip
 - It checks the free space first and stops with a message if there is not enough.
 - A copy in `data/backups/` is on the same disk as the database. **Also copy it somewhere else** (another computer, a USB stick, cloud storage): a disk failure takes both.
 
+## Automatic backups
+
+With SQLite, the server makes a backup every day at 02:00 (in the church's time zone; UTC before the church is set up) and writes it to `data/backups/auto-<UTC time>.zip`. It keeps the newest **7** of them, plus the newest one of each of the **4** weeks before those. Other files in `backups/` (manual backups, `pre-upgrade-*`, `pre-restore-*`) are never deleted by this. Old backups are deleted only after a new one succeeded, so a full disk never removes the last good copy.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `LITURGIST_BACKUP_TIME` | `02:00` | Time of day, `HH:MM`, 24-hour; `off` turns automatic backups off |
+| `LITURGIST_BACKUP_KEEP_DAILY` | `7` | How many of the newest backups to keep (1 to 365) |
+| `LITURGIST_BACKUP_KEEP_WEEKLY` | `4` | How many older weeks keep one backup (0 to 365) |
+
+- If the server was off at 02:00, it makes a backup 5 minutes after it starts when the newest automatic backup is more than 26 hours old.
+- If the disk has too little free space, the backup is skipped and the server logs `backup_skipped`; other failures are logged as `backup_failed`. Neither stops the server.
+- These backups are on the same disk as the database: **also copy them somewhere else**.
+- A save that fails because the disk is full shows "Server storage is full. Ask the person who runs the server to free some space."
+
 ## Restore a backup
 
 1. **Stop the server** (`systemctl stop liturgist`, close the console window, or stop the container). `restore` refuses to run while the server is running.

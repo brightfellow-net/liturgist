@@ -14,6 +14,7 @@ var (
 	SQLiteConstraintName = sqliteConstraintName
 	SQLiteUniqueNames    = sqliteUniqueNames
 	Jitter               = jitter
+	PostgresMapError     = postgresDialect{}.MapError
 )
 
 // RawTx exposes the transaction behind a Store.

@@ -102,7 +102,7 @@ func (sqliteDialect) MapError(err error) error {
 		return fmt.Errorf("%w: %w", app.ErrReferenced, err)
 	}
 	if e.Code()&0xff == sqlite3.SQLITE_FULL {
-		return fmt.Errorf("%w: disk full", app.ErrUnavailable)
+		return fmt.Errorf("%w: %w", app.ErrStorageFull, err)
 	}
 	return err
 }

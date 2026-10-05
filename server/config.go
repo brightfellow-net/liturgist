@@ -35,6 +35,9 @@ type Config struct {
 	AutoMigrate           bool
 	AllowNewerSchema      bool // --allow-newer-schema: only skips the refusal to start (02 §5.1)
 	RequirePreUpgradeCopy bool
+	BackupTime            string // "HH:MM" daily automatic backup; "" = none (14 §4)
+	BackupKeepDaily       int    // 0 = 7
+	BackupKeepWeekly      int    // 0 = 4; set BackupKeepWeekly to -1 for none
 	SessionTTL            time.Duration
 	SessionMaxAge         time.Duration
 	TrustedProxies        []netip.Prefix
@@ -51,6 +54,12 @@ func withDefaults(cfg Config) Config {
 	}
 	if cfg.SessionMaxAge == 0 {
 		cfg.SessionMaxAge = 8760 * time.Hour
+	}
+	if cfg.BackupKeepDaily == 0 {
+		cfg.BackupKeepDaily = 7
+	}
+	if cfg.BackupKeepWeekly == 0 {
+		cfg.BackupKeepWeekly = 4
 	}
 	if cfg.Logger == nil {
 		cfg.Logger = slog.New(slog.DiscardHandler)

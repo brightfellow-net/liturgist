@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/brightfellow-net/liturgist/adapters/argon2pw"
@@ -96,12 +97,13 @@ func WithNotifier(n app.Notifier) Option { return func(o *options) { o.notifier 
 
 // Server is a configured Liturgist HTTP server.
 type Server struct {
-	cfg     Config
-	db      *sqlstore.DB
-	handler http.Handler
-	single  *tenancy.SingleChurch // nil when the SaaS supplies a resolver
-	urls    app.URLBuilder
-	uc      useCases
+	cfg      Config
+	db       *sqlstore.DB
+	backupMu sync.Mutex // one backup at a time (14 §4)
+	handler  http.Handler
+	single   *tenancy.SingleChurch // nil when the SaaS supplies a resolver
+	urls     app.URLBuilder
+	uc       useCases
 }
 
 // useCases are the wired application use cases.
@@ -254,6 +256,7 @@ func (s *Server) Run(ctx context.Context) error {
 		}
 	}
 	go s.cleanupLoop(ctx)
+	s.startBackups(ctx)
 
 	srv := &http.Server{
 		Addr:              s.cfg.Listen,

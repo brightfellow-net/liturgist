@@ -425,7 +425,7 @@ func TestRestoreOverDamagedDatabase(t *testing.T) {
 
 // TC-609 (mapping part)
 func TestStorageErr(t *testing.T) {
-	for _, in := range []error{syscall.ENOSPC, app.ErrUnavailable} {
+	for _, in := range []error{syscall.ENOSPC, app.ErrStorageFull} {
 		if err := storageErr(in); !errors.Is(err, ErrStorageFull) {
 			t.Errorf("%v: %v", in, err)
 		}

@@ -52,7 +52,7 @@ func LockDataDir(ctx context.Context, dir string) (func(), error) { return lockD
 // SnapshotFile writes a consistent copy of the SQLite database src to dest
 // (which must not exist) with VACUUM INTO. It uses a connection of its own,
 // so it works while a server has the file open and never queues behind its
-// writer. When the disk is full the error wraps app.ErrUnavailable (SQLITE_FULL).
+// writer. When the disk is full the error wraps app.ErrStorageFull.
 func SnapshotFile(ctx context.Context, src, dest string) error {
 	db, err := sql.Open("sqlite", plainDSN(src, false)) // VACUUM INTO is refused under query_only
 	if err != nil {
@@ -77,7 +77,7 @@ func plainDSN(path string, queryOnly bool) string {
 }
 
 func mapDiskFull(err error) error {
-	return sqliteDialect{}.MapError(err) // SQLITE_FULL becomes app.ErrUnavailable
+	return sqliteDialect{}.MapError(err) // SQLITE_FULL becomes app.ErrStorageFull
 }
 
 // CheckSQLiteFile opens the database file at path read-only, runs SQLite's

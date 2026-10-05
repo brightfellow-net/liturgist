@@ -75,6 +75,8 @@ func Load(getenv func(string) string) (server.Config, LogOptions, error) {
 	cfg.AutoMigrate = parseBool(get("LITURGIST_AUTO_MIGRATE", "true"), "LITURGIST_AUTO_MIGRATE", fail)
 	cfg.RequirePreUpgradeCopy = parseBool(get("LITURGIST_REQUIRE_PREUPGRADE_COPY", "false"), "LITURGIST_REQUIRE_PREUPGRADE_COPY", fail)
 
+	cfg.BackupTime, cfg.BackupKeepDaily, cfg.BackupKeepWeekly = parseBackup(get, fail)
+
 	cfg.SessionTTL = parseDuration(get("LITURGIST_SESSION_TTL", "2160h"), "LITURGIST_SESSION_TTL", fail)
 	cfg.SessionMaxAge = parseDuration(get("LITURGIST_SESSION_MAX_AGE", "8760h"), "LITURGIST_SESSION_MAX_AGE", fail)
 	if cfg.SessionTTL != 0 && cfg.SessionTTL < time.Hour {
@@ -153,4 +155,30 @@ func parseDuration(s, key string, fail failFunc) time.Duration {
 		fail(key, "must be a duration such as 2160h")
 	}
 	return d
+}
+
+// parseBackup reads LITURGIST_BACKUP_TIME ("HH:MM" or "off"),
+// LITURGIST_BACKUP_KEEP_DAILY and LITURGIST_BACKUP_KEEP_WEEKLY (14 §4).
+func parseBackup(get func(k, def string) string, fail failFunc) (at string, daily, weekly int) {
+	at = get("LITURGIST_BACKUP_TIME", "02:00")
+	if strings.EqualFold(at, "off") {
+		at = ""
+	} else if _, _, err := server.ParseBackupTime(at); err != nil {
+		fail("LITURGIST_BACKUP_TIME", "must be a time of day such as 02:00, or off")
+		at = ""
+	}
+	count := func(key, def string, min int) int {
+		n, err := strconv.Atoi(get(key, def))
+		if err != nil || n < min || n > 365 {
+			fail(key, "must be a whole number from %d to 365", min)
+			return 0
+		}
+		return n
+	}
+	daily = count("LITURGIST_BACKUP_KEEP_DAILY", "7", 1)
+	weekly = count("LITURGIST_BACKUP_KEEP_WEEKLY", "4", 0)
+	if weekly == 0 {
+		weekly = -1 // zero in the Config means "the default"
+	}
+	return at, daily, weekly
 }

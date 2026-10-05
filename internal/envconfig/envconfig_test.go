@@ -27,6 +27,9 @@ func TestDefaults(t *testing.T) {
 		"DBDriver":      {cfg.DBDriver, "sqlite"},
 		"AutoMigrate":   {cfg.AutoMigrate, true},
 		"StrictCopy":    {cfg.RequirePreUpgradeCopy, false},
+		"BackupTime":    {cfg.BackupTime, "02:00"},
+		"BackupDaily":   {cfg.BackupKeepDaily, 7},
+		"BackupWeekly":  {cfg.BackupKeepWeekly, 4},
 		"SessionTTL":    {cfg.SessionTTL, 2160 * time.Hour},
 		"SessionMaxAge": {cfg.SessionMaxAge, 8760 * time.Hour},
 		"LogFormat":     {logOpts.Format, "text"},
@@ -117,5 +120,30 @@ func TestSessionDurations(t *testing.T) {
 	}
 	if _, _, err := Load(env(map[string]string{"LITURGIST_SESSION_TTL": "48h", "LITURGIST_SESSION_MAX_AGE": "24h"})); err == nil {
 		t.Error("max age below TTL must fail")
+	}
+}
+
+// The backup settings of 14 §4: off, a custom time, and invalid values reported together.
+func TestBackupSettings(t *testing.T) {
+	cfg, _, err := Load(env(map[string]string{"LITURGIST_BACKUP_TIME": "off"}))
+	if err != nil || cfg.BackupTime != "" {
+		t.Errorf("off: %q %v", cfg.BackupTime, err)
+	}
+	cfg, _, err = Load(env(map[string]string{"LITURGIST_BACKUP_TIME": "OFF"}))
+	if err != nil || cfg.BackupTime != "" {
+		t.Errorf("OFF: %q %v", cfg.BackupTime, err)
+	}
+	cfg, _, err = Load(env(map[string]string{"LITURGIST_BACKUP_TIME": "23:30", "LITURGIST_BACKUP_KEEP_DAILY": "14", "LITURGIST_BACKUP_KEEP_WEEKLY": "0"}))
+	if err != nil || cfg.BackupTime != "23:30" || cfg.BackupKeepDaily != 14 || cfg.BackupKeepWeekly != -1 {
+		t.Errorf("custom: %+v %v", cfg, err)
+	}
+	_, _, err = Load(env(map[string]string{"LITURGIST_BACKUP_TIME": "2am", "LITURGIST_BACKUP_KEEP_DAILY": "0", "LITURGIST_BACKUP_KEEP_WEEKLY": "x"}))
+	if err == nil {
+		t.Fatal("invalid values accepted")
+	}
+	for _, key := range []string{"LITURGIST_BACKUP_TIME", "LITURGIST_BACKUP_KEEP_DAILY", "LITURGIST_BACKUP_KEEP_WEEKLY"} {
+		if !strings.Contains(err.Error(), key) {
+			t.Errorf("error does not mention %s: %v", key, err)
+		}
 	}
 }

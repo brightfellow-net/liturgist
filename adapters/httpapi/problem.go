@@ -243,6 +243,9 @@ func MapError(ctx context.Context, err error, log *slog.Logger) error {
 		}
 		log.Info("not_found", "not_found_reason", reason, "user_id", string(info.UserID), "request_id", info.RequestID)
 		return problem(http.StatusNotFound, "not_found", "")
+	case errors.Is(err, app.ErrStorageFull):
+		log.Error("storage_full", "error", err, "request_id", info.RequestID)
+		return problem(http.StatusInsufficientStorage, "storage_full", "Server storage is full.")
 	case errors.Is(err, app.ErrUnavailable):
 		return problem(http.StatusServiceUnavailable, "unavailable", "")
 	}

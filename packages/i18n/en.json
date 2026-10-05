@@ -591,6 +591,7 @@
     "reading_in_use": "This reading is used in a liturgy that isn't published yet, so it can't be deleted.",
     "internal": "Something went wrong on the server.",
     "unavailable": "The server is busy. Please try again.",
+    "storage_full": "Server storage is full. Ask the person who runs the server to free some space.",
     "too_large": "That is too much at once. Import fewer files.",
     "import_unreadable": {
       "unknown": "This can't be read as a song.",
