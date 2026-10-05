@@ -52,6 +52,8 @@ commands:
   auth clear-throttle --identifier X | --ip Y | --all
                                          delete login-throttle counters
   search reindex                         rebuild the song search index
+  backup [file]                          write one archive of the database and files (SQLite)
+  restore <file> [--yes]                 replace the data with a backup; the server must be stopped
   openapi                                print the OpenAPI document
   version                                print version information`
 
@@ -83,6 +85,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return withOperator("auth clear-throttle", args[2:], stdout, stderr, clearThrottle)
 	case len(args) > 1 && args[0] == "search" && args[1] == "reindex":
 		return withOperator("search reindex", args[2:], stdout, stderr, reindexSongs)
+	case args[0] == "backup":
+		return backupCmd(args[1:], stdout, stderr)
+	case args[0] == "restore":
+		return restoreCmd(args[1:], stdin, stdout, stderr)
 	case args[0] == "openapi":
 		doc, err := server.OpenAPI()
 		if err != nil {
@@ -120,6 +126,18 @@ func load(name string, args []string, allowNewerFlag bool, stdout, stderr io.Wri
 	return cfg, true
 }
 
+// loadToStderr is the configuration for commands whose standard output is
+// their result: the log goes to standard error.
+func loadToStderr(stderr io.Writer) (server.Config, bool) {
+	cfg, logOpts, err := envconfig.Load(os.Getenv)
+	if err != nil {
+		fmt.Fprintf(stderr, "invalid configuration:\n%v\n", err)
+		return server.Config{}, false
+	}
+	cfg.Logger = logging.New(stderr, logOpts.Format, logOpts.Level)
+	return cfg, true
+}
+
 func exitFor(err error, stderr io.Writer) int {
 	fmt.Fprintln(stderr, err)
 	switch {
@@ -133,6 +151,8 @@ func exitFor(err error, stderr io.Writer) int {
 		return exitNotMember
 	case server.IsTooManyChurches(err):
 		return exitTooManyChurches
+	case server.IsBackupNewer(err):
+		return exitSchemaNewer
 	}
 	return exitError
 }
@@ -143,6 +163,13 @@ func serve(args []string, stdout, stderr io.Writer) int {
 		return exitConfig
 	}
 	cfg.Notices = stderr
+	release, err := server.LockRun(cfg)
+	if err != nil {
+		cfg.Logger.Error("start-up failed", "error", err)
+		fmt.Fprintln(stderr, err)
+		return exitError
+	}
+	defer release()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -388,4 +415,78 @@ func readPassword(stdin io.Reader, stderr io.Writer, fromStdin bool) (string, er
 		return "", errors.New("the passwords don't match")
 	}
 	return string(first), nil
+}
+
+func backupCmd(args []string, stdout, stderr io.Writer) int {
+	cfg, ok := loadToStderr(stderr)
+	if !ok {
+		return exitConfig
+	}
+	if len(args) > 1 {
+		fmt.Fprintln(stderr, usage)
+		return exitConfig
+	}
+	dest := ""
+	if len(args) == 1 {
+		dest = args[0]
+	}
+	res, err := server.Backup(context.Background(), cfg, dest)
+	if err != nil {
+		return exitFor(err, stderr)
+	}
+	fmt.Fprintf(stdout, "Backup written to %s (%.1f MB, schema version %d).\n", res.Path, float64(res.Size)/(1<<20), res.Schema)
+	return exitOK
+}
+
+func restoreCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("restore", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	yes := fs.Bool("yes", false, "do not ask for confirmation")
+	// Flags may come after the file name: liturgist restore backup.zip --yes.
+	var files []string
+	for rest := args; ; {
+		if err := fs.Parse(rest); err != nil {
+			return exitConfig
+		}
+		if fs.NArg() == 0 {
+			break
+		}
+		files = append(files, fs.Arg(0))
+		rest = fs.Args()[1:]
+	}
+	if len(files) != 1 {
+		fmt.Fprintln(stderr, usage)
+		return exitConfig
+	}
+	cfg, ok := loadToStderr(stderr)
+	if !ok {
+		return exitConfig
+	}
+	var confirm func(server.RestoreInfo) bool
+	if !*yes {
+		f, isFile := stdin.(*os.File)
+		if !isFile || !term.IsTerminal(int(f.Fd())) { //nolint:gosec // file descriptors fit in int
+			fmt.Fprintln(stderr, "no terminal to ask for confirmation; use --yes")
+			return exitError
+		}
+		confirm = func(info server.RestoreInfo) bool {
+			fmt.Fprintf(stderr, "Replace ALL current data with the backup made %s (Liturgist %s)?\nThe current data is kept in the backups folder. Type yes to continue: ",
+				info.CreatedAt.Local().Format("2006-01-02 15:04"), info.Program)
+			line, _ := bufio.NewReader(stdin).ReadString('\n')
+			answer := strings.ToLower(strings.TrimSpace(line))
+			return answer == "y" || answer == "yes"
+		}
+	}
+	res, err := server.Restore(context.Background(), cfg, files[0], confirm)
+	if err != nil {
+		return exitFor(err, stderr)
+	}
+	fmt.Fprintf(stdout, "Restored (schema version %d). Start the server again.\n", res.Schema)
+	if res.PreRestoreDB != "" {
+		fmt.Fprintf(stdout, "The previous database is kept as %s\n", res.PreRestoreDB)
+	}
+	if res.PreRestoreFiles != "" {
+		fmt.Fprintf(stdout, "The previous files are kept in %s\n", res.PreRestoreFiles)
+	}
+	return exitOK
 }

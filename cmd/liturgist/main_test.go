@@ -6,6 +6,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,9 +15,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/brightfellow-net/liturgist/adapters/sqlstore"
+	"github.com/brightfellow-net/liturgist/internal/backup"
 	"github.com/brightfellow-net/liturgist/internal/envconfig"
 	"github.com/brightfellow-net/liturgist/server"
 )
@@ -194,5 +198,120 @@ func TestGrantAdminNotMember(t *testing.T) {
 
 	if code, _, errOut := cli("", "member", "grant-admin", "sari@example.org"); code != exitNotMember {
 		t.Errorf("grant-admin for a former member: %d %s", code, errOut)
+	}
+}
+
+// IT-601 through the command line: backup, change, restore, compare.
+func TestBackupRestoreCommands(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("LITURGIST_DATA_DIR", dir)
+	t.Setenv("LITURGIST_BASE_URL", "https://liturgi.example.org")
+	if code, _, errOut := cli("", "migrate"); code != exitOK {
+		t.Fatalf("migrate: %d %s", code, errOut)
+	}
+	setup := []string{"setup", "--church-name", "GKY Citragarden", "--admin-name", "Admin",
+		"--admin-identifier", "admin@example.org", "--password-stdin"}
+	if code, _, errOut := cli("kopi susu pagi hari\n", setup...); code != exitOK {
+		t.Fatalf("setup: %d %s", code, errOut)
+	}
+	_, before, _ := cli("", "user", "list")
+
+	file := filepath.Join(t.TempDir(), "church.zip")
+	code, out, errOut := cli("", "backup", file)
+	if code != exitOK || !strings.Contains(out, file) {
+		t.Fatalf("backup: %d %q %q", code, out, errOut)
+	}
+	if code, _, errOut := cli("", "backup", file); code != exitError || !strings.Contains(errOut, "already exists") {
+		t.Errorf("second backup to the same file: %d %q", code, errOut)
+	}
+	if code, out, _ := cli("", "backup"); code != exitOK || !strings.Contains(out, filepath.Join(dir, "backups", "manual-")) {
+		t.Errorf("default path: %d %q", code, out)
+	}
+
+	db, err := sql.Open("sqlite", "file:"+filepath.ToSlash(filepath.Join(dir, "liturgist.db")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec("UPDATE users SET name = 'Someone Else'"); err != nil {
+		t.Fatal(err)
+	}
+	_ = db.Close()
+	if _, changed, _ := cli("", "user", "list"); changed == before {
+		t.Fatal("the change is not visible")
+	}
+
+	if code, _, errOut := cli("", "restore", file); code != exitError || !strings.Contains(errOut, "--yes") {
+		t.Errorf("restore without a terminal or --yes: %d %q", code, errOut)
+	}
+	if code, _, _ := cli("", "restore"); code != exitConfig {
+		t.Errorf("restore without a file: %d", code)
+	}
+	if code, out, errOut := cli("", "restore", file, "--yes"); code != exitOK || !strings.Contains(out, "pre-restore-") {
+		t.Fatalf("restore: %d %q %q", code, out, errOut)
+	}
+	if _, after, _ := cli("", "user", "list"); after != before {
+		t.Errorf("after the restore: %q, want %q", after, before)
+	}
+	if code, _, errOut := cli("", "restore", filepath.Join(dir, "missing.zip"), "--yes"); code != exitError {
+		t.Errorf("missing file: %d %q", code, errOut)
+	}
+}
+
+// A second server on the same data folder, and a restore while one runs, are refused.
+func TestRestoreRefusedWhileServing(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("LITURGIST_DATA_DIR", dir)
+	t.Setenv("LITURGIST_BASE_URL", "https://liturgi.example.org")
+	if code, _, errOut := cli("", "migrate"); code != exitOK {
+		t.Fatalf("migrate: %d %s", code, errOut)
+	}
+	file := filepath.Join(t.TempDir(), "b.zip")
+	if code, _, errOut := cli("", "backup", file); code != exitOK {
+		t.Fatalf("backup: %d %s", code, errOut)
+	}
+	release, err := sqlstore.LockRun(dir) // what a running serve holds
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	if code, _, errOut := cli("", "restore", file, "--yes"); code != exitError || !strings.Contains(errOut, "stop the server") {
+		t.Errorf("restore while serving: %d %q", code, errOut)
+	}
+	if code, _, _ := cli("", "backup", filepath.Join(t.TempDir(), "c.zip")); code != exitOK {
+		t.Errorf("backup while serving: %d", code)
+	}
+	if code, _, errOut := cli("", "serve"); code != exitError || !strings.Contains(errOut, "another Liturgist process") {
+		t.Errorf("a second serve: %d %q", code, errOut)
+	}
+}
+
+// TC-602: a backup made by a newer program exits with code 3 and changes nothing.
+func TestRestoreNewerBackupExitsThree(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("LITURGIST_DATA_DIR", dir)
+	if code, _, errOut := cli("", "migrate"); code != exitOK {
+		t.Fatalf("migrate: %d %s", code, errOut)
+	}
+	file := filepath.Join(t.TempDir(), "b.zip")
+	if code, _, errOut := cli("", "backup", file); code != exitOK {
+		t.Fatalf("backup: %d %s", code, errOut)
+	}
+	a, err := backup.Open(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmp := t.TempDir()
+	if err := a.Extract(tmp); err != nil {
+		t.Fatal(err)
+	}
+	m := a.Manifest
+	_ = a.Close()
+	m.Schema = 9999
+	newer := filepath.Join(t.TempDir(), "newer.zip")
+	if err := backup.CreateFile(newer, m, filepath.Join(tmp, "liturgist.db"), "", nil); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, errOut := cli("", "restore", newer, "--yes"); code != exitSchemaNewer || !strings.Contains(errOut, "newer Liturgist") {
+		t.Errorf("newer backup: %d %q", code, errOut)
 	}
 }

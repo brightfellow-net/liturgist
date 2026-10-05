@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/brightfellow-net/liturgist/adapters/sqlstore"
 	"github.com/brightfellow-net/liturgist/adapters/sysclock"
@@ -95,4 +96,23 @@ func MigrateStatus(ctx context.Context, cfg Config) (current, target int64, err 
 	}
 	defer func() { _ = db.Close() }()
 	return db.CheckVersion(ctx, mo)
+}
+
+// LockRun takes the data folder's run lock for the life of "liturgist serve"
+// (14 §3, H-2): a second server on the same folder, or a restore, is refused.
+// On PostgreSQL there is no data folder to protect and the release is a no-op.
+// It is the command's job, not New's: a program that builds several servers
+// on one folder (the tests) or a hosted edition decides for itself.
+func LockRun(cfg Config) (func(), error) {
+	if cfg.DBDriver != "sqlite" {
+		return func() {}, nil
+	}
+	if err := os.MkdirAll(cfg.DataDir, 0o700); err != nil {
+		return nil, fmt.Errorf("data folder: %w", err)
+	}
+	release, err := sqlstore.LockRun(cfg.DataDir)
+	if errors.Is(err, sqlstore.ErrAlreadyRunning) {
+		return nil, fmt.Errorf("%w; stop it first, or use a different LITURGIST_DATA_DIR", err)
+	}
+	return release, err
 }

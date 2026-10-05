@@ -147,7 +147,7 @@ func (db *DB) preUpgradeCopy(ctx context.Context, version int64, o MigrateOption
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return skip("cannot create backups folder", "error", err)
 	}
-	need := int64(float64(fileSize(db.path)+fileSize(db.path+"-wal")) * 1.2)
+	need := SnapshotSpace(db.path)
 	free, err := freeBytes(dir)
 	if err != nil {
 		return skip("cannot read free disk space", "error", err)
