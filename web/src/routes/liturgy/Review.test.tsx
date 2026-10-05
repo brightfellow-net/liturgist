@@ -13,7 +13,7 @@ import { LiturgyPage } from "./LiturgyPage";
 afterEach(() => vi.unstubAllGlobals());
 void i18n.changeLanguage("en");
 
-const none = { edit: false, delete: false, submit: false, approve: false, request_changes: false, reopen: false, comment: false };
+const none = { edit: false, delete: false, submit: false, approve: false, request_changes: false, reopen: false, comment: false, publish: false, archive: false, unarchive: false };
 const user = { id: "u9", name: "Ruth" };
 const change = (to: string, from: string, note = "") => ({ id: "c-" + to, from_state: from, to_state: to, user, note, edit_seq: 7, created_at: "2026-10-02T09:00:00Z" });
 const history = (...items: ReturnType<typeof change>[]) => ({ status: 200, body: { items, total: items.length } });
@@ -56,13 +56,14 @@ describe("WT-R-001 review bar", () => {
     expect(await screen.findByText("Ruth wrote: Ganti doa")).toBeInTheDocument();
   });
 
-  it("shows no buttons and no history to someone without a liturgy scope", async () => {
+  it("shows no review bar and no history to a view without review data", async () => {
     const l = liturgy({ state: "published", actions: none });
     delete (l as { open_comments?: number }).open_comments;
     const calls = mockApi(base(l));
     page([]);
-    expect(await screen.findByText("This liturgy is final and can't be edited.")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Ibadah Umum" })).toBeInTheDocument();
     expect(buttons()).toEqual([]);
+    expect(screen.queryByText("Review")).toBeNull();
     expect(screen.queryByText("Review history")).toBeNull();
     expect(calls.some((c) => c.route.endsWith("/state-changes"))).toBe(false);
   });
@@ -117,6 +118,80 @@ describe("WT-R-002 approve", () => {
     expect(await screen.findByText("The liturgy changed after you opened it. Read it again.")).toBeInTheDocument();
     await vi.waitFor(() => expect(loads).toBe(2));
     expect(calls.filter((c) => c.route === "POST /liturgies/l1/approve")).toHaveLength(1);
+  });
+});
+
+const published = { number: 2, published_at: "2026-10-04T09:00:00Z" };
+const pub = (over: Partial<LiturgyView> = {}) => liturgy({ state: "published", published, actions: { ...none, reopen: true, archive: true }, ...over } as never);
+
+// WT-P-001: publish, reopen, archive and unarchive follow the actions.
+describe("WT-P-001 publishing", () => {
+  it("publishes with the edit_seq it displayed and the note", async () => {
+    const calls = mockApi({
+      ...base(liturgy({ state: "approved", actions: { ...none, publish: true, reopen: true } })),
+      "POST /liturgies/l1/publish": { status: 200, body: pub() },
+    });
+    page();
+    await userEvent.click(await screen.findByRole("button", { name: "Publish" }));
+    await userEvent.type(screen.getByLabelText(/Note/), "Shalom");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText(/Published as version 2 on/)).toBeInTheDocument();
+    expect(calls.find((c) => c.route === "POST /liturgies/l1/publish")!.body).toEqual({ note: "Shalom", edit_seq: 7 });
+    expect(screen.getByRole("button", { name: "Reopen as draft" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Publish" })).toBeNull();
+  });
+
+  it("shows exactly the buttons the actions allow", async () => {
+    mockApi(base(pub({ archived_at: "2026-10-05T09:00:00Z", actions: { ...none, unarchive: true } } as never)));
+    page();
+    expect(await screen.findByText(/Archived\. This liturgy stays readable/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Unarchive" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Archive" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reopen as draft" })).toBeNull();
+  });
+
+  it("tells that the team still sees the published version while it is revised", async () => {
+    mockApi(base(liturgy({ published, actions: { ...none, edit: true, submit: true } } as never)));
+    page();
+    expect(await screen.findByText("Being revised. The team still sees version 2 until you publish again.")).toBeInTheDocument();
+  });
+
+  it("archives and unarchives straight away", async () => {
+    const calls = mockApi({
+      ...base(pub()),
+      "POST /liturgies/l1/archive": { status: 200, body: pub({ archived_at: "2026-10-05T09:00:00Z", actions: { ...none, unarchive: true } } as never) },
+      "POST /liturgies/l1/unarchive": { status: 200, body: pub() },
+    });
+    page();
+    await userEvent.click(await screen.findByRole("button", { name: "Archive" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Unarchive" }));
+    expect(await screen.findByRole("button", { name: "Archive" })).toBeInTheDocument();
+    expect(calls.filter((c) => c.route.endsWith("/archive") || c.route.endsWith("/unarchive")).map((c) => c.route)).toEqual([
+      "POST /liturgies/l1/archive", "POST /liturgies/l1/unarchive",
+    ]);
+  });
+
+  it("names the limit that stopped a reopen", async () => {
+    mockApi({
+      ...base(pub()),
+      "POST /liturgies/l1/reopen": { status: 403, body: { code: "limit_reached", limit: "max_unpublished_liturgies", used: 4, max: 4 } },
+    });
+    page();
+    await userEvent.click(await screen.findByRole("button", { name: "Reopen as draft" }));
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText(/Finish or delete one first/)).toBeInTheDocument();
+  });
+
+  it("names the longest item when the copy is too large", async () => {
+    mockApi({
+      ...base(liturgy({ state: "approved", actions: { ...none, publish: true } })),
+      "POST /liturgies/l1/publish": { status: 422, body: { code: "publish_too_large", largest_item: "Khotbah" } },
+    });
+    page();
+    await userEvent.click(await screen.findByRole("button", { name: "Publish" }));
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText(/The longest item is “Khotbah”/)).toBeInTheDocument();
   });
 });
 

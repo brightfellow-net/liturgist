@@ -439,6 +439,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/liturgies/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive a published liturgy */
+        post: operations["archiveLiturgy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/liturgies/{id}/assignments": {
         parameters: {
             query?: never;
@@ -595,6 +612,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/liturgies/{id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publish an approved liturgy: store its published version */
+        post: operations["publishLiturgy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/liturgies/{id}/redo": {
         parameters: {
             query?: never;
@@ -621,7 +655,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Reopen an approved liturgy as a draft */
+        /** Reopen an approved or published liturgy as a draft */
         post: operations["reopenLiturgy"];
         delete?: never;
         options?: never;
@@ -674,6 +708,23 @@ export interface paths {
         put?: never;
         /** Submit a liturgy for review (draft or needs revision to in review) */
         post: operations["submitLiturgy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/liturgies/{id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Make an archived liturgy active again */
+        post: operations["unarchiveLiturgy"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1872,12 +1923,15 @@ export interface components {
         };
         LiturgyActions: {
             approve: boolean;
+            archive: boolean;
             comment: boolean;
             delete: boolean;
             edit: boolean;
+            publish: boolean;
             reopen: boolean;
             request_changes: boolean;
             submit: boolean;
+            unarchive: boolean;
         };
         LiturgyItemView: {
             duty_id: string | null;
@@ -1919,6 +1973,7 @@ export interface components {
         };
         LiturgySummaryView: {
             actions: components["schemas"]["LiturgyActions"];
+            archived: boolean;
             date: string;
             id: string;
             /** Format: int64 */
@@ -1941,6 +1996,11 @@ export interface components {
              */
             readonly $schema?: string;
             actions: components["schemas"]["LiturgyActions"];
+            /**
+             * Format: date-time
+             * @description null unless the liturgy is archived
+             */
+            archived_at: string | null;
             assignments: components["schemas"]["AssignmentView"][] | null;
             /** Format: date-time */
             created_at: string;
@@ -1962,6 +2022,8 @@ export interface components {
              */
             open_comments?: number;
             problems: components["schemas"]["ProblemView"][] | null;
+            /** @description the newest published version; absent when there is none, and for a member without a liturgy scope */
+            published?: components["schemas"]["PublishedInfoView"];
             /** @description null for a one-off, and after the service is deleted */
             service_id: string | null;
             service_name: string;
@@ -2157,6 +2219,8 @@ export interface components {
              * @example /api/v1/schemas/PrepareLiturgiesRequest.json
              */
             readonly $schema?: string;
+            /** @description published liturgies of earlier weeks to archive first, in the same transaction; needs liturgy.manage */
+            archive_ids?: string[] | null;
             /** @description 1 to 50 occurrences of services */
             occurrences: components["schemas"]["Item4"][] | null;
         };
@@ -2167,6 +2231,8 @@ export interface components {
              * @example /api/v1/schemas/PrepareLiturgiesResponse.json
              */
             readonly $schema?: string;
+            /** @description the liturgies archived to make room */
+            archived: string[] | null;
             items: components["schemas"]["PreparedView"][] | null;
         };
         PrepareWeekView: {
@@ -2206,6 +2272,7 @@ export interface components {
             detail?: string;
             errors?: components["schemas"]["ErrorDetail"][] | null;
             item_id?: string;
+            largest_item?: string;
             limit?: string;
             liturgy_id?: string;
             /** Format: int64 */
@@ -2237,6 +2304,12 @@ export interface components {
             /** @description the provider's ID, for POST /readings/from-provider */
             source: string;
             text: string;
+        };
+        PublishedInfoView: {
+            /** Format: int64 */
+            number: number;
+            /** Format: date-time */
+            published_at: string;
         };
         ReadingActions: {
             delete: boolean;
@@ -3779,6 +3852,8 @@ export interface operations {
         parameters: {
             query?: {
                 state?: "draft" | "in_review" | "needs_revision" | "approved" | "published";
+                /** @description default false: archived liturgies are hidden */
+                archived?: "false" | "true" | "all";
                 /** @description first date, inclusive */
                 from?: string;
                 /** @description last date, inclusive */
@@ -4051,6 +4126,37 @@ export interface operations {
                 "application/json": components["schemas"]["ReviewSeqBody"];
             };
         };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiturgyView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    archiveLiturgy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description OK */
             200: {
@@ -4488,6 +4594,41 @@ export interface operations {
             };
         };
     };
+    publishLiturgy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewSeqBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiturgyView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     redoLiturgyEdit: {
         parameters: {
             query?: never;
@@ -4638,6 +4779,37 @@ export interface operations {
                 "application/json": components["schemas"]["ReviewBody"];
             };
         };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiturgyView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    unarchiveLiturgy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description OK */
             200: {

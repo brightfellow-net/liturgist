@@ -23,6 +23,7 @@ type LiturgySummaryView struct {
 	State       string             `json:"state" enum:"draft,in_review,needs_revision,approved,published"`
 	ItemCount   int                `json:"item_count"`
 	Version     int                `json:"version"`
+	Archived    bool               `json:"archived"`
 	Actions     app.LiturgyActions `json:"actions"`
 }
 
@@ -124,12 +125,20 @@ type LiturgyView struct {
 	// Review data: absent for a member without a liturgy scope (12 §2, P-74).
 	OpenComments *int               `json:"open_comments,omitempty" doc:"the number of unresolved comments"`
 	LastChange   *StateChangeView   `json:"last_change,omitempty" doc:"the newest state change; absent when the liturgy never changed state"`
+	Published    *PublishedInfoView `json:"published,omitempty" doc:"the newest published version; absent when there is none, and for a member without a liturgy scope"`
+	ArchivedAt   *time.Time         `json:"archived_at" doc:"null unless the liturgy is archived"`
 	Items        []LiturgyItemView  `json:"items"`
 	Assignments  []AssignmentView   `json:"assignments"`
 	Problems     []ProblemView      `json:"problems"`
 	Actions      app.LiturgyActions `json:"actions"`
 	CreatedAt    time.Time          `json:"created_at"`
 	UpdatedAt    time.Time          `json:"updated_at"`
+}
+
+// PublishedInfoView is the newest published version without its content (13 §2).
+type PublishedInfoView struct {
+	Number      int       `json:"number"`
+	PublishedAt time.Time `json:"published_at"`
 }
 
 // UserRefView names a person.
@@ -316,7 +325,11 @@ func liturgyView(v app.LiturgyView) LiturgyView {
 	out := LiturgyView{ID: string(l.ID), Date: l.Date, Time: l.Time, ServiceID: optional(string(l.ServiceID)), ServiceName: l.ServiceName,
 		Language: l.Language, TemplateID: optional(string(l.TemplateID)), State: string(l.State), Version: l.Version, Actions: v.Actions,
 		Items: make([]LiturgyItemView, len(v.Items)), Assignments: make([]AssignmentView, len(v.Assignments)),
-		Problems: make([]ProblemView, len(v.Problems)), CreatedAt: l.CreatedAt, UpdatedAt: l.UpdatedAt, EditSeq: l.EditSeq}
+		Problems: make([]ProblemView, len(v.Problems)), CreatedAt: l.CreatedAt, UpdatedAt: l.UpdatedAt, EditSeq: l.EditSeq,
+		ArchivedAt: l.ArchivedAt}
+	if v.Published != nil {
+		out.Published = &PublishedInfoView{Number: v.Published.Number, PublishedAt: v.Published.PublishedAt}
+	}
 	if v.Review != nil {
 		n := v.Review.OpenComments
 		out.OpenComments = &n

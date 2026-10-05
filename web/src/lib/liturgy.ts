@@ -12,7 +12,7 @@ export const liturgyLimits = { items: 60, songsPerItem: 10, entriesPerSong: 100,
 export const liturgyStates = ["draft", "in_review", "needs_revision", "approved", "published", "archived"] as const;
 
 // Query keys are fixed (05 §4, 11 §5).
-export type LiturgyFilters = { state?: (typeof liturgyStates)[number] & ("draft" | "in_review" | "needs_revision" | "approved" | "published"); from?: string; to?: string; order?: "date_asc" | "date_desc"; limit?: number; offset?: number };
+export type LiturgyFilters = { state?: (typeof liturgyStates)[number] & ("draft" | "in_review" | "needs_revision" | "approved" | "published"); archived?: "true" | "all"; from?: string; to?: string; order?: "date_asc" | "date_desc"; limit?: number; offset?: number };
 
 export const liturgiesQuery = (filters: LiturgyFilters) =>
   queryOptions({

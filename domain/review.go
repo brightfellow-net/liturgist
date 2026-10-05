@@ -15,19 +15,20 @@ type StateChangeID string
 // MaxNote is the longest note of a state change, in characters (12 §2).
 const MaxNote = 500
 
-// ReviewAction is one of the four transitions of the review workflow (12 §2).
+// ReviewAction is one of the transitions of the review workflow (12 §2, 13 §2).
 type ReviewAction string
 
-// The actions. Publishing is step 5.
+// The actions. Publish is step 5 (13 §2).
 const (
 	ActionSubmit         ReviewAction = "submit"
 	ActionApprove        ReviewAction = "approve"
 	ActionRequestChanges ReviewAction = "request_changes"
 	ActionReopen         ReviewAction = "reopen"
+	ActionPublish        ReviewAction = "publish"
 )
 
 // ReviewActions lists every action.
-var ReviewActions = []ReviewAction{ActionSubmit, ActionApprove, ActionRequestChanges, ActionReopen}
+var ReviewActions = []ReviewAction{ActionSubmit, ActionApprove, ActionRequestChanges, ActionReopen, ActionPublish}
 
 // ReviewRule is the row of the transition table of one action (12 §2).
 type ReviewRule struct {
@@ -42,7 +43,8 @@ var reviewRules = map[ReviewAction]ReviewRule{
 	ActionSubmit:         {From: []LiturgyState{StateDraft, StateNeedsRevision}, To: StateInReview, Scope: ScopeLiturgyEdit},
 	ActionApprove:        {From: []LiturgyState{StateInReview}, To: StateApproved, Scope: ScopeLiturgyApprove, NeedsSeq: true},
 	ActionRequestChanges: {From: []LiturgyState{StateInReview}, To: StateNeedsRevision, Scope: ScopeLiturgyApprove, NeedsSeq: true},
-	ActionReopen:         {From: []LiturgyState{StateApproved}, To: StateDraft, Scope: ScopeLiturgyApprove},
+	ActionReopen:         {From: []LiturgyState{StateApproved, StatePublished}, To: StateDraft, Scope: ScopeLiturgyApprove},
+	ActionPublish:        {From: []LiturgyState{StateApproved}, To: StatePublished, Scope: ScopeLiturgyApprove, NeedsSeq: true},
 }
 
 // Rule returns the rule of the action; false for an unknown one.

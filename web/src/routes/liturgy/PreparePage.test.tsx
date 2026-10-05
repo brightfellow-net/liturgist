@@ -54,6 +54,38 @@ describe("TC-E-004 prepare page", () => {
     expect(screen.getByRole("button", { name: "Create 1 liturgy" })).toBeEnabled();
   });
 
+  // WT-P-001: archive the oldest published liturgies to make room under max_active_liturgies.
+  it("offers to archive the oldest published liturgies when the active limit is full", async () => {
+    const old = (id: string, date: string, archive = true) => ({
+      id, date, time: "", service_name: "Lama " + id, language: "id", state: "published", item_count: 1, version: 1, archived: false,
+      actions: { edit: false, delete: false, submit: false, approve: false, request_changes: false, reopen: true, comment: false, publish: false, archive, unarchive: false },
+    });
+    const calls = mockApi({
+      "GET /liturgies/prepare": week({ max_unpublished_liturgies: unlimited, max_active_liturgies: { unlimited: false, max: 7, used: 7 } }),
+      "GET /liturgies": { status: 200, body: { items: [old("o1", "2026-09-27"), old("o2", "2026-10-04")], total: 2 } },
+      "POST /liturgies/prepare": { status: 201, body: { items: [], archived: ["o1", "o2"] } },
+    });
+    renderPage("/liturgies/prepare", "/liturgies/prepare", <PreparePage />, meWith(["liturgy.edit", "liturgy.manage"]));
+    await screen.findByText("Week of 12 October 2026");
+    expect(screen.getByRole("button", { name: "Create 2 liturgies" })).toBeDisabled();
+    await userEvent.click(await screen.findByRole("button", { name: "Archive the 2 oldest published liturgies and create 2" }));
+    await vi.waitFor(() => expect(calls.some((c) => c.route === "POST /liturgies/prepare")).toBe(true));
+    expect(calls.find((c) => c.route === "POST /liturgies/prepare")!.body).toEqual({
+      occurrences: [{ service_id: "sv1", date: "2026-10-14", time: "19:00" }, { service_id: "sv3", date: "2026-10-18", time: "07:00" }],
+      archive_ids: ["o1", "o2"],
+    });
+  });
+
+  it("does not offer archiving when the unpublished limit is the one that is full, or without liturgy.manage", async () => {
+    mockApi({
+      "GET /liturgies/prepare": week({ max_unpublished_liturgies: { unlimited: false, max: 5, used: 5 }, max_active_liturgies: { unlimited: false, max: 7, used: 7 } }),
+      "GET /liturgies": { status: 200, body: { items: [], total: 0 } },
+    });
+    renderPage("/liturgies/prepare", "/liturgies/prepare", <PreparePage />, meWith(["liturgy.edit", "liturgy.manage"]));
+    await screen.findByText(/You ticked 2; only 0 can be created/);
+    expect(screen.queryByRole("button", { name: /Archive the/ })).toBeNull();
+  });
+
   it("asks for the other week when the week buttons are used", async () => {
     const calls = mockApi({ "GET /liturgies/prepare": week() });
     page();

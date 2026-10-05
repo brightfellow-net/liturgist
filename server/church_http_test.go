@@ -355,6 +355,7 @@ func TestTenancyDeclarations(t *testing.T) {
 		"reorderLiturgyItems": "church", "addItemSong": "church", "setItemSongs": "church", "addAssignment": "church",
 		"removeAssignment": "church", "undoLiturgyEdit": "church", "redoLiturgyEdit": "church",
 		"submitLiturgy": "church", "approveLiturgy": "church", "requestLiturgyChanges": "church", "reopenLiturgy": "church",
+		"publishLiturgy": "church", "archiveLiturgy": "church", "unarchiveLiturgy": "church",
 		"listLiturgyStateChanges": "church", "listLiturgyComments": "church", "addLiturgyComment": "church", "setLiturgyCommentResolved": "church",
 		"saasExtra": "church", // added through WithRoutes without a declaration
 	}

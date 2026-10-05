@@ -14,12 +14,13 @@ import { ApiError, isCode } from "@/lib/errors";
 import { liturgyQuery, problemText, stateChangesQuery } from "@/lib/liturgy";
 import { ReviewComments } from "./Comments";
 
-type Action = "submit" | "approve" | "request_changes" | "reopen";
+type Action = "submit" | "approve" | "request_changes" | "reopen" | "publish";
 
 // Review is the review bar of a liturgy (12 §6): the state in words, the buttons
 // the liturgy's actions allow, the note form, and the review history. Submit
-// goes straight away; approving, requesting changes and reopening ask for an
-// optional note first, and approving asks once more when comments are open.
+// goes straight away; approving, publishing, requesting changes and reopening
+// ask for an optional note first, and approving asks once more when comments
+// are open. Archive and unarchive go straight away too (13 §4): both undo each other.
 export function Review({ liturgy, onChanged }: { liturgy: LiturgyView; onChanged?: (message: string) => void }) {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
@@ -32,6 +33,7 @@ export function Review({ liturgy, onChanged }: { liturgy: LiturgyView; onChanged
   const a = liturgy.actions;
   const open = liturgy.open_comments ?? 0;
   const items = liturgy.items ?? [];
+  const published = liturgy.published;
   const when = new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium", timeStyle: "short" });
 
   const run = useMutation({
@@ -43,6 +45,7 @@ export function Review({ liturgy, onChanged }: { liturgy: LiturgyView; onChanged
         case "approve": return call(api.POST("/liturgies/{id}/approve", { params, body: { ...body, edit_seq: liturgy.edit_seq } }));
         case "request_changes": return call(api.POST("/liturgies/{id}/request-changes", { params, body: { ...body, edit_seq: liturgy.edit_seq } }));
         case "reopen": return call(api.POST("/liturgies/{id}/reopen", { params, body }));
+        case "publish": return call(api.POST("/liturgies/{id}/publish", { params, body: { ...body, edit_seq: liturgy.edit_seq } }));
       }
     },
     onSuccess: async (l, { action }) => {
@@ -60,6 +63,21 @@ export function Review({ liturgy, onChanged }: { liturgy: LiturgyView; onChanged
     onError: async (err) => {
       if (isCode(err, "review_stale") || isCode(err, "invalid_transition") || isCode(err, "liturgy_locked")) {
         setAsking(null);
+        await queryClient.invalidateQueries({ queryKey: key, exact: true });
+      }
+    },
+  });
+
+  const archive = useMutation({
+    mutationFn: (undo: boolean) =>
+      call(api.POST(undo ? "/liturgies/{id}/unarchive" : "/liturgies/{id}/archive", { params: { path: { id: liturgy.id } } })),
+    onSuccess: async (l, undo) => {
+      queryClient.setQueryData<LiturgyView>(key, l);
+      await queryClient.invalidateQueries({ queryKey: ["liturgies"] });
+      onChanged?.(t(undo ? "liturgy.review.done.unarchive" : "liturgy.review.done.archive"));
+    },
+    onError: async (err) => {
+      if (isCode(err, "invalid_transition") || isCode(err, "liturgy_archived") || isCode(err, "not_archived")) {
         await queryClient.invalidateQueries({ queryKey: key, exact: true });
       }
     },
@@ -84,16 +102,19 @@ export function Review({ liturgy, onChanged }: { liturgy: LiturgyView; onChanged
   const banner =
     liturgy.state === "in_review" ? t("liturgy.review.banner.in_review")
     : liturgy.state === "approved" ? t("liturgy.review.banner.approved")
-    : liturgy.state === "published" ? t("liturgy.locked_final")
+    : liturgy.state === "published" && liturgy.archived_at ? t("liturgy.review.banner.published_archived")
+    : liturgy.state === "published" && published ? t("liturgy.review.banner.published", { number: published.number, date: when.format(new Date(published.published_at)) })
     : liturgy.state === "needs_revision" ? t("liturgy.review.banner.needs_revision")
     : "";
+  const revising = liturgy.state !== "published" && published ? t("liturgy.review.banner.revising", { number: published.number }) : "";
   const problems = isCode(run.error, "has_problems") && run.error instanceof ApiError ? run.error.problem.problems ?? [] : [];
 
-  if (!banner && !reviewable && !a.submit && !a.approve && !a.request_changes && !a.reopen) return null;
+  if (!banner && !revising && !reviewable && !a.submit && !a.approve && !a.request_changes && !a.reopen && !a.publish && !a.archive && !a.unarchive) return null;
   return (
     <section aria-labelledby="review-title" className="space-y-3">
       <h3 id="review-title" className="text-lg font-semibold">{t("liturgy.review.title")}</h3>
       {banner && <Alert variant="info">{banner}</Alert>}
+      {revising && <Alert variant="info">{revising}</Alert>}
       {liturgy.state === "needs_revision" && last?.note && last.to_state === "needs_revision" && (
         <p className="rounded-md border border-border p-3">{t("liturgy.review.banner.needs_revision_note", { name: last.user.name, note: last.note })}</p>
       )}
@@ -102,7 +123,10 @@ export function Review({ liturgy, onChanged }: { liturgy: LiturgyView; onChanged
         {a.submit && <Button type="button" disabled={run.isPending} onClick={() => start("submit")}>{t("liturgy.review.submit")}</Button>}
         {a.approve && <Button type="button" variant={asking === "approve" ? "default" : "outline"} disabled={run.isPending} onClick={() => start("approve")}>{t("liturgy.review.approve")}</Button>}
         {a.request_changes && <Button type="button" variant="outline" disabled={run.isPending} onClick={() => start("request_changes")}>{t("liturgy.review.request_changes")}</Button>}
+        {a.publish && <Button type="button" variant={asking === "publish" ? "default" : "outline"} disabled={run.isPending} onClick={() => start("publish")}>{t("liturgy.review.publish")}</Button>}
         {a.reopen && <Button type="button" variant="outline" disabled={run.isPending} onClick={() => start("reopen")}>{t("liturgy.review.reopen")}</Button>}
+        {a.archive && <Button type="button" variant="outline" disabled={archive.isPending} onClick={() => archive.mutate(false)}>{t("liturgy.review.archive")}</Button>}
+        {a.unarchive && <Button type="button" variant="outline" disabled={archive.isPending} onClick={() => archive.mutate(true)}>{t("liturgy.review.unarchive")}</Button>}
       </div>
 
       {asking && (
@@ -131,7 +155,7 @@ export function Review({ liturgy, onChanged }: { liturgy: LiturgyView; onChanged
             })}
           </ul>
         </div>
-      ) : <ErrorAlert error={run.error} />}
+      ) : <ErrorAlert error={run.error ?? archive.error} />}
 
       <ReviewComments liturgy={liturgy} announce={onChanged} />
 

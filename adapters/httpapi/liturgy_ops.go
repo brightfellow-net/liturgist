@@ -100,26 +100,40 @@ func RegisterLiturgies(api huma.API, d LiturgyDeps) {
 					Date      string `json:"date" maxLength:"10"`
 					Time      string `json:"time" maxLength:"5"`
 				} `json:"occurrences" maxItems:"100" doc:"1 to 50 occurrences of services"`
+				ArchiveIDs []string `json:"archive_ids,omitempty" maxItems:"100" maxLength:"26" doc:"published liturgies of earlier weeks to archive first, in the same transaction; needs liturgy.manage"`
 			}
 		}) (*struct {
 			Body struct {
-				Items []PreparedView `json:"items"`
+				Items    []PreparedView `json:"items"`
+				Archived []string       `json:"archived" doc:"the liturgies archived to make room"`
 			}
 		}, error) {
 			entries := make([]app.PrepareEntry, len(in.Body.Occurrences))
 			for i, o := range in.Body.Occurrences {
 				entries[i] = app.PrepareEntry{ServiceID: domain.ServiceID(o.ServiceID), Date: o.Date, Time: o.Time}
 			}
-			made, err := d.Liturgies.PrepareCreate(ctx, sess(ctx), entries)
+			archive := make([]domain.LiturgyID, len(in.Body.ArchiveIDs))
+			for i, id := range in.Body.ArchiveIDs {
+				archive[i] = domain.LiturgyID(id)
+			}
+			made, archived, err := d.Liturgies.PrepareCreateArchiving(ctx, sess(ctx), entries, archive)
 			if err != nil {
 				return nil, fail(ctx, err)
+			}
+			for _, id := range archived {
+				d.Log.Info("liturgy_archived", "actor", actor(ctx), "liturgy_id", string(id))
 			}
 			d.Log.Info("liturgies_prepared", "actor", actor(ctx), "count", len(made))
 			out := &struct {
 				Body struct {
-					Items []PreparedView `json:"items"`
+					Items    []PreparedView `json:"items"`
+					Archived []string       `json:"archived" doc:"the liturgies archived to make room"`
 				}
 			}{}
+			out.Body.Archived = make([]string, len(archived))
+			for i, id := range archived {
+				out.Body.Archived[i] = string(id)
+			}
 			out.Body.Items = make([]PreparedView, len(made))
 			for i, m := range made {
 				out.Body.Items[i] = PreparedView{LiturgyID: string(m.LiturgyID), ServiceName: m.ServiceName, Date: m.Date, Time: m.Time,
@@ -161,12 +175,13 @@ func RegisterLiturgies(api huma.API, d LiturgyDeps) {
 
 	huma.Register(api, lop("listLiturgies", http.MethodGet, "/liturgies", http.StatusOK, "List the liturgies the caller may see"),
 		func(ctx context.Context, in *struct {
-			State  string `query:"state" enum:"draft,in_review,needs_revision,approved,published"`
-			From   string `query:"from" maxLength:"10" doc:"first date, inclusive"`
-			To     string `query:"to" maxLength:"10" doc:"last date, inclusive"`
-			Order  string `query:"order" enum:"date_asc,date_desc" doc:"default date_desc; ties by time, then ID"`
-			Limit  int    `query:"limit" minimum:"0" maximum:"1000" doc:"default 50, at most 100"`
-			Offset int    `query:"offset" minimum:"0"`
+			State    string `query:"state" enum:"draft,in_review,needs_revision,approved,published"`
+			Archived string `query:"archived" enum:"false,true,all" doc:"default false: archived liturgies are hidden"`
+			From     string `query:"from" maxLength:"10" doc:"first date, inclusive"`
+			To       string `query:"to" maxLength:"10" doc:"last date, inclusive"`
+			Order    string `query:"order" enum:"date_asc,date_desc" doc:"default date_desc; ties by time, then ID"`
+			Limit    int    `query:"limit" minimum:"0" maximum:"1000" doc:"default 50, at most 100"`
+			Offset   int    `query:"offset" minimum:"0"`
 		}) (*struct {
 			Body struct {
 				Items []LiturgySummaryView `json:"items"`
@@ -177,7 +192,7 @@ func RegisterLiturgies(api huma.API, d LiturgyDeps) {
 			if limit < 1 || limit > domain.MaxLiturgyQuery {
 				limit = 50
 			}
-			page, err := d.Liturgies.List(ctx, sess(ctx), app.LiturgyFilter{State: domain.LiturgyState(in.State), From: in.From, To: in.To,
+			page, err := d.Liturgies.List(ctx, sess(ctx), app.LiturgyFilter{State: domain.LiturgyState(in.State), Archived: archivedFilter(in.Archived), From: in.From, To: in.To,
 				Ascending: in.Order == "date_asc", Limit: limit, Offset: in.Offset})
 			if err != nil {
 				return nil, fail(ctx, err)
@@ -193,7 +208,7 @@ func RegisterLiturgies(api huma.API, d LiturgyDeps) {
 			for i, it := range page.Items {
 				l := it.Liturgy
 				out.Body.Items[i] = LiturgySummaryView{ID: string(l.ID), Date: l.Date, Time: l.Time, ServiceName: l.ServiceName, Language: l.Language,
-					State: string(l.State), ItemCount: it.ItemCount, Version: l.Version, Actions: it.Actions}
+					State: string(l.State), ItemCount: it.ItemCount, Version: l.Version, Archived: l.ArchivedAt != nil, Actions: it.Actions}
 			}
 			return out, nil
 		})
@@ -462,7 +477,14 @@ func RegisterLiturgies(api huma.API, d LiturgyDeps) {
 			if err != nil {
 				return nil, fail(ctx, err)
 			}
-			d.Log.Info("liturgy_"+string(act), "actor", actor(ctx), "liturgy_id", liturgy, "state", string(v.Liturgy.State))
+			event := "liturgy_" + string(act)
+			switch act {
+			case domain.ActionPublish:
+				event = "liturgy_published"
+			case domain.ActionReopen:
+				event = "liturgy_reopened"
+			}
+			d.Log.Info(event, "actor", actor(ctx), "liturgy_id", liturgy, "state", string(v.Liturgy.State))
 			return &liturgyOutput{Body: liturgyView(v)}, nil
 		}
 		if withSeq {
@@ -486,7 +508,21 @@ func RegisterLiturgies(api huma.API, d LiturgyDeps) {
 	review(domain.ActionSubmit, "submitLiturgy", "/liturgies/{id}/submit", "Submit a liturgy for review (draft or needs revision to in review)", false)
 	review(domain.ActionApprove, "approveLiturgy", "/liturgies/{id}/approve", "Approve a liturgy in review", true)
 	review(domain.ActionRequestChanges, "requestLiturgyChanges", "/liturgies/{id}/request-changes", "Send a liturgy in review back for revision", true)
-	review(domain.ActionReopen, "reopenLiturgy", "/liturgies/{id}/reopen", "Reopen an approved liturgy as a draft", false)
+	review(domain.ActionReopen, "reopenLiturgy", "/liturgies/{id}/reopen", "Reopen an approved or published liturgy as a draft", false)
+	review(domain.ActionPublish, "publishLiturgy", "/liturgies/{id}/publish", "Publish an approved liturgy: store its published version", true)
+	archiveOp := func(id, path, summary, event string, run func(ctx context.Context, sess *domain.Session, id domain.LiturgyID) (app.LiturgyView, error)) {
+		huma.Register(api, lop(id, http.MethodPost, path, http.StatusOK, summary),
+			func(ctx context.Context, in *liturgyPath) (*liturgyOutput, error) {
+				v, err := run(ctx, sess(ctx), domain.LiturgyID(in.ID))
+				if err != nil {
+					return nil, fail(ctx, err)
+				}
+				d.Log.Info(event, "actor", actor(ctx), "liturgy_id", in.ID)
+				return &liturgyOutput{Body: liturgyView(v)}, nil
+			})
+	}
+	archiveOp("archiveLiturgy", "/liturgies/{id}/archive", "Archive a published liturgy", "liturgy_archived", d.Liturgies.Archive)
+	archiveOp("unarchiveLiturgy", "/liturgies/{id}/unarchive", "Make an archived liturgy active again", "liturgy_unarchived", d.Liturgies.Unarchive)
 	huma.Register(api, lop("listLiturgyStateChanges", http.MethodGet, "/liturgies/{id}/state-changes", http.StatusOK, "The review history of a liturgy, newest first"),
 		func(ctx context.Context, in *struct {
 			ID     string `path:"id" maxLength:"26"`
@@ -580,4 +616,15 @@ func RegisterLiturgies(api huma.API, d LiturgyDeps) {
 			d.Log.Info("assignment_removed", "actor", actor(ctx), "liturgy_id", in.ID, "assignment_id", in.AssignmentID)
 			return nil, nil
 		})
+}
+
+// archivedFilter reads the archived query parameter of the list.
+func archivedFilter(s string) app.ArchivedFilter {
+	switch s {
+	case "true":
+		return app.ArchivedOnly
+	case "all":
+		return app.ArchivedAll
+	}
+	return app.ArchivedExclude
 }

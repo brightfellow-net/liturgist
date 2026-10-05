@@ -60,6 +60,10 @@ func churchRowsIn(t *testing.T, s app.Store, db *sqlstore.DB, cid string) string
 			"SELECT * FROM sequence_entries WHERE church_id = ? ORDER BY id",
 			"SELECT * FROM assignments WHERE church_id = ? ORDER BY id",
 			"SELECT * FROM liturgy_edits WHERE church_id = ? ORDER BY id",
+			"SELECT * FROM liturgy_state_changes WHERE church_id = ? ORDER BY id",
+			"SELECT * FROM liturgy_comments WHERE church_id = ? ORDER BY id",
+			"SELECT * FROM published_versions WHERE church_id = ? ORDER BY id",
+			"SELECT * FROM published_assignees WHERE church_id = ? ORDER BY version_id, user_id",
 		} {
 			rows, err := sqlstore.RawTx(s).QueryxContext(ctx, db.Dialect().Rebind(q), cid)
 			if err != nil {

@@ -245,14 +245,17 @@ func TestReviewVisibility(t *testing.T) {
 	sqlstoretest.ForEachDialect(t, func(t *testing.T, db *sqlstore.DB) {
 		r := newReviewEnv(t, db)
 		r.must(r.b, domain.ActionSubmit, nil, "")
-		// Step 5 publishes; here the state is set directly.
+		// The state is set directly (the publish tests make real versions).
 		r.sql("UPDATE liturgies SET state = 'published' WHERE id = ?", string(r.lid))
-		v, err := r.liturgies.Get(r.ctx, r.team, r.lid)
-		if err != nil {
-			t.Fatal(err)
+		// 13 §5, P-79: a member without a scope reaches nothing of the editable liturgy.
+		if _, err := r.liturgies.Get(r.ctx, r.team, r.lid); !isNotFound(err, app.ReasonNotVisible) {
+			t.Errorf("a team member reads a published liturgy: %v", err)
 		}
-		if v.Review != nil || v.Actions != (app.LiturgyActions{}) {
-			t.Errorf("a team member sees review data on a published liturgy: %+v %+v", v.Review, v.Actions)
+		if _, err := r.liturgies.Edits(r.ctx, r.team, r.lid, 0); !isNotFound(err, app.ReasonNotVisible) {
+			t.Errorf("a team member reads the edit history of a published liturgy: %v", err)
+		}
+		if page, err := r.liturgies.List(r.ctx, r.team, app.LiturgyFilter{Limit: 50}); err != nil || page.Total != 0 {
+			t.Errorf("a team member lists published liturgies: %+v %v", page, err)
 		}
 		if _, err := r.liturgies.StateChanges(r.ctx, r.team, r.lid, 0, 0); !isNotFound(err, app.ReasonNotVisible) {
 			t.Errorf("team member: %v", err)

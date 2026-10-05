@@ -29,7 +29,7 @@ const base = (l: LiturgyView, comments = list()) => ({
   "GET /liturgies/assignable": { status: 200, body: { items: [] } },
 });
 const page = () => renderPage("/liturgies/:id", "/liturgies/l1", <LiturgyPage />, meWith(["liturgy.edit", "liturgy.comment", "liturgy.approve"]));
-const inReview = () => liturgy({ state: "in_review", actions: { edit: false, delete: false, submit: false, approve: true, request_changes: true, reopen: false, comment: true } });
+const inReview = () => liturgy({ state: "in_review", actions: { edit: false, delete: false, submit: false, approve: true, request_changes: true, reopen: false, comment: true, publish: false, archive: false, unarchive: false } });
 
 describe("WT-R-004 comments", () => {
   it("adds a comment on an item and on the whole liturgy", async () => {

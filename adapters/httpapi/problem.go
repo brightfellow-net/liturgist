@@ -44,9 +44,11 @@ type Problem struct {
 	LiturgyID string `json:"liturgy_id,omitempty"`
 	// State is the liturgy's state (invalid_transition); Problems lists the
 	// unfinished items (has_problems).
-	State    string              `json:"state,omitempty"`
-	Problems []ProblemView       `json:"problems,omitempty"`
-	Errors   []*huma.ErrorDetail `json:"errors,omitempty"`
+	// LargestItem is the longest item (publish_too_large).
+	LargestItem string              `json:"largest_item,omitempty"`
+	State       string              `json:"state,omitempty"`
+	Problems    []ProblemView       `json:"problems,omitempty"`
+	Errors      []*huma.ErrorDetail `json:"errors,omitempty"`
 }
 
 // Error implements error.
@@ -125,6 +127,7 @@ func MapError(ctx context.Context, err error, log *slog.Logger) error {
 		undoRef  *app.UndoRefusedError
 		badTrans *app.InvalidTransitionError
 		hasProbs *app.HasProblemsError
+		tooBig   *app.PublishTooLargeError
 	)
 	info := RequestInfoFrom(ctx)
 	switch {
@@ -175,6 +178,10 @@ func MapError(ctx context.Context, err error, log *slog.Logger) error {
 		for _, x := range hasProbs.Problems {
 			p.Problems = append(p.Problems, ProblemView{Code: x.Code, ItemID: string(x.ItemID), ItemSongID: optional(string(x.ItemSongID)), EntryID: optional(string(x.EntryID))})
 		}
+		return p
+	case errors.As(err, &tooBig):
+		p := problem(http.StatusUnprocessableEntity, "publish_too_large", "This liturgy is too large to publish.")
+		p.LargestItem = tooBig.LargestItem
 		return p
 	case errors.As(err, &lexists):
 		p := problem(http.StatusConflict, "liturgy_exists", "There is already a liturgy for this service at this time.")
@@ -264,7 +271,9 @@ var conflicts = map[error]*Problem{
 	app.ErrDutyInUse:           problem(http.StatusConflict, "duty_in_use", "This duty is used in a liturgy."),
 	app.ErrSingingPartInUse:    problem(http.StatusConflict, "singing_part_in_use", "This singing part is used in a liturgy."),
 	app.ErrLiturgyLocked:       problem(http.StatusConflict, "liturgy_locked", "This liturgy can't be edited now."),
-	app.ErrLiturgyNotDeletable: problem(http.StatusConflict, "liturgy_not_deletable", "A published liturgy can only be archived."),
+	app.ErrLiturgyNotDeletable: problem(http.StatusConflict, "liturgy_not_deletable", "A liturgy that has been published can only be archived."),
+	app.ErrLiturgyArchived:     problem(http.StatusConflict, "liturgy_archived", "This liturgy is archived. Unarchive it first."),
+	app.ErrNotArchived:         problem(http.StatusConflict, "not_archived", "This liturgy is not archived."),
 	app.ErrAssignmentExists:    problem(http.StatusConflict, "assignment_exists", "This person already has this duty."),
 	app.ErrReviewStale:         problem(http.StatusConflict, "review_stale", "The liturgy changed after you opened it. Read it again."),
 	app.ErrCommentLimit:        problem(http.StatusUnprocessableEntity, "comment_limit", "This liturgy has reached its limit of comments."),

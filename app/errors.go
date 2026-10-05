@@ -172,6 +172,8 @@ var (
 	ErrReviewStale         = errors.New("liturgy changed since it was read")      // 409 review_stale
 	ErrEmptyLiturgy        = errors.New("liturgy has no items")                   // 422 empty_liturgy
 	ErrCommentLimit        = errors.New("liturgy has too many comments")          // 422 comment_limit
+	ErrLiturgyArchived     = errors.New("liturgy is archived")                    // 409 liturgy_archived (13 §4)
+	ErrNotArchived         = errors.New("liturgy is not archived")                // 409 not_archived (13 §4)
 	// ErrNoSeq is NextSeq's answer when no row matched: the liturgy is gone or no
 	// longer editable. Only the helper nextSeq tells which (12 §2, P-71).
 	ErrNoSeq = errors.New("history number not taken")
@@ -182,6 +184,12 @@ var (
 type InvalidTransitionError struct{ State domain.LiturgyState }
 
 func (e *InvalidTransitionError) Error() string { return "invalid transition from " + string(e.State) }
+
+// PublishTooLargeError maps to 422 publish_too_large: the copy of a liturgy
+// is over the cap (13 §2). LargestItem is the title of its longest item.
+type PublishTooLargeError struct{ LargestItem string }
+
+func (e *PublishTooLargeError) Error() string { return "published copy is too large" }
 
 // HasProblemsError maps to 422 has_problems: a submit of a liturgy with unfinished items (12 §2, P-69).
 type HasProblemsError struct{ Problems []domain.Problem }

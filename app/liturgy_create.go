@@ -321,15 +321,29 @@ type Prepared struct {
 // PrepareCreate makes one liturgy per entry, all or nothing (liturgy.edit,
 // 10 §3.1). Each entry must be a real occurrence of its service.
 func (u *Liturgies) PrepareCreate(ctx context.Context, sess *domain.Session, entries []PrepareEntry) ([]Prepared, error) {
+	made, _, err := u.PrepareCreateArchiving(ctx, sess, entries, nil)
+	return made, err
+}
+
+// PrepareCreateArchiving is PrepareCreate that first archives the listed
+// published liturgies in the same transaction, so a church at its limit can
+// make room with one request (liturgy.edit and liturgy.manage, 13 §4). Each
+// must be a published, not archived liturgy dated before the Monday of the
+// earliest occurrence's week. The limits are counted after the archiving; if
+// they still stop the creation, nothing is archived.
+func (u *Liturgies) PrepareCreateArchiving(ctx context.Context, sess *domain.Session, entries []PrepareEntry, archive []domain.LiturgyID) ([]Prepared, []domain.LiturgyID, error) {
 	if sess == nil {
-		return nil, ErrUnauthenticated
+		return nil, nil, ErrUnauthenticated
 	}
 	if len(entries) < 1 || len(entries) > domain.MaxPrepareOccurence {
-		return nil, &domain.InvalidInputError{Field: "occurrences", Message: "1 to 50 occurrences.", Reason: domain.ReasonLimit, Max: domain.MaxPrepareOccurence, Used: len(entries)}
+		return nil, nil, &domain.InvalidInputError{Field: "occurrences", Message: "1 to 50 occurrences.", Reason: domain.ReasonLimit, Max: domain.MaxPrepareOccurence, Used: len(entries)}
+	}
+	if len(archive) > domain.MaxPrepareOccurence {
+		return nil, nil, &domain.InvalidInputError{Field: "archive_ids", Message: "At most 50 liturgies.", Reason: domain.ReasonLimit, Max: domain.MaxPrepareOccurence, Used: len(archive)}
 	}
 	lim, err := u.limits(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var res []Prepared
 	err = u.Tx.Write(ctx, func(s Store) error {
@@ -339,6 +353,14 @@ func (u *Liturgies) PrepareCreate(ctx context.Context, sess *domain.Session, ent
 		}
 		if err := sc.actor.Require(domain.ScopeLiturgyEdit); err != nil {
 			return err
+		}
+		if len(archive) > 0 {
+			if err := sc.actor.Require(domain.ScopeLiturgyManage); err != nil {
+				return err
+			}
+			if err := u.archiveBefore(ctx, sc, entries, archive); err != nil {
+				return err
+			}
 		}
 		if err := lim.check(ctx, sc.cs, len(entries)); err != nil {
 			return err
@@ -396,7 +418,48 @@ func (u *Liturgies) PrepareCreate(ctx context.Context, sess *domain.Session, ent
 		}
 		return nil
 	})
-	return res, err
+	if err != nil {
+		return nil, nil, err
+	}
+	return res, archive, nil
+}
+
+// archiveBefore archives the listed liturgies for PrepareCreateArchiving.
+func (u *Liturgies) archiveBefore(ctx context.Context, sc churchScope, entries []PrepareEntry, ids []domain.LiturgyID) error {
+	first := ""
+	for _, e := range entries {
+		if domain.ValidDate(e.Date) && (first == "" || e.Date < first) {
+			first = e.Date
+		}
+	}
+	if first == "" {
+		return nil // the entries are refused later with their own errors
+	}
+	day, _ := time.Parse("2006-01-02", first)
+	monday := domain.WeekStart(day).Format("2006-01-02")
+	now, seen := u.Clock.Now(), map[domain.LiturgyID]bool{}
+	for i, id := range ids {
+		if seen[id] {
+			return &domain.InvalidInputError{Field: "archive_ids." + strconv.Itoa(i), Message: "This liturgy is listed twice."}
+		}
+		seen[id] = true
+		l, err := sc.cs.Liturgies().ByID(ctx, id)
+		if err != nil {
+			return missing(err)
+		}
+		switch {
+		case l.ArchivedAt != nil:
+			return ErrLiturgyArchived
+		case l.State != domain.StatePublished || l.Date >= monday:
+			return &InvalidTransitionError{State: l.State}
+		}
+		if ok, err := sc.cs.Liturgies().Archive(ctx, id, sc.actor.UserID, now); err != nil {
+			return err
+		} else if !ok {
+			return ErrLiturgyArchived
+		}
+	}
+	return nil
 }
 
 // LiturgyChange is a PATCH of the liturgy's own fields (structural, 10 §5).

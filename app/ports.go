@@ -60,6 +60,7 @@ type ChurchStore interface {
 	Usage() UsageRepo              // what unpublished liturgies refer to (10 §6)
 	StateChanges() StateChangeRepo // the review history of a liturgy (12 §5)
 	Comments() CommentRepo         // comments on liturgies and items (12 §4)
+	Published() PublishedRepo      // published versions (13 §3)
 }
 
 // Clock returns the current time in UTC, truncated to microseconds (02 §4).
@@ -399,15 +400,41 @@ type SeedRepo interface {
 // LiturgyFilter selects the liturgies of a list (10 §4). Empty fields do not filter.
 type LiturgyFilter struct {
 	State         domain.LiturgyState
-	From, To      string // inclusive dates
-	Ascending     bool   // by date, then time, then ID
+	Archived      ArchivedFilter // zero value: not archived only (13 §5)
+	From, To      string         // inclusive dates
+	Ascending     bool           // by date, then time, then ID
 	Limit, Offset int
+}
+
+// ArchivedFilter selects archived liturgies in a list.
+type ArchivedFilter string
+
+// The filters: the zero value shows liturgies that are not archived.
+const (
+	ArchivedExclude ArchivedFilter = ""
+	ArchivedOnly    ArchivedFilter = "true"
+	ArchivedAll     ArchivedFilter = "all"
+)
+
+// PublishedRepo stores the published versions of liturgies (13 §3). Every
+// method filters by church; rows are never updated.
+type PublishedRepo interface {
+	// Create stores the next version of the liturgy (v.Number is ignored) and
+	// the user IDs of its assignments, and returns the number it took:
+	// MAX(number)+1, safe under the liturgy's row lock held by the caller.
+	Create(ctx context.Context, v domain.PublishedVersion, assignees []domain.UserID) (int, error)
+	// Info returns the newest version without its content; ErrNotFound when
+	// the liturgy has none.
+	Info(ctx context.Context, liturgy domain.LiturgyID) (domain.PublishedVersion, error)
+	// Exists reports whether the liturgy has any version.
+	Exists(ctx context.Context, liturgy domain.LiturgyID) (bool, error)
 }
 
 // LiturgyRow is a liturgy in a list.
 type LiturgyRow struct {
-	Liturgy   domain.Liturgy
-	ItemCount int
+	Liturgy     domain.Liturgy
+	ItemCount   int
+	HasVersions bool // a published version exists (13 §2)
 }
 
 // Slot is the (service, date, time) a service liturgy occupies (10 §2.1).
@@ -448,8 +475,17 @@ type LiturgyRepo interface {
 	// transition and sees its result (12 §4, P-74). False when the liturgy is
 	// gone or in another state.
 	LockForComment(ctx context.Context, id domain.LiturgyID) (bool, error)
+	// It also requires the liturgy not to be archived (13 §2).
 	Transition(ctx context.Context, id domain.LiturgyID, from, to domain.LiturgyState, expectSeq int, now time.Time) (int, bool, error)
-	// Delete removes the liturgy with its items, songs, entries, assignments and history.
+	// Archive sets archived_at and archived_by on a published, not archived
+	// liturgy; false when no row matched (13 §4).
+	Archive(ctx context.Context, id domain.LiturgyID, by domain.UserID, now time.Time) (bool, error)
+	// Unarchive clears them; false when the liturgy is gone or not archived.
+	Unarchive(ctx context.Context, id domain.LiturgyID, now time.Time) (bool, error)
+	// Delete removes the liturgy with its items, songs, entries, assignments and
+	// history, unless it is published or has a published version: ErrNotFound
+	// when no row matched (gone, or not deletable: the use case re-reads), and
+	// ErrReferenced when a version appeared after the check (13 §2).
 	Delete(ctx context.Context, id domain.LiturgyID) error
 }
 

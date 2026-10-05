@@ -6,6 +6,7 @@ package app
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/brightfellow-net/liturgist/domain"
 )
@@ -29,16 +30,26 @@ type LiturgyActions struct {
 	RequestChanges bool `json:"request_changes"`
 	Reopen         bool `json:"reopen"`
 	Comment        bool `json:"comment"`
+	Publish        bool `json:"publish"`
+	Archive        bool `json:"archive"`
+	Unarchive      bool `json:"unarchive"`
 }
 
-func liturgyActions(a Actor, state domain.LiturgyState) LiturgyActions {
+// liturgyActions depends on the scope and the liturgy's own state and archive
+// flag; published says whether it has a version, which blocks deleting (13 §2).
+func liturgyActions(a Actor, l domain.Liturgy, published bool) LiturgyActions {
+	state, archived := l.State, l.ArchivedAt != nil
 	can := func(act domain.ReviewAction) bool {
 		r, _ := act.Rule()
-		return a.Scopes.Has(r.Scope) && r.Allowed(state)
+		return a.Scopes.Has(r.Scope) && r.Allowed(state) && !archived
 	}
+	manage := a.Scopes.Has(domain.ScopeLiturgyManage)
 	return LiturgyActions{
 		Edit:           a.Scopes.Has(domain.ScopeLiturgyEdit) && state.Editable(),
-		Delete:         a.Scopes.Has(domain.ScopeLiturgyManage) && state.Deletable(),
+		Delete:         manage && state.Deletable() && !published,
+		Publish:        can(domain.ActionPublish),
+		Archive:        manage && state == domain.StatePublished && !archived,
+		Unarchive:      manage && archived,
 		Submit:         can(domain.ActionSubmit),
 		Approve:        can(domain.ActionApprove),
 		RequestChanges: can(domain.ActionRequestChanges),
@@ -54,13 +65,14 @@ func canSeeLiturgies(a Actor) bool {
 }
 
 // openLiturgy loads a liturgy the actor may see: 404 when it is missing or
-// unpublished and the actor holds no liturgy scope.
+// the actor holds no liturgy scope, in every state. A member without a scope
+// reads a published liturgy only through its published copy (13 §5, P-79).
 func (sc churchScope) openLiturgy(ctx context.Context, id domain.LiturgyID) (domain.Liturgy, error) {
 	l, err := sc.cs.Liturgies().ByID(ctx, id)
 	if err != nil {
 		return domain.Liturgy{}, missing(err)
 	}
-	if l.State != domain.StatePublished && !canSeeLiturgies(sc.actor) {
+	if !canSeeLiturgies(sc.actor) {
 		return domain.Liturgy{}, notFound(ReasonNotVisible)
 	}
 	return l, nil
@@ -126,13 +138,15 @@ func (u *Liturgies) limits(ctx context.Context) (liturgyLimits, error) {
 
 // check refuses n more liturgies when they would pass a limit. It counts in
 // the caller's transaction, under LockChurch.
-func (lim liturgyLimits) check(ctx context.Context, cs ChurchStore, n int) error {
+// With names only those limits are checked (a reopen takes an unpublished
+// slot, an unarchive an active one, 13 §4).
+func (lim liturgyLimits) check(ctx context.Context, cs ChurchStore, n int, names ...LimitName) error {
 	for _, x := range []struct {
 		name   LimitName
 		limit  Limit
 		states []domain.LiturgyState
 	}{{LimitMaxActiveLiturgies, lim.active, nil}, {LimitMaxUnpublishedLiturgies, lim.unpublished, unpublishedStates}} {
-		if x.limit.Unlimited {
+		if x.limit.Unlimited || (len(names) > 0 && !slices.Contains(names, x.name)) {
 			continue
 		}
 		used, err := cs.Liturgies().CountActive(ctx, x.states)
@@ -196,6 +210,9 @@ type LiturgyView struct {
 	Actions     LiturgyActions
 	// Review is nil for a member without a liturgy scope (12 §2, P-74).
 	Review *ReviewInfo
+	// Published is the newest version, nil when there is none or for a member
+	// without a liturgy scope (13 §2).
+	Published *PublishedInfo
 }
 
 // ReviewInfo is what the liturgy view carries of the review workflow: the
@@ -311,9 +328,15 @@ func (u *Liturgies) view(ctx context.Context, sc churchScope, l domain.Liturgy) 
 	if err != nil {
 		return LiturgyView{}, err
 	}
-	v := LiturgyView{Liturgy: l, Items: iv, Assignments: av, Problems: domain.Problems(items),
-		Actions: liturgyActions(sc.actor, l.State)}
+	v := LiturgyView{Liturgy: l, Items: iv, Assignments: av, Problems: domain.Problems(items)}
 	if canSeeLiturgies(sc.actor) {
+		pub, err := sc.cs.Published().Info(ctx, l.ID)
+		switch {
+		case err == nil:
+			v.Published = &PublishedInfo{Number: pub.Number, PublishedAt: pub.PublishedAt}
+		case !errors.Is(err, ErrNotFound):
+			return LiturgyView{}, err
+		}
 		v.Review = &ReviewInfo{}
 		if v.Review.OpenComments, err = sc.cs.Comments().Open(ctx, l.ID); err != nil {
 			return LiturgyView{}, err
@@ -330,11 +353,12 @@ func (u *Liturgies) view(ctx context.Context, sc churchScope, l domain.Liturgy) 
 			return LiturgyView{}, err
 		}
 	}
+	v.Actions = liturgyActions(sc.actor, l, v.Published != nil)
 	return v, nil
 }
 
 // List returns the liturgies the caller may see (10 §4). A member without a
-// liturgy scope sees the published ones only.
+// liturgy scope sees none: the published ones are read through /published (13 §5).
 func (u *Liturgies) List(ctx context.Context, sess *domain.Session, f LiturgyFilter) (LiturgyPage, error) {
 	var res LiturgyPage
 	err := u.Tx.Read(ctx, func(s Store) error {
@@ -343,11 +367,8 @@ func (u *Liturgies) List(ctx context.Context, sess *domain.Session, f LiturgyFil
 			return err
 		}
 		if !canSeeLiturgies(sc.actor) {
-			if f.State != "" && f.State != domain.StatePublished {
-				res = LiturgyPage{}
-				return nil
-			}
-			f.State = domain.StatePublished
+			res = LiturgyPage{}
+			return nil
 		}
 		rows, total, err := sc.cs.Liturgies().List(ctx, f)
 		if err != nil {
@@ -355,7 +376,7 @@ func (u *Liturgies) List(ctx context.Context, sess *domain.Session, f LiturgyFil
 		}
 		res = LiturgyPage{Total: total, Items: make([]LiturgyListItem, len(rows))}
 		for i, r := range rows {
-			res.Items[i] = LiturgyListItem{Liturgy: r.Liturgy, ItemCount: r.ItemCount, Actions: liturgyActions(sc.actor, r.Liturgy.State)}
+			res.Items[i] = LiturgyListItem{Liturgy: r.Liturgy, ItemCount: r.ItemCount, Actions: liturgyActions(sc.actor, r.Liturgy, r.HasVersions)}
 		}
 		return nil
 	})
@@ -454,8 +475,8 @@ func (u *Liturgies) Assignable(ctx context.Context, sess *domain.Session) ([]Ass
 	return res, err
 }
 
-// Delete removes a liturgy that is not published, with everything in it
-// (liturgy.manage). Published liturgies can only be archived (10 §2.1).
+// Delete removes a liturgy that is not published and never was, with everything
+// in it (liturgy.manage). Such liturgies can only be archived (10 §2.1, 13 §2).
 func (u *Liturgies) Delete(ctx context.Context, sess *domain.Session, id domain.LiturgyID) error {
 	return u.Tx.Write(ctx, func(s Store) error {
 		sc, err := actorIn(ctx, s, sess, false)
@@ -472,6 +493,23 @@ func (u *Liturgies) Delete(ctx context.Context, sess *domain.Session, id domain.
 		if !l.State.Deletable() {
 			return ErrLiturgyNotDeletable
 		}
-		return missing(sc.cs.Liturgies().Delete(ctx, id))
+		if has, err := sc.cs.Published().Exists(ctx, id); err != nil {
+			return err
+		} else if has {
+			return ErrLiturgyNotDeletable
+		}
+		// The delete is conditional on the state and the absence of versions
+		// (13 §2): a publish that commits after the checks above fails it.
+		switch err := sc.cs.Liturgies().Delete(ctx, id); {
+		case errors.Is(err, ErrReferenced):
+			return ErrLiturgyNotDeletable
+		case errors.Is(err, ErrNotFound):
+			if _, err := sc.cs.Liturgies().ByID(ctx, id); err != nil {
+				return missing(err)
+			}
+			return ErrLiturgyNotDeletable
+		default:
+			return err
+		}
 	})
 }

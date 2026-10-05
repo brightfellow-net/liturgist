@@ -44,13 +44,15 @@ func (sc churchScope) stateChangeView(ctx context.Context, c domain.StateChange)
 	return v, nil
 }
 
-// Review runs one transition of the review workflow (12 §2). The order of the
-// checks is part of the contract: 404, 403, 422, invalid_transition, the submit
-// checks, then one conditional update.
+// Review runs one transition of the review workflow (12 §2, 13 §2). The order
+// of the checks is part of the contract: 404, 403, 422, invalid_transition,
+// liturgy_archived, the submit checks or the reopen limit, then one conditional
+// update. A reopen takes LockChurch first, because reopening a published
+// liturgy counts the unpublished liturgies (13 §4).
 func (u *Liturgies) Review(ctx context.Context, sess *domain.Session, id domain.LiturgyID, in ReviewInput) (LiturgyView, error) {
 	var res LiturgyView
 	err := u.Tx.Write(ctx, func(s Store) error {
-		sc, err := actorIn(ctx, s, sess, false)
+		sc, err := actorIn(ctx, s, sess, in.Action == domain.ActionReopen)
 		if err != nil {
 			return err
 		}
@@ -74,6 +76,18 @@ func (u *Liturgies) Review(ctx context.Context, sess *domain.Session, id domain.
 		}
 		if !rule.Allowed(l.State) {
 			return &InvalidTransitionError{State: l.State}
+		}
+		if l.ArchivedAt != nil {
+			return ErrLiturgyArchived
+		}
+		if in.Action == domain.ActionReopen && l.State == domain.StatePublished {
+			lim, err := u.limits(ctx)
+			if err != nil {
+				return err
+			}
+			if err := lim.check(ctx, sc.cs, 1, LimitMaxUnpublishedLiturgies); err != nil {
+				return err
+			}
 		}
 		expect := l.EditSeq
 		if rule.NeedsSeq {
@@ -104,14 +118,29 @@ func (u *Liturgies) Review(ctx context.Context, sess *domain.Session, id domain.
 			if err != nil {
 				return missing(err)
 			}
-			if cur.State != l.State {
+			switch {
+			case cur.State != l.State:
 				return &InvalidTransitionError{State: cur.State}
+			case cur.ArchivedAt != nil:
+				return ErrLiturgyArchived
 			}
 			return ErrReviewStale
 		}
 		if err := sc.cs.StateChanges().Append(ctx, domain.StateChange{ID: domain.StateChangeID(u.IDs.NewID()), LiturgyID: id,
 			From: l.State, To: rule.To, UserID: sc.actor.UserID, Note: note, EditSeq: seq, CreatedAt: now}); err != nil {
 			return err
+		}
+		if in.Action == domain.ActionPublish {
+			// The copy is made in the same transaction as the state change: a
+			// liturgy is never published without a version (13 §2).
+			content, assignees, err := buildPublished(ctx, sc, l)
+			if err != nil {
+				return err
+			}
+			if _, err := sc.cs.Published().Create(ctx, domain.PublishedVersion{ID: domain.PublishedVersionID(u.IDs.NewID()), LiturgyID: id,
+				Content: content, PublishedBy: sc.actor.UserID, PublishedAt: now}, assignees); err != nil {
+				return err
+			}
 		}
 		l, err = sc.cs.Liturgies().ByID(ctx, id)
 		if err != nil {

@@ -600,16 +600,20 @@
     "limit": "You can have at most {{max}} of these.",
     "liturgy_exists": "A liturgy already exists for this service, date and time.",
     "liturgy_locked": "This liturgy can't be edited now. Reload the page.",
-    "liturgy_not_deletable": "A published liturgy can't be deleted. Archive it instead.",
+    "liturgy_not_deletable": "A liturgy that has been published can't be deleted. Archive it instead.",
     "assignment_exists": "This person already has this duty.",
     "language_mismatch": "The template and the liturgy must be in the same language.",
-    "liturgy_limit": "Your church has reached its limit of {{max}} liturgies.",
+    "liturgy_limit": "Your church has reached its limit of {{max}} active liturgies. Archive another liturgy first.",
     "undo_refused": "This can't be undone or redone.",
     "invalid_transition": "This liturgy is now {{state}}, so this can't be done. Reload the page.",
     "review_stale": "The liturgy changed after you opened it. Read it again.",
     "empty_liturgy": "Add at least one item before submitting.",
     "has_problems": "Some items are not finished.",
-    "comment_limit": "This liturgy has reached its limit of 500 comments."
+    "comment_limit": "This liturgy has reached its limit of 500 comments.",
+    "unpublished_limit": "Your plan allows {{max}} liturgies that are not published yet. Finish or delete one first.",
+    "liturgy_archived": "This liturgy is archived. Unarchive it first.",
+    "not_archived": "This liturgy is not archived.",
+    "publish_too_large": "This liturgy is too large to publish. The longest item is “{{title}}”."
   },
   "import": {
     "title": "Import songs",
@@ -761,7 +765,9 @@
       "items_one": "{{count}} item",
       "items_other": "{{count}} items",
       "previous": "Previous page",
-      "next": "Next page"
+      "next": "Next page",
+      "show_archived": "Show archived",
+      "archived": "Archived"
     },
     "prepare": {
       "title": "Prepare next week",
@@ -780,7 +786,10 @@
       "slots": "{{free}} of {{max}} liturgy places free.",
       "too_many": "You ticked {{n}}; only {{free}} can be created.",
       "create_one": "Create {{count}} liturgy",
-      "create_other": "Create {{count}} liturgies"
+      "create_other": "Create {{count}} liturgies",
+      "archive_and_create_one": "Archive the oldest published liturgy and create {{count}}",
+      "archive_and_create_other": "Archive the {{archive}} oldest published liturgies and create {{count}}",
+      "archive_hint": "Archiving keeps them readable and makes room under your plan."
     },
     "new": {
       "title": "New liturgy",
@@ -960,19 +969,28 @@
         "submit": "Submitted for review.",
         "approve": "Approved.",
         "request_changes": "Sent back for changes.",
-        "reopen": "Reopened as a draft."
+        "reopen": "Reopened as a draft.",
+        "publish": "Published.",
+        "archive": "Archived.",
+        "unarchive": "Made active again."
       },
       "banner": {
         "in_review": "This liturgy is being reviewed. Only comments can be added until the reviewer approves it or asks for changes.",
         "needs_revision": "Changes were requested. Edit the liturgy and submit it again.",
         "needs_revision_note": "{{name}} wrote: {{note}}",
-        "approved": "Approved. Reopen it to make changes."
+        "approved": "Approved. Reopen it to make changes.",
+        "published": "Published as version {{number}} on {{date}}. Reopen it to make changes; the team keeps seeing this version until you publish again.",
+        "published_archived": "Archived. This liturgy stays readable; unarchive it to reopen it.",
+        "revising": "Being revised. The team still sees version {{number}} until you publish again."
       },
       "history": {
         "title": "Review history",
         "none": "Not submitted for review yet.",
         "row": "{{name}}: {{from}} → {{to}}"
-      }
+      },
+      "publish": "Publish",
+      "archive": "Archive",
+      "unarchive": "Unarchive"
     },
     "comments": {
       "title": "Comments",

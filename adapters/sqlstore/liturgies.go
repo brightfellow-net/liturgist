@@ -85,6 +85,13 @@ func (r liturgyRepo) List(ctx context.Context, f app.LiturgyFilter) ([]app.Litur
 		where += " AND date <= ?"
 		args = append(args, f.To)
 	}
+	switch f.Archived {
+	case app.ArchivedOnly:
+		where += " AND archived_at IS NOT NULL"
+	case app.ArchivedAll:
+	default:
+		where += " AND archived_at IS NULL"
+	}
 	var total int
 	if err := r.tx.GetContext(ctx, &total, r.d.Rebind("SELECT COUNT(*) FROM liturgies WHERE "+where), args...); err != nil {
 		return nil, 0, r.d.MapError(err)
@@ -93,7 +100,8 @@ func (r liturgyRepo) List(ctx context.Context, f app.LiturgyFilter) ([]app.Litur
 	if f.Ascending {
 		dir = " ASC"
 	}
-	q := "SELECT " + liturgyColumns + `, (SELECT COUNT(*) FROM liturgy_items i WHERE i.church_id = liturgies.church_id AND i.liturgy_id = liturgies.id)
+	q := "SELECT " + liturgyColumns + `, (SELECT COUNT(*) FROM liturgy_items i WHERE i.church_id = liturgies.church_id AND i.liturgy_id = liturgies.id),
+		(SELECT COUNT(*) FROM published_versions v WHERE v.church_id = liturgies.church_id AND v.liturgy_id = liturgies.id)
 		FROM liturgies WHERE ` + where + " ORDER BY date" + dir + ", time" + dir + ", id" + dir + " LIMIT ? OFFSET ?"
 	rows, err := r.tx.QueryContext(ctx, r.d.Rebind(q), append(args, f.Limit, f.Offset)...)
 	if err != nil {
@@ -102,11 +110,15 @@ func (r liturgyRepo) List(ctx context.Context, f app.LiturgyFilter) ([]app.Litur
 	defer func() { _ = rows.Close() }()
 	var out []app.LiturgyRow
 	for rows.Next() {
-		var row app.LiturgyRow
-		row.Liturgy, err = scanLiturgy(func(dest ...any) error { return rows.Scan(append(dest, &row.ItemCount)...) })
+		var (
+			row      app.LiturgyRow
+			versions int
+		)
+		row.Liturgy, err = scanLiturgy(func(dest ...any) error { return rows.Scan(append(dest, &row.ItemCount, &versions)...) })
 		if err != nil {
 			return nil, 0, r.d.MapError(err)
 		}
+		row.HasVersions = versions > 0
 		out = append(out, row)
 	}
 	return out, total, r.d.MapError(rows.Err())
@@ -187,7 +199,7 @@ func (r liturgyRepo) LockForComment(ctx context.Context, id domain.LiturgyID) (b
 func (r liturgyRepo) Transition(ctx context.Context, id domain.LiturgyID, from, to domain.LiturgyState, expectSeq int, now time.Time) (int, bool, error) {
 	var seq int
 	err := r.tx.QueryRowContext(ctx, r.d.Rebind(`UPDATE liturgies SET state = ?, undo_floor_seq = edit_seq, updated_at = ?
-		WHERE church_id = ? AND id = ? AND state = ? AND edit_seq = ? RETURNING edit_seq`),
+		WHERE church_id = ? AND id = ? AND state = ? AND edit_seq = ? AND archived_at IS NULL RETURNING edit_seq`),
 		string(to), r.d.TimeArg(now), r.churchID, id, string(from), expectSeq).Scan(&seq)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, false, nil
@@ -198,8 +210,23 @@ func (r liturgyRepo) Transition(ctx context.Context, id domain.LiturgyID, from, 
 	return seq, true, nil
 }
 
+func (r liturgyRepo) Archive(ctx context.Context, id domain.LiturgyID, by domain.UserID, now time.Time) (bool, error) {
+	res, err := r.tx.ExecContext(ctx, r.d.Rebind(`UPDATE liturgies SET archived_at = ?, archived_by = ?, updated_at = ?
+		WHERE church_id = ? AND id = ? AND state = 'published' AND archived_at IS NULL`), r.d.TimeArg(now), by, r.d.TimeArg(now), r.churchID, id)
+	return changed(r.d, res, err)
+}
+
+func (r liturgyRepo) Unarchive(ctx context.Context, id domain.LiturgyID, now time.Time) (bool, error) {
+	res, err := r.tx.ExecContext(ctx, r.d.Rebind(`UPDATE liturgies SET archived_at = NULL, archived_by = NULL, updated_at = ?
+		WHERE church_id = ? AND id = ? AND archived_at IS NOT NULL`), r.d.TimeArg(now), r.churchID, id)
+	return changed(r.d, res, err)
+}
+
+// Delete is conditional on the state and on the absence of versions, and the
+// foreign key of published_versions backs it (13 §2).
 func (r liturgyRepo) Delete(ctx context.Context, id domain.LiturgyID) error {
-	res, err := r.tx.ExecContext(ctx, r.d.Rebind("DELETE FROM liturgies WHERE church_id = ? AND id = ?"), r.churchID, id)
+	res, err := r.tx.ExecContext(ctx, r.d.Rebind(`DELETE FROM liturgies WHERE church_id = ? AND id = ? AND state <> 'published'
+		AND NOT EXISTS (SELECT 1 FROM published_versions v WHERE v.church_id = liturgies.church_id AND v.liturgy_id = liturgies.id)`), r.churchID, id)
 	return rowsOrNotFound(r.d, res, err)
 }
 

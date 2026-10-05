@@ -18,11 +18,13 @@ export function LiturgiesPage() {
   const me = useOutletContext<Me>();
   const [params, setParams] = useSearchParams();
   const past = params.get("tab") === "past";
+  const showArchived = params.get("archived") === "1";
   const page = Math.max(0, Number(params.get("page")) || 0);
   const today = dateInZone(me.church?.time_zone);
+  const archivedFilter = showArchived ? { archived: "all" as const } : {};
   const filters: LiturgyFilters = past
-    ? { to: addDays(today, -1), order: "date_desc" as const, limit: liturgyLimits.pageSize, offset: page * liturgyLimits.pageSize }
-    : { from: today, order: "date_asc" as const, limit: liturgyLimits.pageSize, offset: page * liturgyLimits.pageSize };
+    ? { to: addDays(today, -1), order: "date_desc" as const, limit: liturgyLimits.pageSize, offset: page * liturgyLimits.pageSize, ...archivedFilter }
+    : { from: today, order: "date_asc" as const, limit: liturgyLimits.pageSize, offset: page * liturgyLimits.pageSize, ...archivedFilter };
   const list = useQuery(liturgiesQuery(filters));
   const upcomingProbe = useQuery({ ...liturgiesQuery({ from: today, order: "date_asc", limit: 1 }), enabled: past });
   const services = useQuery(servicesQuery);
@@ -36,7 +38,7 @@ export function LiturgiesPage() {
       <button
         type="button"
         aria-pressed={active}
-        onClick={() => setParams(name === "past" ? { tab: "past" } : {}, { replace: true })}
+        onClick={() => setParams({ ...(name === "past" ? { tab: "past" } : {}), ...(showArchived ? { archived: "1" } : {}) }, { replace: true })}
         className={"inline-flex min-h-12 items-center border-b-2 px-3 " + (active ? "border-primary font-semibold" : "border-transparent")}
       >
         {t(`liturgy.list.${name}`)}
@@ -57,6 +59,11 @@ export function LiturgiesPage() {
         {tab("upcoming")}
         {tab("past")}
       </div>
+      <label className="flex min-h-12 items-center gap-2">
+        <input type="checkbox" className="size-6" checked={showArchived}
+          onChange={(e) => setParams({ ...(past ? { tab: "past" } : {}), ...(e.target.checked ? { archived: "1" } : {}) }, { replace: true })} />
+        {t("liturgy.list.show_archived")}
+      </label>
       <ErrorAlert error={list.error} onRetry={() => void list.refetch()} />
       {list.isPending && <p role="status">{t("app.loading")}</p>}
       {noLiturgiesAtAll && (
@@ -87,11 +94,11 @@ export function LiturgiesPage() {
       {total > liturgyLimits.pageSize && (
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" className={buttonVariants({ variant: "outline" })} disabled={page === 0}
-            onClick={() => setParams({ ...(past ? { tab: "past" } : {}), page: String(page - 1) }, { replace: true })}>
+            onClick={() => setParams({ ...(past ? { tab: "past" } : {}), ...(showArchived ? { archived: "1" } : {}), page: String(page - 1) }, { replace: true })}>
             {t("liturgy.list.previous")}
           </button>
           <button type="button" className={buttonVariants({ variant: "outline" })} disabled={(page + 1) * liturgyLimits.pageSize >= total}
-            onClick={() => setParams({ ...(past ? { tab: "past" } : {}), page: String(page + 1) }, { replace: true })}>
+            onClick={() => setParams({ ...(past ? { tab: "past" } : {}), ...(showArchived ? { archived: "1" } : {}), page: String(page + 1) }, { replace: true })}>
             {t("liturgy.list.next")}
           </button>
         </div>
@@ -108,7 +115,7 @@ function LiturgyRow({ l, lang }: { l: LiturgySummaryView; lang: string }) {
         {longDate(l.date, lang)} {l.time} · {l.service_name}
       </Link>
       <p className="text-sm text-muted-foreground">
-        {t(`setup.content_languages.${l.language}`)} · {t(`liturgy.states.${l.state}`)} · {t("liturgy.list.items", { count: l.item_count })}
+        {t(`setup.content_languages.${l.language}`)} · {t(`liturgy.states.${l.state}`)}{l.archived ? ` · ${t("liturgy.list.archived")}` : ""} · {t("liturgy.list.items", { count: l.item_count })}
       </p>
     </li>
   );

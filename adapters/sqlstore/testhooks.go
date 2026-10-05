@@ -22,3 +22,9 @@ func (db *DB) CountForTest(ctx context.Context, table string) (int, error) {
 	err := db.writer.QueryRowContext(ctx, "SELECT COUNT(*) FROM "+table).Scan(&n)
 	return n, db.d.MapError(err)
 }
+
+// SelectForTest reads rows into dest (a pointer to a slice of structs with
+// db tags) outside any Tx. Tests only.
+func (db *DB) SelectForTest(ctx context.Context, dest any, q string, args ...any) error {
+	return db.d.MapError(db.writer.SelectContext(ctx, dest, db.d.Rebind(q), args...))
+}

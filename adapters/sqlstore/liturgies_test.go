@@ -73,6 +73,13 @@ func seedLiturgies(a, b app.ChurchStore, now time.Time) error {
 			ItemID: domain.ItemID(id("ITP" + c.suffix)), ItemTitle: "Doa", AuthorID: domain.UserID(id("U1")), Body: "Bagus", CreatedAt: now}))
 		errs = append(errs, err, c.cs.StateChanges().Append(ctx, domain.StateChange{ID: domain.StateChangeID(id("SC" + c.suffix)), LiturgyID: l.ID,
 			From: domain.StateDraft, To: domain.StateInReview, UserID: domain.UserID(id("U1")), Note: "n", EditSeq: seq, CreatedAt: now}))
+		// A published liturgy with one version in each church (13 §3).
+		pl := liturgyOf("LGP"+c.suffix, "", "U1", now)
+		pl.ServiceID, pl.Time, pl.State = "", "", domain.StatePublished
+		errs = append(errs, c.cs.Liturgies().Create(ctx, pl))
+		_, perr := c.cs.Published().Create(ctx, domain.PublishedVersion{ID: domain.PublishedVersionID(id("PV" + c.suffix)), LiturgyID: pl.ID,
+			Content: []byte(`{"format":1}`), PublishedBy: domain.UserID(id("U1")), PublishedAt: now}, []domain.UserID{domain.UserID(id("U1"))})
+		errs = append(errs, perr)
 		errs = append(errs, err, c.cs.Edits().Append(ctx, domain.Edit{ID: domain.EditID(id("ED" + c.suffix)), LiturgyID: l.ID, Seq: seq,
 			UserID: domain.UserID(id("U1")), Command: domain.CmdLiturgyCreate, After: []byte(`{}`), LiturgyVersionAfter: 1,
 			Status: domain.EditDone, CreatedAt: now}))
@@ -121,14 +128,19 @@ func liturgyHarness(errRollback error, notFound func(error) error, unchanged fun
 	}
 	h["Liturgies.List"] = func(cs app.ChurchStore, _ time.Time) error {
 		rows, total, err := cs.Liturgies().List(ctx, app.LiturgyFilter{Limit: 50})
-		if err != nil || total != 1 || len(rows) != 1 || rows[0].Liturgy.ID != lgA || rows[0].ItemCount != 3 {
+		// A's draft and its published liturgy (which has a version); B's are not listed.
+		if err != nil || total != 2 || len(rows) != 2 || rows[0].Liturgy.ID != lgA || rows[0].ItemCount != 3 || rows[0].HasVersions ||
+			rows[1].Liturgy.ID != domain.LiturgyID(id("LGPA")) || !rows[1].HasVersions {
 			return fmt.Errorf("list: %+v %d %w", rows, total, err)
+		}
+		if _, only, err := cs.Liturgies().List(ctx, app.LiturgyFilter{Limit: 50, Archived: app.ArchivedOnly}); err != nil || only != 0 {
+			return fmt.Errorf("archived only: %d %w", only, err)
 		}
 		return nil
 	}
 	h["Liturgies.CountActive"] = func(cs app.ChurchStore, _ time.Time) error {
 		n, err := cs.Liturgies().CountActive(ctx, nil)
-		if err != nil || n != 1 {
+		if err != nil || n != 2 {
 			return fmt.Errorf("count %d: %w", n, err)
 		}
 		return nil
@@ -157,6 +169,43 @@ func liturgyHarness(errRollback error, notFound func(error) error, unchanged fun
 	h["Liturgies.Transition"] = func(cs app.ChurchStore, now time.Time) error {
 		_, ok, err := cs.Liturgies().Transition(ctx, lgB, domain.StateDraft, domain.StateInReview, 0, now)
 		return unchanged(ok, err)
+	}
+	h["Liturgies.Archive"] = func(cs app.ChurchStore, now time.Time) error {
+		if ok, err := cs.Liturgies().Archive(ctx, domain.LiturgyID(id("LGPA")), domain.UserID(id("U1")), now); err != nil || !ok {
+			return fmt.Errorf("own published liturgy: %v %w", ok, err)
+		}
+		ok, err := cs.Liturgies().Archive(ctx, domain.LiturgyID(id("LGPB")), domain.UserID(id("U1")), now)
+		return unchanged(ok, err)
+	}
+	h["Liturgies.Unarchive"] = func(cs app.ChurchStore, now time.Time) error {
+		// Archive both through A's own scope first: only A's row may change.
+		if ok, err := cs.Liturgies().Archive(ctx, domain.LiturgyID(id("LGPA")), domain.UserID(id("U1")), now); err != nil || !ok {
+			return fmt.Errorf("archive own: %v %w", ok, err)
+		}
+		if ok, err := cs.Liturgies().Unarchive(ctx, domain.LiturgyID(id("LGPA")), now); err != nil || !ok {
+			return fmt.Errorf("own: %v %w", ok, err)
+		}
+		ok, err := cs.Liturgies().Unarchive(ctx, domain.LiturgyID(id("LGPB")), now)
+		return unchanged(ok, err)
+	}
+	h["Published.Create"] = func(cs app.ChurchStore, now time.Time) error {
+		return referenced("a version of church B's liturgy", errOfInt(cs.Published().Create(ctx, domain.PublishedVersion{ID: domain.PublishedVersionID(id("PVX")),
+			LiturgyID: domain.LiturgyID(id("LGPB")), Content: []byte(`{}`), PublishedBy: domain.UserID(id("U1")), PublishedAt: now}, nil)))
+	}
+	h["Published.Info"] = func(cs app.ChurchStore, _ time.Time) error {
+		if v, err := cs.Published().Info(ctx, domain.LiturgyID(id("LGPA"))); err != nil || v.ID != domain.PublishedVersionID(id("PVA")) || v.Number != 1 {
+			return fmt.Errorf("own: %+v %w", v, err)
+		}
+		_, err := cs.Published().Info(ctx, domain.LiturgyID(id("LGPB")))
+		return notFound(err)
+	}
+	h["Published.Exists"] = func(cs app.ChurchStore, _ time.Time) error {
+		a, err := cs.Published().Exists(ctx, domain.LiturgyID(id("LGPA")))
+		b, err2 := cs.Published().Exists(ctx, domain.LiturgyID(id("LGPB")))
+		if err != nil || err2 != nil || !a || b {
+			return fmt.Errorf("exists %v %v %v %v", a, b, err, err2)
+		}
+		return nil
 	}
 	h["Liturgies.LockForComment"] = func(cs app.ChurchStore, _ time.Time) error {
 		if ok, err := cs.Liturgies().LockForComment(ctx, lgA); err != nil || !ok {
@@ -913,3 +962,5 @@ func TestLiturgyConstraints(t *testing.T) {
 		}
 	})
 }
+
+func errOfInt(_ int, err error) error { return err }

@@ -11,7 +11,7 @@ import { ErrorAlert } from "@/components/ErrorAlert";
 import { Field } from "@/components/Field";
 import { api, call } from "@/lib/api";
 import { isCode, ApiError } from "@/lib/errors";
-import { addDays, longDate, prepareQuery, weekdayOf } from "@/lib/liturgy";
+import { addDays, liturgiesQuery, longDate, prepareQuery, weekdayOf } from "@/lib/liturgy";
 import { hasScope } from "@/lib/scopes";
 import { liturgyPath, paths } from "../paths";
 
@@ -27,6 +27,7 @@ export function PreparePage() {
 
 function Prepare() {
   const { t, i18n } = useTranslation();
+  const me = useOutletContext<Me>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [week, setWeek] = useState(""); // "" = the week after the current one, chosen by the server
@@ -41,13 +42,28 @@ function Prepare() {
     ? Math.min(...[limits.max_unpublished_liturgies, limits.max_active_liturgies].filter((l) => !l.unlimited).map((l) => l.max - l.used), Infinity)
     : Infinity;
   const tooMany = ticked.length > room;
+  // Archiving the oldest published liturgies can make room under max_active_liturgies,
+  // never under max_unpublished_liturgies (13 §4); the server checks it all again.
+  const roomOf = (l?: { unlimited: boolean; max: number; used: number }) => (!l || l.unlimited ? Infinity : l.max - l.used);
+  const roomActive = roomOf(limits?.max_active_liturgies);
+  const need = ticked.length - roomActive;
+  const canArchive = hasScope(me, "liturgy.manage") && tooMany && ticked.length <= roomOf(limits?.max_unpublished_liturgies) && need > 0;
+  const oldest = useQuery({
+    ...liturgiesQuery({ state: "published", to: data.data?.week ? addDays(data.data.week, -1) : "", order: "date_asc", limit: 50 }),
+    enabled: canArchive && !!data.data?.week,
+  });
+  const archivable = (oldest.data?.items ?? []).filter((l) => l.actions.archive).slice(0, need);
+  const archiveAndCreate = canArchive && archivable.length === need;
 
   const create = useMutation({
-    mutationFn: () =>
-      call(api.POST("/liturgies/prepare", { body: { occurrences: ticked.map((o) => ({ service_id: o.service_id, date: o.date, time: o.time })) } })),
+    mutationFn: (archiveIds: string[]) =>
+      call(api.POST("/liturgies/prepare", {
+        body: { occurrences: ticked.map((o) => ({ service_id: o.service_id, date: o.date, time: o.time })), ...(archiveIds.length > 0 ? { archive_ids: archiveIds } : {}) },
+      })),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["liturgies"] });
       await queryClient.invalidateQueries({ queryKey: ["prepare"] });
+      await queryClient.invalidateQueries({ queryKey: ["liturgy"] });
       void navigate(paths.planning);
     },
   });
@@ -130,9 +146,19 @@ function Prepare() {
         ) : <ErrorAlert error={create.error} />
       )}
       {free.length > 0 && (
-        <Button disabled={ticked.length === 0 || tooMany || create.isPending} onClick={() => create.mutate()}>
-          {t("liturgy.prepare.create", { count: ticked.length })}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button disabled={ticked.length === 0 || tooMany || create.isPending} onClick={() => create.mutate([])}>
+            {t("liturgy.prepare.create", { count: ticked.length })}
+          </Button>
+          {archiveAndCreate && (
+            <>
+              <Button variant="outline" disabled={create.isPending} onClick={() => create.mutate(archivable.map((l) => l.id))}>
+                {t("liturgy.prepare.archive_and_create", { count: ticked.length, archive: need })}
+              </Button>
+              <p className="text-sm text-muted-foreground">{t("liturgy.prepare.archive_hint")}</p>
+            </>
+          )}
+        </div>
       )}
     </div>
   );

@@ -595,16 +595,20 @@
     "limit": "Anda dapat memiliki paling banyak {{max}}.",
     "liturgy_exists": "Sudah ada liturgi untuk ibadah, tanggal, dan jam ini.",
     "liturgy_locked": "Liturgi ini tidak bisa diubah sekarang. Muat ulang halaman.",
-    "liturgy_not_deletable": "Liturgi yang sudah diterbitkan tidak bisa dihapus. Arsipkan saja.",
+    "liturgy_not_deletable": "Liturgi yang pernah diterbitkan tidak bisa dihapus. Arsipkan saja.",
     "assignment_exists": "Orang ini sudah punya tugas ini.",
     "language_mismatch": "Templat dan liturgi harus berbahasa sama.",
-    "liturgy_limit": "Gereja Anda sudah mencapai batas {{max}} liturgi.",
+    "liturgy_limit": "Gereja Anda sudah mencapai batas {{max}} liturgi aktif. Arsipkan liturgi lain dahulu.",
     "undo_refused": "Ini tidak bisa dibatalkan atau diulangi.",
     "invalid_transition": "Liturgi ini sekarang {{state}}, jadi tidak bisa dilakukan. Muat ulang halaman.",
     "review_stale": "Liturgi berubah setelah Anda membukanya. Bacalah lagi.",
     "empty_liturgy": "Tambahkan setidaknya satu butir sebelum dikirim.",
     "has_problems": "Beberapa butir belum selesai.",
-    "comment_limit": "Liturgi ini sudah mencapai batas 500 komentar."
+    "comment_limit": "Liturgi ini sudah mencapai batas 500 komentar.",
+    "unpublished_limit": "Paket Anda mengizinkan {{max}} liturgi yang belum diterbitkan. Selesaikan atau hapus satu dahulu.",
+    "liturgy_archived": "Liturgi ini diarsipkan. Aktifkan lagi dahulu.",
+    "not_archived": "Liturgi ini tidak diarsipkan.",
+    "publish_too_large": "Liturgi ini terlalu besar untuk diterbitkan. Butir terpanjang adalah “{{title}}”."
   },
   "import": {
     "title": "Impor lagu",
@@ -750,7 +754,9 @@
       "none_past": "Belum ada liturgi yang sudah lewat.",
       "items_other": "{{count}} butir",
       "previous": "Halaman sebelumnya",
-      "next": "Halaman berikutnya"
+      "next": "Halaman berikutnya",
+      "show_archived": "Tampilkan arsip",
+      "archived": "Diarsipkan"
     },
     "prepare": {
       "title": "Siapkan minggu depan",
@@ -768,7 +774,10 @@
       "exists_now": "Salah satunya sudah punya liturgi.",
       "slots": "{{free}} dari {{max}} tempat liturgi masih kosong.",
       "too_many": "Anda mencentang {{n}}; hanya {{free}} yang bisa dibuat.",
-      "create_other": "Buat {{count}} liturgi"
+      "create_other": "Buat {{count}} liturgi",
+      "archive_and_create_one": "Arsipkan liturgi terbit terlama dan buat {{count}}",
+      "archive_and_create_other": "Arsipkan {{archive}} liturgi terbit terlama dan buat {{count}}",
+      "archive_hint": "Liturgi yang diarsipkan tetap bisa dibaca dan memberi ruang pada paket Anda."
     },
     "new": {
       "title": "Liturgi baru",
@@ -947,19 +956,28 @@
         "submit": "Dikirim untuk ditinjau.",
         "approve": "Disetujui.",
         "request_changes": "Dikembalikan untuk diperbaiki.",
-        "reopen": "Dibuka kembali sebagai draf."
+        "reopen": "Dibuka kembali sebagai draf.",
+        "publish": "Diterbitkan.",
+        "archive": "Diarsipkan.",
+        "unarchive": "Diaktifkan lagi."
       },
       "banner": {
         "in_review": "Liturgi ini sedang ditinjau. Hanya komentar yang bisa ditambahkan sampai peninjau menyetujui atau meminta perubahan.",
         "needs_revision": "Ada perubahan yang diminta. Ubah liturgi lalu kirim lagi.",
         "needs_revision_note": "{{name}} menulis: {{note}}",
-        "approved": "Sudah disetujui. Buka kembali untuk mengubahnya."
+        "approved": "Sudah disetujui. Buka kembali untuk mengubahnya.",
+        "published": "Diterbitkan sebagai versi {{number}} pada {{date}}. Buka kembali untuk mengubahnya; tim tetap melihat versi ini sampai Anda menerbitkan lagi.",
+        "published_archived": "Diarsipkan. Liturgi ini tetap bisa dibaca; aktifkan lagi untuk membukanya kembali.",
+        "revising": "Sedang direvisi. Tim masih melihat versi {{number}} sampai Anda menerbitkan lagi."
       },
       "history": {
         "title": "Riwayat tinjauan",
         "none": "Belum dikirim untuk ditinjau.",
         "row": "{{name}}: {{from}} → {{to}}"
-      }
+      },
+      "publish": "Terbitkan",
+      "archive": "Arsipkan",
+      "unarchive": "Aktifkan lagi"
     },
     "comments": {
       "title": "Komentar",

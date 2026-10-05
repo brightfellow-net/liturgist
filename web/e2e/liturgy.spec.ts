@@ -350,3 +350,57 @@ test("E2E-W-016 submit, request changes, resubmit, approve and reopen", async ({
   await api.delete(`/api/v1/liturgies/${id}`, { data: {} });
   await api.dispose();
 });
+
+// E2E-W-017 (slice 5A): the liturgist approves and publishes, archives and unarchives,
+// reopens; a team member with no scope cannot open the editable liturgy (13 §2, §4, §5).
+test("E2E-W-017 publish, archive, unarchive and reopen", async ({ browser }) => {
+  const api = await adminApi();
+  const link = await createInvite("Tia Team", "tia.team@example.org", []);
+  const anon = await request.newContext({ baseURL });
+  const accepted = await anon.post("/api/v1/invites/accept", { data: { token: tokenOf(link), name: "Tia Team", email: "tia.team@example.org", password: memberPassword } });
+  expect(accepted.status(), await accepted.text()).toBe(201);
+  await anon.dispose();
+
+  const created = await api.post("/api/v1/liturgies", { data: { service_name: "Ibadah Terbit", date: dateAhead(60), time: "10:00", template_id: "", language: "id" } });
+  expect(created.status(), await created.text()).toBe(201);
+  const { id, version } = (await created.json()) as { id: string; version: number };
+  const item = await api.post(`/api/v1/liturgies/${id}/items`, { data: { liturgy_version: version, title: "Doa Pembuka", item_type: "free_text" } });
+  expect(item.status(), await item.text()).toBe(201);
+
+  const lead = await adminPage(browser);
+  await lead.goto(`/liturgies/${id}`);
+  await lead.getByRole("button", { name: "Submit for review" }).click();
+  await expect(lead.getByText(/This liturgy is being reviewed/)).toBeVisible();
+  await lead.getByRole("button", { name: "Approve", exact: true }).click();
+  await lead.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(lead.getByText(/Approved\. Reopen it to make changes/)).toBeVisible();
+
+  await lead.getByRole("button", { name: "Publish" }).click();
+  await lead.getByLabel(/Note/).fill("Shalom");
+  await lead.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(lead.getByText(/Published as version 1 on/).first()).toBeVisible();
+  await expect(lead.getByRole("button", { name: "Delete this liturgy" })).toHaveCount(0);
+  await expectAccessible(lead);
+
+  // A team member with no role cannot open the editable liturgy: 404 in every state.
+  const tia = await logIn(browser, "tia.team@example.org", memberPassword);
+  const asTia = await tia.request.get(`/api/v1/liturgies/${id}`);
+  expect(asTia.status()).toBe(404);
+
+  await lead.getByRole("button", { name: "Archive", exact: true }).click();
+  await expect(lead.getByText("Archived.").first()).toBeVisible();
+  await expect(lead.getByText(/Archived\. This liturgy stays readable/)).toBeVisible();
+  await lead.getByRole("button", { name: "Unarchive" }).click();
+  await expect(lead.getByRole("button", { name: "Archive", exact: true })).toBeVisible();
+
+  await lead.getByRole("button", { name: "Reopen as draft" }).click();
+  await lead.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(lead.getByText(/Being revised\. The team still sees version 1/)).toBeVisible();
+  await expect(lead.getByText("Admin: Published → Draft")).toBeVisible();
+
+  // It was published once, so it can never be deleted: the API says so and the button is gone.
+  await expect(lead.getByRole("button", { name: "Delete this liturgy" })).toHaveCount(0);
+  const del = await api.delete(`/api/v1/liturgies/${id}`, { data: {} });
+  expect(del.status()).toBe(409);
+  await api.dispose();
+});

@@ -8,13 +8,14 @@ import (
 	"testing"
 )
 
-// TC-R-001: exactly four (state, action) pairs plus the second source of submit.
+// TC-R-001 and TC-P-001: exactly the (state, action) pairs of 12 §2 and 13 §2, 13 §4.
 func TestReviewTransitionTable(t *testing.T) {
 	allowed := map[ReviewAction][]LiturgyState{
 		ActionSubmit:         {StateDraft, StateNeedsRevision},
 		ActionApprove:        {StateInReview},
 		ActionRequestChanges: {StateInReview},
-		ActionReopen:         {StateApproved},
+		ActionReopen:         {StateApproved, StatePublished},
+		ActionPublish:        {StateApproved},
 	}
 	n := 0
 	for _, act := range ReviewActions {
@@ -38,19 +39,20 @@ func TestReviewTransitionTable(t *testing.T) {
 			t.Errorf("%s leads to %q", act, rule.To)
 		}
 	}
-	if n != 5 {
-		t.Errorf("%d allowed pairs, want 5", n)
+	if n != 7 {
+		t.Errorf("%d allowed pairs, want 7", n)
 	}
-	if _, ok := ReviewAction("publish").Rule(); ok {
-		t.Error("publish is step 5")
+	if _, ok := ReviewAction("archive").Rule(); ok {
+		t.Error("archive is not a transition (13 §4)")
 	}
-	// Only approve and request changes state the edit_seq; the scopes are the SPEC's.
+	// Only approve, request changes and publish state the edit_seq; the scopes are the SPEC's.
 	for act, want := range map[ReviewAction]struct {
 		seq   bool
 		scope Scope
 	}{
 		ActionSubmit: {false, ScopeLiturgyEdit}, ActionApprove: {true, ScopeLiturgyApprove},
 		ActionRequestChanges: {true, ScopeLiturgyApprove}, ActionReopen: {false, ScopeLiturgyApprove},
+		ActionPublish: {true, ScopeLiturgyApprove},
 	} {
 		if r, _ := act.Rule(); r.NeedsSeq != want.seq || r.Scope != want.scope {
 			t.Errorf("%s: %+v", act, r)

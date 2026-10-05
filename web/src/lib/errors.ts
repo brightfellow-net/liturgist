@@ -13,6 +13,7 @@ export const errorCodes = [
   "invalid_reference", "reading_exists", "reading_in_use", "import_unreadable", "import_conflict",
   "liturgy_exists", "liturgy_locked", "liturgy_not_deletable", "assignment_exists", "undo_refused",
   "invalid_transition", "review_stale", "empty_liturgy", "has_problems", "comment_limit",
+  "liturgy_archived", "not_archived", "publish_too_large",
   "internal", "unavailable",
 ] as const;
 
@@ -30,6 +31,7 @@ export type Problem = {
   problems?: { code: string; item_id: string }[]; // has_problems: the unfinished items
   scopes?: string[];
   limit?: string;
+  largest_item?: string; // publish_too_large: the longest item
   used?: number;
   max?: number;
   errors?: { location?: string; message?: string }[];
@@ -105,7 +107,10 @@ export function errorText(t: TFunction, err: unknown, scopeName: (scope: string)
     }
     case "limit_reached":
       // The liturgy limits name which count was reached (10 §8).
+      if (p.limit === "max_unpublished_liturgies") return t("errors.unpublished_limit", { max: p.max ?? 0 });
       return p.limit?.includes("liturgies") ? t("errors.liturgy_limit", { max: p.max ?? 0 }) : t("errors.limit_reached", { max: p.max ?? 0 });
+    case "publish_too_large":
+      return t("errors.publish_too_large", { title: p.largest_item ?? "" });
     case "scope_not_held":
       return t("errors.scope_not_held", { scopes: (p.scopes ?? []).map(scopeName).join("; ") });
   }
