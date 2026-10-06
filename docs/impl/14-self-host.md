@@ -309,3 +309,9 @@ A follow-up to 6F. `internal/logging/zapbridge.go` is a `zapcore.Core` that writ
 **Fixes a 6F flaw:** `certmagic.NewDefault()` shares a process-wide cache whose renewal callback builds a fresh default config (default storage folder, no agreement), not the one 6F set up on the instance. `acmeTLS` now builds its own cache with a callback that returns its config, and stops the cache when the context ends. Found by reading the library; the old failure was not reproduced.
 
 Tests: TC-613 (message, level, name and fields; level filter; redaction), four mutations caught (the fifth, the filter in `Check`, is redundant because zap checks the level first). Verified against a Pebble server: issuance with the bridged log, and a renewal through the cache using 150-second certificates and a temporary 5-second check interval (scratch build, not committed), with the data kept in `data/certs`. **Not verified:** real Let's Encrypt.
+
+## 23. The quick start builds the image locally until a release (2026-10-06)
+
+The README quick start and `docs/self-host/install-docker.md` pulled `ghcr.io/brightfellow-net/liturgist:latest`. That image does not exist until `release.yml` has run on a tag (it never has), so a new user got `denied` from ghcr.io. Both now show `git clone`, `docker build -t liturgist:local .` and `docker run ... liturgist:local`; the Compose example uses `liturgist:local`; the upgrade steps are `git pull` and a rebuild. Checked by building from a fresh worktree and running it: healthy, `/healthz` 200, setup link printed.
+
+**To undo at the first release:** switch the quick start and the guide back to the `ghcr.io` image, and make the package public in the GitHub package settings (new ghcr packages are private, which also gives `denied`). Confirm that `release.yml` tags `latest` on a release tag. `upgrading.md` (the `cosign verify` line) and `SPEC.md` §8 keep the `ghcr.io` name on purpose.
