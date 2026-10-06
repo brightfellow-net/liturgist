@@ -6,13 +6,18 @@ Status: before version 1.0. The pilot church is GKY Citragarden.
 
 ## Quick start
 
-You need [Docker](https://docs.docker.com/get-docker/). In a terminal:
+You need [Docker](https://docs.docker.com/get-docker/) and [Git](https://git-scm.com/downloads). There is no published image yet (it comes with the first release), so build it from the source. In a terminal:
 
 ```
+git clone https://github.com/brightfellow-net/liturgist.git
+cd liturgist
+docker build -t liturgist:local .
 docker run -d --name liturgist -p 127.0.0.1:8080:8080 -v liturgist-data:/data \
-  -e LITURGIST_BASE_URL=http://localhost:8080 ghcr.io/brightfellow-net/liturgist:latest
+  -e LITURGIST_BASE_URL=http://localhost:8080 liturgist:local
 docker logs liturgist
 ```
+
+The build takes a few minutes the first time.
 
 Open the **setup link** shown in the log to create your church and its first administrator. That is a trial on one computer. For a real installation, with HTTPS and backups, follow a guide below.
 

@@ -1,6 +1,16 @@
 # Install with Docker
 
-Needs Docker. The image is `ghcr.io/brightfellow-net/liturgist` (Linux amd64 and arm64). It runs as an unprivileged user and keeps everything in `/data`.
+Needs Docker. The image runs as an unprivileged user and keeps everything in `/data`.
+
+**No image is published yet.** Until the first release, build it from the source (below). The release will publish `ghcr.io/brightfellow-net/liturgist` (Linux amd64 and arm64); then replace `liturgist:local` with that name in the commands on this page.
+
+## Build the image
+
+```
+git clone https://github.com/brightfellow-net/liturgist.git
+cd liturgist
+docker build -t liturgist:local .
+```
 
 ## Try it
 
@@ -9,7 +19,7 @@ docker run -d --name liturgist \
   -p 127.0.0.1:8080:8080 \
   -v liturgist-data:/data \
   -e LITURGIST_BASE_URL=http://localhost:8080 \
-  ghcr.io/brightfellow-net/liturgist:latest
+  liturgist:local
 docker logs liturgist
 ```
 
@@ -28,7 +38,7 @@ Seen from the container, a proxy running on the same computer comes from Docker'
 ```yaml
 services:
   liturgist:
-    image: ghcr.io/brightfellow-net/liturgist:latest
+    image: liturgist:local
     restart: unless-stopped
     ports: ["127.0.0.1:8080:8080"]
     volumes: ["liturgist-data:/data"]
@@ -59,9 +69,10 @@ The image has a health check (`docker ps` shows `healthy`). It runs `/liturgist 
 ## Upgrade
 
 ```
-docker pull ghcr.io/brightfellow-net/liturgist:latest
+git pull
+docker build -t liturgist:local .
 docker rm -f liturgist     # the data stays in the volume
 # run the same docker run command again
 ```
 
-Read [upgrading.md](upgrading.md) first. Pin a version (`:0.1.0`) instead of `latest` if you want upgrades to be a decision.
+Read [upgrading.md](upgrading.md) first. Once the image is published, pull `ghcr.io/brightfellow-net/liturgist:latest` instead of building, and pin a version (`:0.1.0`) instead of `latest` if you want upgrades to be a decision.
