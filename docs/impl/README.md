@@ -59,7 +59,7 @@
 
 ## 1e. Documents for the church logo
 
-After step 6: a church admin uploads a logo that appears left of the church name. **Status: decisions L-1 to L-8 Approved** 2026-10-07 ([15 §2](15-church-logo.md#2-decisions)). Slices 15A (server) and 15B (pages).
+After step 6: a church admin uploads a logo that appears left of the church name. **Status: decisions L-1 to L-8 Approved** 2026-10-07 ([15 §2](15-church-logo.md#2-decisions)). Slices 15A (server, **merged** 2026-10-07, [15 §8](15-church-logo.md#8-slice-15a-as-built-2026-10-07)) and 15B (pages, not drafted).
 
 | Document | Covers |
 |---|---|

@@ -1,7 +1,7 @@
 # 15 — Church Logo (Implementation)
 
 > **Document type: Implementation.** A church admin uploads a logo; it appears to the left of the church name in the app header, the published view and the print header. Deferred by [Q-5.1](README.md#4g-questions-for-the-owner-step-5) until after the first pilot week; the owner asked for it on 2026-10-07.
-> Status: decisions **[L-1] to [L-8] Approved** 2026-10-07 ([L-1] and [L-2] were the owner's own choices; the rest as proposed). Spec Gate and adversarial review have not run; slices are drafted one at a time and each waits for the owner's approval before merging. Nothing is built.
+> Status: decisions **[L-1] to [L-8] Approved** 2026-10-07 ([L-1] and [L-2] were the owner's own choices; the rest as proposed). Spec Gate and adversarial review have not run; slices are drafted one at a time and each waits for the owner's approval before merging. Slice 15A (the server side) is merged; 15B is not drafted.
 
 ## 1. Scope and what already exists
 
@@ -104,3 +104,26 @@ Mutation checks to run when built: skip the size check, skip `DecodeConfig`, ski
 | Church settings and print settings | [04 §6](04-tenancy-extensions.md), [13 §6](13-publishing.md) |
 | `files/` in the backup | [14 §3](14-self-host.md) |
 | Deferral decision | [Q-5.1](README.md#4g-questions-for-the-owner-step-5), [13 §1](13-publishing.md#1-scope) |
+
+## 8. Slice 15A as built (2026-10-07)
+
+Server side only; nothing is visible in the app yet.
+
+| Part | Where |
+|---|---|
+| `ChurchLogo{Version, Width, Height}` in `ChurchSettings` (JSON key `logo`; a broken value reads as no logo; other keys are still kept), `LogoKey`, the limits | `domain/church.go` |
+| `app.ImageNormalizer`, `app.ChurchLogos` (`Set`, `Remove`, `Open`) | `app/church_logo.go` |
+| The normalizer: `DecodeConfig` first, then decode, scale with `draw.CatmullRom`, write a PNG | `adapters/images/images.go` (`golang.org/x/image` v0.46.0, now a direct dependency) |
+| `PUT`, `DELETE`, `GET /church/logo`; `logo_url` in `ChurchView` (also in `/me`) | `adapters/httpapi/church_logo_ops.go`, `views.go` |
+| `localfs.Put` reports a full disk as `app.ErrStorageFull` (so 507 `storage_full`) | `adapters/storage/localfs/localfs.go` |
+| Wiring | `server/server.go` (`uc.logos`; the `storage` option is no longer unused) |
+
+**Deviations from the plan**
+- A JPEG is painted on white before scaling (it has no transparency, and the result should not depend on the decoder).
+- `Set` checks `church.settings` in a read transaction before it decodes anything, so a sender without the scope costs no decoding; the scope is checked again under the church lock when the setting is written.
+- `Remove` of a church without a logo does not change `updated_at`.
+- The `GET` answers 304 when `If-None-Match` equals the ETag, and sets `ETag` and `Cache-Control` on the 304 too.
+
+**Memory:** a 16-million-pixel upload takes about 64 MB while it is decoded, plus the scaled copy. Several large uploads at once could use a few hundred MB; only admins can upload.
+
+Tests: TC-614 to TC-616 (`adapters/images`), TC-617 and TC-618 (`app/church_logo_test.go`, SQLite and PostgreSQL), TC-619 (`localfs_test.go`), the settings round trip (`domain/church_logo_test.go`), a full-disk check (`fulldisk_test.go`), IT-607 and IT-608 (`server/church_logo_http_test.go`); `TestTenancyDeclarations` lists the three operations. Fifteen mutations were tried: fourteen caught; the survivor (`Over` instead of `Src` when drawing onto a transparent canvas) is equivalent. **Not verified:** a real full disk, the Windows disk-full codes (compile-checked only), the pages (15B).
