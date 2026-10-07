@@ -90,6 +90,25 @@ export interface paths {
         patch: operations["updateChurch"];
         trace?: never;
     };
+    "/church/logo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The church logo, a PNG */
+        get: operations["getChurchLogo"];
+        /** Set the church logo (church.settings) */
+        put: operations["setChurchLogo"];
+        post?: never;
+        /** Remove the church logo (church.settings) */
+        delete: operations["removeChurchLogo"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/duties": {
         parameters: {
             query?: never;
@@ -1497,6 +1516,8 @@ export interface components {
             /** @enum {string} */
             key_display: "do" | "letter";
             licence_footer: string;
+            /** @description null without a logo; the version in the address changes with the logo (15 §2) */
+            logo_url: string | null;
             name: string;
             print: components["schemas"]["PrintDefaultsView"];
             privacy_contact: string | null;
@@ -2889,6 +2910,16 @@ export interface components {
              */
             version: number;
         };
+        SetChurchLogoRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example /api/v1/schemas/SetChurchLogoRequest.json
+             */
+            readonly $schema?: string;
+            /** @description A PNG, JPEG or WebP file, at most 2 MB, as base64 */
+            image: string;
+        };
         SetItemSongsRequest: {
             /**
              * Format: uri
@@ -3647,6 +3678,100 @@ export interface operations {
                 "application/json": components["schemas"]["UpdateChurchRequest"];
             };
         };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChurchView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getChurchLogo: {
+        parameters: {
+            query?: {
+                /** @description The version from logo_url; with the current one the file is cached for a year */
+                v?: string;
+            };
+            header?: {
+                "If-None-Match"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    setChurchLogo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetChurchLogoRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChurchView"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    removeChurchLogo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description OK */
             200: {

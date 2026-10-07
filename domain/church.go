@@ -68,7 +68,46 @@ type ChurchSettings struct {
 	ShowCredits    *bool          // nil = not set = true (13 §6)
 	LicenceFooter  string         // "" = none
 	Print          *PrintDefaults // nil = DefaultPrint
+	Logo           *ChurchLogo    // nil = no logo (15 §2, L-3)
 	Extra          map[string]json.RawMessage
+}
+
+// ChurchLogo describes the stored logo. Version is the first 16 hex
+// characters of the SHA-256 of the stored PNG; it is part of the file key and
+// of the URL, so a changed logo is a new file and a new URL.
+type ChurchLogo struct {
+	Version string `json:"version"`
+	Width   int    `json:"width"`
+	Height  int    `json:"height"`
+}
+
+// Logo limits (15 §2, L-2).
+const (
+	LogoMaxBytes  = 2 << 20 // upload, after decoding the base64
+	LogoMaxSide   = 4096    // pixels, either way
+	LogoMaxPixels = 16_000_000
+	LogoFitSide   = 512 // the stored PNG fits in this square
+)
+
+// Valid reports whether the stored description is usable; one that is not
+// reads as no logo.
+func (l ChurchLogo) Valid() bool {
+	if len(l.Version) != 16 || l.Width < 1 || l.Height < 1 {
+		return false
+	}
+	for _, c := range l.Version {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
+// LogoKey is the storage key of a church's logo file. Church IDs are
+// upper-case ULIDs and storage keys are lower-case (04 §7), hence the
+// conversion.
+func LogoKey(church ChurchID, version string) string {
+	return "church/" + strings.ToLower(string(church)) + "/logo-" + version + ".png"
 }
 
 // CreditsShown is show_credits with its default.
@@ -82,7 +121,7 @@ func (s ChurchSettings) PrintOrDefault() PrintDefaults {
 	return *s.Print
 }
 
-var knownSettings = []string{"key_display", "feedback_url", "privacy_contact", "show_credits", "licence_footer", "print"}
+var knownSettings = []string{"key_display", "feedback_url", "privacy_contact", "show_credits", "licence_footer", "print", "logo"}
 
 // MarshalJSON writes known keys (omitting empty ones) plus the preserved extras.
 func (s ChurchSettings) MarshalJSON() ([]byte, error) {
@@ -103,6 +142,9 @@ func (s ChurchSettings) MarshalJSON() ([]byte, error) {
 	}
 	if s.Print != nil {
 		m["print"] = *s.Print
+	}
+	if s.Logo != nil {
+		m["logo"] = *s.Logo
 	}
 	return json.Marshal(m)
 }
@@ -131,6 +173,11 @@ func (s *ChurchSettings) UnmarshalJSON(b []byte) error {
 			var v PrintDefaults
 			if json.Unmarshal(raw, &v) == nil && v.Validate("print") == nil {
 				s.Print = &v
+			}
+		case "logo":
+			var v ChurchLogo
+			if json.Unmarshal(raw, &v) == nil && v.Valid() {
+				s.Logo = &v
 			}
 		default:
 			_ = json.Unmarshal(raw, dst[k]) // a non-string value reads as empty

@@ -26,8 +26,12 @@ type ChurchView struct {
 	ShowCredits            bool              `json:"show_credits"`
 	LicenceFooter          string            `json:"licence_footer"`
 	Print                  PrintDefaultsView `json:"print"`
+	LogoURL                *string           `json:"logo_url" doc:"null without a logo; the version in the address changes with the logo (15 §2)"`
 	Actions                app.ChurchActions `json:"actions"`
 }
+
+// logoURLPrefix is the address of the logo; the version follows it.
+const logoURLPrefix = "/api/v1/church/logo?v="
 
 // PrintDefaultsView is the church's print options with their defaults filled in (13 §6).
 type PrintDefaultsView struct {
@@ -46,7 +50,12 @@ func printDefaultsView(p domain.PrintDefaults) PrintDefaultsView {
 
 func churchView(r app.ChurchResult) ChurchView {
 	c := r.Church
-	return ChurchView{ID: string(c.ID), Name: c.Name, DefaultUILanguage: c.DefaultUILanguage,
+	var logoURL *string
+	if l := c.Settings.Logo; l != nil {
+		u := logoURLPrefix + l.Version
+		logoURL = &u
+	}
+	return ChurchView{LogoURL: logoURL, ID: string(c.ID), Name: c.Name, DefaultUILanguage: c.DefaultUILanguage,
 		DefaultLanguage: c.DefaultLanguage, DefaultTranslationCode: r.TranslationCode, TimeZone: c.TimeZone,
 		KeyDisplay: c.Settings.KeyDisplay, FeedbackURL: optional(c.Settings.FeedbackURL),
 		PrivacyContact: optional(c.Settings.PrivacyContact), ShowCredits: c.Settings.CreditsShown(),

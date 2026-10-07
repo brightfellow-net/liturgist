@@ -334,7 +334,7 @@ func TestTenancyDeclarations(t *testing.T) {
 		"endOtherSessions": "platform", "getSetupStatus": "platform", "setup": "platform", "listTranslations": "platform",
 		"inspectReset": "platform", "resetPassword": "platform",
 		"inspectInvite": "optional", "acceptInvite": "optional", "acceptInviteExisting": "optional",
-		"getChurch": "church", "updateChurch": "church", "listMembers": "church", "setMemberRoles": "church",
+		"getChurch": "church", "updateChurch": "church", "setChurchLogo": "church", "removeChurchLogo": "church", "getChurchLogo": "church", "listMembers": "church", "setMemberRoles": "church",
 		"removeMember": "church", "createResetLink": "church", "listRoles": "church", "createRole": "church",
 		"updateRole": "church", "deleteRole": "church", "listScopes": "church", "listInvites": "church",
 		"createInvite": "church", "regenerateInvite": "church", "cancelInvite": "church",

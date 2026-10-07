@@ -13,7 +13,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"syscall"
 
 	"github.com/brightfellow-net/liturgist/app"
 )
@@ -70,12 +72,22 @@ func (s Storage) Put(ctx context.Context, key string, r io.Reader) error {
 	defer func() { _ = os.Remove(tmp.Name()) }() // no-op after the rename
 	if _, err := io.Copy(tmp, r); err != nil {
 		_ = tmp.Close()
-		return err
+		return fullDisk(err)
 	}
 	if err := tmp.Close(); err != nil {
-		return err
+		return fullDisk(err)
 	}
-	return os.Rename(tmp.Name(), p)
+	return fullDisk(os.Rename(tmp.Name(), p))
+}
+
+// fullDisk marks a "no space left" error as app.ErrStorageFull (14 §4); any
+// other error is returned as it is.
+func fullDisk(err error) error {
+	var errno syscall.Errno
+	if errors.As(err, &errno) && (errno == syscall.ENOSPC || (runtime.GOOS == "windows" && (errno == 39 || errno == 112))) {
+		return fmt.Errorf("%w: %w", app.ErrStorageFull, err)
+	}
+	return err
 }
 
 // Open returns the file at key; app.ErrNotFound if there is none.

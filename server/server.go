@@ -18,6 +18,7 @@ import (
 	"github.com/brightfellow-net/liturgist/adapters/entitlements/unlimited"
 	"github.com/brightfellow-net/liturgist/adapters/eventbus/memory"
 	"github.com/brightfellow-net/liturgist/adapters/httpapi"
+	"github.com/brightfellow-net/liturgist/adapters/images"
 	"github.com/brightfellow-net/liturgist/adapters/importers/chordpro"
 	"github.com/brightfellow-net/liturgist/adapters/importers/openlyrics"
 	"github.com/brightfellow-net/liturgist/adapters/importers/paste"
@@ -42,7 +43,7 @@ type options struct {
 	resolver     httpapi.TenantResolver
 	entitlements app.Entitlements
 	urls         app.URLBuilder
-	storage      app.Storage  // unused until logo upload; wired so later steps only read it
+	storage      app.Storage  // the church logo (15)
 	events       app.EventBus // unused until the liturgy editor (step 3)
 	notifier     app.Notifier // unused until publishing (step 5)
 	clock        app.Clock    // tests only
@@ -115,6 +116,7 @@ type useCases struct {
 	account   *app.Account
 	setup     *app.Setup
 	churches  *app.Churches
+	logos     *app.ChurchLogos
 	members   *app.Members
 	roles     *app.Roles
 	invites   *app.Invites
@@ -168,6 +170,7 @@ func wire(cfg Config, db app.Tx, o *options, refresh func()) useCases {
 		account:  &app.Account{Tx: db, Hasher: hasher, Clock: clock, Auth: auth},
 		setup:    &app.Setup{Tx: db, Hasher: hasher, Clock: clock, IDs: ids, Auth: auth, OnDone: refresh},
 		churches: &app.Churches{Tx: db, Clock: clock},
+		logos:    &app.ChurchLogos{Tx: db, Clock: clock, Storage: o.storage, Images: images.Normalizer{}, Log: cfg.Logger},
 		members:  &app.Members{Tx: db, Clock: clock, Entitlements: o.entitlements},
 		roles:    &app.Roles{Tx: db, Clock: clock, IDs: ids},
 		invites: &app.Invites{Tx: db, Hasher: hasher, Clock: clock, IDs: ids, URLs: o.urls,
@@ -231,7 +234,7 @@ func New(ctx context.Context, cfg Config, opts ...Option) (*Server, error) {
 	cookies := httpapi.Cookies{Secure: cfg.BaseURL.Scheme == "https"}
 	d := deps{
 		auth: httpapi.AuthDeps{Auth: s.uc.auth, Account: s.uc.account, Cookies: cookies, Clock: s.uc.auth.Clock, Log: cfg.Logger},
-		church: httpapi.ChurchDeps{Setup: s.uc.setup, Churches: s.uc.churches, Members: s.uc.members, Roles: s.uc.roles,
+		church: httpapi.ChurchDeps{Setup: s.uc.setup, Churches: s.uc.churches, Logos: s.uc.logos, Members: s.uc.members, Roles: s.uc.roles,
 			Invites: s.uc.invites, Resets: s.uc.resets, Cookies: cookies, Clock: s.uc.auth.Clock, Log: cfg.Logger},
 		library:  httpapi.LibraryDeps{Songs: s.uc.songs, Readings: s.uc.readings, Imports: s.uc.imports, Log: cfg.Logger},
 		planning: httpapi.PlanningDeps{Vocabulary: s.uc.vocab, Templates: s.uc.templates, Services: s.uc.services, Log: cfg.Logger},

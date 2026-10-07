@@ -19,6 +19,7 @@ import (
 type ChurchDeps struct {
 	Setup    *app.Setup
 	Churches *app.Churches
+	Logos    *app.ChurchLogos
 	Members  *app.Members
 	Roles    *app.Roles
 	Invites  *app.Invites
@@ -244,6 +245,8 @@ func RegisterChurch(api huma.API, d ChurchDeps) {
 			}
 			return &churchOutput{Body: churchView(res)}, nil
 		})
+
+	registerLogo(api, d)
 
 	// --- members ---
 

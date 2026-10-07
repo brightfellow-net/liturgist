@@ -14,6 +14,7 @@ import (
 
 	"github.com/brightfellow-net/liturgist/adapters/storage/localfs"
 	"github.com/brightfellow-net/liturgist/app"
+	"github.com/brightfellow-net/liturgist/domain"
 )
 
 // TC-T-006: keys are validated before any file is touched.
@@ -87,3 +88,11 @@ func TestPutOpenDelete(t *testing.T) {
 type errReader struct{}
 
 func (errReader) Read([]byte) (int, error) { return 0, errors.New("disk on fire") }
+
+// TC-619: the key of a church's logo (the ID is an upper-case ULID) is a valid key.
+func TestLogoKeyIsValid(t *testing.T) {
+	key := domain.LogoKey("01M487A8PBK1DEN9Q93N6VB05D", "0123456789abcdef")
+	if key != "church/01m487a8pbk1den9q93n6vb05d/logo-0123456789abcdef.png" || !localfs.ValidKey(key) {
+		t.Errorf("key %q", key)
+	}
+}
