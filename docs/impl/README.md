@@ -57,6 +57,14 @@
 | [14-self-host.md](14-self-host.md) | Step 6: backup and restore, scheduled backups, system page, releases, guides |
 | [../reference/schema.md](../reference/schema.md#step-5-tables) | Step 5 tables (Reference) |
 
+## 1e. Documents for the church logo
+
+After step 6: a church admin uploads a logo that appears left of the church name. **Status: decisions L-1 to L-8 Approved** 2026-10-07 ([15 §2](15-church-logo.md#2-decisions)). Slices 15A (server) and 15B (pages).
+
+| Document | Covers |
+|---|---|
+| [15-church-logo.md](15-church-logo.md) | Upload, image checks, storage, serving route, settings section, display |
+
 ## 2. How to use these documents
 
 - **Required reading before writing any step-1 code:** [SPEC.md](../SPEC.md) and **every** document in the table above. This index alone is not a specification.
