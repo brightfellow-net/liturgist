@@ -1,7 +1,7 @@
 # 15 — Church Logo (Implementation)
 
 > **Document type: Implementation.** A church admin uploads a logo; it appears to the left of the church name in the app header, the published view and the print header. Deferred by [Q-5.1](README.md#4g-questions-for-the-owner-step-5) until after the first pilot week; the owner asked for it on 2026-10-07.
-> Status: decisions **[L-1] to [L-8] Approved** 2026-10-07 ([L-1] and [L-2] were the owner's own choices; the rest as proposed). Spec Gate and adversarial review have not run; slices are drafted one at a time and each waits for the owner's approval before merging. Slice 15A (the server side) is merged; 15B is not drafted.
+> Status: decisions **[L-1] to [L-8] Approved** 2026-10-07 ([L-1] and [L-2] were the owner's own choices; the rest as proposed). Spec Gate and adversarial review have not run; slices are drafted one at a time and each waits for the owner's approval before merging. Slice Both slices are merged (15A the server side, 15B the pages).
 
 ## 1. Scope and what already exists
 
@@ -127,3 +127,22 @@ Server side only; nothing is visible in the app yet.
 **Memory:** a 16-million-pixel upload takes about 64 MB while it is decoded, plus the scaled copy. Several large uploads at once could use a few hundred MB; only admins can upload.
 
 Tests: TC-614 to TC-616 (`adapters/images`), TC-617 and TC-618 (`app/church_logo_test.go`, SQLite and PostgreSQL), TC-619 (`localfs_test.go`), the settings round trip (`domain/church_logo_test.go`), a full-disk check (`fulldisk_test.go`), IT-607 and IT-608 (`server/church_logo_http_test.go`); `TestTenancyDeclarations` lists the three operations. Fifteen mutations were tried: fourteen caught; the survivor (`Over` instead of `Src` when drawing onto a transparent canvas) is equivalent. **Not verified:** a real full disk, the Windows disk-full codes (compile-checked only), the pages (15B).
+
+## 9. Slice 15B as built (2026-10-07)
+
+| Part | Where |
+|---|---|
+| `ChurchLogo`: an `<img>` with an empty alt text that disappears when it fails to load and is tried again for a new address | `web/src/components/ChurchLogo.tsx` |
+| The "Logo" section: preview, "Choose image", "Remove logo"; shown only with `actions.edit`; refuses another type or a file over 2 MB in the browser before sending; sends base64 JSON; after a change it updates the church and refreshes `/me` | `web/src/routes/settings/ChurchLogoSection.tsx`, `ChurchSettingsPage.tsx` |
+| The logo left of the name: app header 32 px high, published view 32 px, print header 14 mm. The two bodies take an optional `logoUrl`; the pages pass the church's from `/me` | `AppLayout.tsx`, `PublishedBody.tsx`, `PrintBody.tsx`, `PublishedPage.tsx`, `PrintPage.tsx` |
+| Strings `church.logo*` in English and Indonesian | `packages/i18n/en.json`, `id.json` |
+| The backup guide says what `files/` holds today | `docs/self-host/backup-and-restore.md` |
+
+**Deviations from the plan**
+- The settings section sits above the church form as its own block, not inside it, because it saves at once (the form has a Save button for its own fields).
+- A wide logo is not boxed into a square: the height is fixed and the width follows, up to 96 px in the header (40 mm in print), so a 2:1 logo is not shrunk to a quarter.
+- `PrintPage` reads the church from the outlet context and shows no logo without it (as in a test without the app frame); it is not read from the stored copy, as planned in L-5.
+- The Indonesian strings are mine and have not been read by a native speaker.
+- Not done: the logo in the offline frame (no `/me` offline, so name only, as planned in L-8); a Playwright check of the print header (a Vitest test covers it; the end-to-end test covers upload, header, reload, a team member and remove).
+
+Tests: WT-L-001 (`ChurchLogoSection.test.tsx`, six tests), WT-L-002 (`ChurchLogo.test.tsx`, `Logo.test.tsx`), E2E-W-022 (`e2e/logo.spec.ts`, with the axe check in light and dark). Thirteen mutations of the web code were tried; twelve were caught at once, and the one that survived (not refreshing `/me` after a change, so the header would not follow) got its own test and is now caught. Vitest 332, Playwright 42 (run with `PLAYWRIGHT_CHANNEL=chrome`), `tsc` clean. **Not verified:** a phone browser, a real logo of several hundred KB, the Indonesian wording.
