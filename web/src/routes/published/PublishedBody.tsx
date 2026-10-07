@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 import { useTranslation } from "react-i18next";
 import type { PublishedContentView, PublishedSongView } from "@liturgist/api-client";
+import { ChurchLogo } from "@/components/ChurchLogo";
 import { formatKey, keyChangeText, longDate } from "@/lib/liturgy";
 
 type Render = { key_display: string; show_credits: boolean };
 
 // PublishedBody shows a stored copy and nothing else (13 §3): every text is
 // plain text, so it is escaped by React and never taken as HTML.
-export function PublishedBody({ content, render, mine }: { content: PublishedContentView; render: Render; mine?: ReadonlySet<string> }) {
+export function PublishedBody({ content, render, mine, logoUrl }: { content: PublishedContentView; render: Render; mine?: ReadonlySet<string>; logoUrl?: string | null }) {
   const { t, i18n } = useTranslation();
   const { liturgy } = content;
   const items = content.items ?? [];
@@ -22,7 +23,11 @@ export function PublishedBody({ content, render, mine }: { content: PublishedCon
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold">{liturgy.service_name}</h1>
         <p>{longDate(liturgy.date, i18n.language)}{liturgy.time && ` · ${liturgy.time}`}</p>
-        <p className="text-muted-foreground">{liturgy.church_name}</p>
+        {/* The logo is the church's current one, not part of the stored copy (15 §2, L-5). */}
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <ChurchLogo url={logoUrl} className="h-8 w-auto max-w-24 shrink-0 object-contain" />
+          <p>{liturgy.church_name}</p>
+        </div>
       </header>
       {items.map((item) => {
         const yours = !!item.duty && !!mine?.has(item.duty.id);

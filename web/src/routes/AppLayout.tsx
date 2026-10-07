@@ -15,6 +15,7 @@ import { isReadingMode } from "@/lib/published";
 import i18n, { chooseLanguage } from "@/lib/i18n";
 import { meQuery } from "@/lib/queries";
 import { showPlanning, showSettings } from "@/lib/scopes";
+import { ChurchLogo } from "@/components/ChurchLogo";
 import { SystemBanners } from "@/components/SystemBanners";
 import { loginWithNext, paths } from "./paths";
 
@@ -93,7 +94,10 @@ export function AppLayout() {
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:p-2 print:hidden">{t("app.skip_to_content")}</a>
       <header className="border-b border-border print:hidden">
         <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-2 px-4 py-2">
-          <p className="mr-4 font-semibold">{me.data.church?.name ?? t("app.name")}</p>
+          <div className="mr-4 flex items-center gap-2">
+            <ChurchLogo url={me.data.church?.logo_url} className="h-8 w-auto max-w-24 shrink-0 object-contain" />
+            <p className="font-semibold">{me.data.church?.name ?? t("app.name")}</p>
+          </div>
           <nav aria-label={t("nav.label")} className="flex flex-1 flex-wrap gap-1">
             <NavLink to={paths.home} end className={link}>{t("nav.assignments")}</NavLink>
             <NavLink to={paths.published} className={link}>{t("nav.published")}</NavLink>

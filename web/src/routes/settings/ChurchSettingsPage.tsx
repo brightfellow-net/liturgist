@@ -16,6 +16,7 @@ import { contentLanguages, timeZones } from "@/lib/church";
 import { fieldErrors } from "@/lib/errors";
 import { languages } from "@/lib/i18n";
 import { churchQuery, meQuery, translationsQuery } from "@/lib/queries";
+import { ChurchLogoSection } from "./ChurchLogoSection";
 
 // Instant feedback only; the server's rules decide (05 §4).
 const schema = z.object({
@@ -67,7 +68,12 @@ export function ChurchSettingsPage() {
   const church = useQuery(churchQuery);
   if (church.error) return <ErrorAlert error={church.error} onRetry={() => void church.refetch()} />;
   if (!church.data) return <p role="status">{t("app.loading")}</p>;
-  return <ChurchForm church={church.data} />;
+  return (
+    <div className="space-y-8">
+      {church.data.actions.edit && <ChurchLogoSection church={church.data} />}
+      <ChurchForm church={church.data} />
+    </div>
+  );
 }
 
 function ChurchForm({ church }: { church: ChurchView }) {

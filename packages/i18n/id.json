@@ -166,7 +166,17 @@
     "show_credits": "Tampilkan keterangan hak cipta lagu pada liturgi yang dicetak dan diterbitkan",
     "licence_footer": "Baris lisensi",
     "licence_footer_hint": "Opsional. Dicetak di kaki setiap liturgi, mis. CCLI License #1234567. Disalin ke liturgi saat diterbitkan.",
-    "licence_footer_long": "Paling banyak 200 karakter."
+    "licence_footer_long": "Paling banyak 200 karakter.",
+    "logo": "Logo",
+    "logo_current": "Logo saat ini",
+    "logo_none": "Belum ada logo. Hanya nama gereja yang ditampilkan.",
+    "logo_hint": "Gambar PNG, JPEG, atau WebP, paling besar 2 MB. Logo tampil di kiri nama gereja dan diperkecil agar muat dalam 512 × 512 piksel. Logo persegi atau lebar dengan latar polos atau transparan paling baik.",
+    "logo_choose": "Pilih gambar",
+    "logo_uploading": "Mengunggah…",
+    "logo_remove": "Hapus logo",
+    "logo_type": "Pilih gambar PNG, JPEG, atau WebP.",
+    "logo_too_big": "Gambar lebih besar dari 2 MB. Pilih yang lebih kecil.",
+    "logo_invalid": "Server tidak dapat memakai gambar ini. Gunakan gambar PNG, JPEG, atau WebP paling besar 2 MB yang tidak beranimasi."
   },
   "members": {
     "title": "Anggota",

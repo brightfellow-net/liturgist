@@ -1,6 +1,7 @@
 // Copyright 2026 Brightfellow contributors
 // SPDX-License-Identifier: Apache-2.0
-import { Link, useParams, useSearchParams } from "react-router";
+import { Link, useOutletContext, useParams, useSearchParams } from "react-router";
+import type { Me } from "@liturgist/api-client";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Alert } from "@/components/ui/alert";
@@ -19,6 +20,7 @@ export function PrintPage() {
   const { t } = useTranslation();
   const { id = "" } = useParams();
   const [params, setParams] = useSearchParams();
+  const me = useOutletContext<Me | undefined>(); // none in a test without the app frame
   const copy = useQuery(publishedQuery(id));
   if (copy.isPending) return <p role="status">{t("app.loading")}</p>;
   if (isCode(copy.error, "not_found")) {
@@ -79,7 +81,7 @@ export function PrintPage() {
         </fieldset>
         <Button onClick={() => window.print()}>{t("print.print")}</Button>
       </div>
-      <PrintBody content={c.content} render={c.render} opts={opts} />
+      <PrintBody content={c.content} render={c.render} opts={opts} logoUrl={me?.church?.logo_url} />
     </div>
   );
 }

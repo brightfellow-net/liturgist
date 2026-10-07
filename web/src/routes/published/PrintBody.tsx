@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { useTranslation } from "react-i18next";
 import type { PublishedContentView, PublishedSongView } from "@liturgist/api-client";
+import { ChurchLogo } from "@/components/ChurchLogo";
 import { formatKey, keyChangeText, longDate } from "@/lib/liturgy";
 import { firstLine, pageSize, type PrintOptions } from "@/lib/print";
 
@@ -11,7 +12,7 @@ type Render = { key_display: string; show_credits: boolean };
 // text, escaped by React. The rules that keep a song heading with its first
 // section and a row of the sequence whole are `break-*` classes; the browser
 // applies them on a best-effort basis.
-export function PrintBody({ content, render, opts }: { content: PublishedContentView; render: Render; opts: PrintOptions }) {
+export function PrintBody({ content, render, opts, logoUrl }: { content: PublishedContentView; render: Render; opts: PrintOptions; logoUrl?: string | null }) {
   const { t, i18n } = useTranslation();
   const { liturgy } = content;
   const musician = opts.variant === "musician";
@@ -24,7 +25,10 @@ export function PrintBody({ content, render, opts }: { content: PublishedContent
     <article lang={liturgy.language} data-paper={opts.paper} data-variant={opts.variant} className={opts.size === "large" ? "text-xl" : "text-base"}>
       <style>{`@media print { @page { size: ${pageSize[opts.paper]}; margin: 15mm; } }`}</style>
       <header className="space-y-1 border-b border-border pb-3">
-        <p className="text-muted-foreground">{liturgy.church_name}</p>
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <ChurchLogo url={logoUrl} className="h-[14mm] w-auto max-w-[40mm] shrink-0 object-contain" />
+          <p>{liturgy.church_name}</p>
+        </div>
         <h1 className="text-2xl font-semibold">{liturgy.service_name}</h1>
         <p>{longDate(liturgy.date, i18n.language)}{liturgy.time && ` · ${liturgy.time}`}</p>
       </header>

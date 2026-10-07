@@ -166,7 +166,17 @@
     "show_credits": "Show song credits (copyright lines) on printed and published liturgies",
     "licence_footer": "Licence line",
     "licence_footer_hint": "Optional. Printed at the foot of each liturgy, e.g. CCLI License #1234567. Copied into a liturgy when it is published.",
-    "licence_footer_long": "At most 200 characters."
+    "licence_footer_long": "At most 200 characters.",
+    "logo": "Logo",
+    "logo_current": "The current logo",
+    "logo_none": "No logo yet. The church name is shown on its own.",
+    "logo_hint": "A PNG, JPEG or WebP image of at most 2 MB. It appears left of the church name and is shrunk to fit 512 × 512 pixels. A square or wide logo with a plain or transparent background works best.",
+    "logo_choose": "Choose image",
+    "logo_uploading": "Uploading…",
+    "logo_remove": "Remove logo",
+    "logo_type": "Choose a PNG, JPEG or WebP image.",
+    "logo_too_big": "The image is larger than 2 MB. Choose a smaller one.",
+    "logo_invalid": "The server could not use this image. Use a PNG, JPEG or WebP image of at most 2 MB that is not animated."
   },
   "members": {
     "title": "Members",

@@ -2,7 +2,7 @@
 
 > **Document type: Guide.** First draft with slice 6A of [14-self-host.md](../impl/14-self-host.md); the install guides and off-site details follow in slice 6E.
 
-Everything Liturgist stores is in one **data folder** (`./data` by default, or `LITURGIST_DATA_DIR`): the database `liturgist.db`, the uploaded `files/` and the `backups/` folder. A backup is one `.zip` file with the database and `files/` inside. It holds every user's data, including password hashes: keep it as private as the database itself.
+Everything Liturgist stores is in one **data folder** (`./data` by default, or `LITURGIST_DATA_DIR`): the database `liturgist.db`, the uploaded `files/` (today only the church logo, which a church admin sets under Settings → Church) and the `backups/` folder. A backup is one `.zip` file with the database and `files/` inside. It holds every user's data, including password hashes: keep it as private as the database itself.
 
 ## Make a backup
 

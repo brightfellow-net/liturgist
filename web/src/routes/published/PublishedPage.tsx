@@ -85,7 +85,7 @@ export function PublishedPage() {
       {c.content.format > knownPublishedFormat ? (
         <Alert variant="error">{t("published.update_app")}</Alert>
       ) : (
-        <PublishedBody content={c.content} render={c.render} mine={reading ? mine : undefined} />
+        <PublishedBody content={c.content} render={c.render} mine={reading ? mine : undefined} logoUrl={me.church?.logo_url} />
       )}
     </article>
   );
