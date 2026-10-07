@@ -12,12 +12,12 @@ You need [Docker](https://docs.docker.com/get-docker/) and [Git](https://git-scm
 git clone https://github.com/brightfellow-net/liturgist.git
 cd liturgist
 docker build -t liturgist:local .
-docker run -d --name liturgist -p 127.0.0.1:8080:8080 -v liturgist-data:/data \
-  -e LITURGIST_BASE_URL=http://localhost:8080 liturgist:local
+docker run -d --name liturgist --restart unless-stopped -p 127.0.0.1:8080:8080 \
+  -v liturgist-data:/data -e LITURGIST_BASE_URL=http://localhost:8080 liturgist:local
 docker logs liturgist
 ```
 
-The build takes a few minutes the first time.
+The build takes a few minutes the first time. `--restart unless-stopped` starts it again after a reboot of the computer.
 
 Open the **setup link** shown in the log to create your church and its first administrator. That is a trial on one computer. For a real installation, with HTTPS and backups, follow a guide below.
 

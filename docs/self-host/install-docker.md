@@ -16,12 +16,15 @@ docker build -t liturgist:local .
 
 ```
 docker run -d --name liturgist \
+  --restart unless-stopped \
   -p 127.0.0.1:8080:8080 \
   -v liturgist-data:/data \
   -e LITURGIST_BASE_URL=http://localhost:8080 \
   liturgist:local
 docker logs liturgist
 ```
+
+`--restart unless-stopped` starts the container again after a reboot of the computer or a restart of Docker; without it the app stays down until you run `docker start liturgist`. A container you already started without it can be changed with `docker update --restart unless-stopped liturgist`.
 
 The log shows a framed **setup link**. Open it in your browser to create your church and the first administrator. A new link is printed by:
 
