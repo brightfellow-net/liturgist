@@ -60,19 +60,28 @@ type ItemSongInput struct {
 	Entries []EntryInput `json:"entries" maxItems:"1000" doc:"the sequence: 0 to 100 entries"`
 }
 
+// liturgyPath is the path parameter of the operations of one liturgy.
+type liturgyPath struct {
+	ID string `path:"id" maxLength:"26"`
+}
+
 // RegisterLiturgies registers the liturgy operations (10 §4).
 func RegisterLiturgies(api huma.API, d LiturgyDeps) {
-	fail := func(ctx context.Context, err error) error { return MapError(ctx, err, d.Log) }
-	sess := func(ctx context.Context) *domain.Session { return RequestInfoFrom(ctx).Session }
-	actor := func(ctx context.Context) string { return string(sess(ctx).UserID) }
-	lop := func(id, method, path string, status int, summary string) huma.Operation {
-		return tagged(op(id, method, path, TenancyChurch, status, summary), "liturgies")
-	}
-	type liturgyPath struct {
-		ID string `path:"id" maxLength:"26"`
-	}
+	registerLiturgyWeek(api, d)
+	registerLiturgyCrud(api, d)
+	registerLiturgyItems(api, d)
+	registerLiturgyAssignments(api, d)
+	registerLiturgyUndo(api, d)
+	registerLiturgyReview(api, d)
+	registerLiturgyHistory(api, d)
+}
 
-	// The fixed paths prepare and assignable come before {id}: a ULID can never equal them.
+// registerLiturgyWeek registers the preparation of a week and the list of members who can be
+// assigned. The fixed paths prepare and assignable come before {id}: a ULID can never equal them.
+func registerLiturgyWeek(api huma.API, d LiturgyDeps) {
+	fail, sess := failer(d.Log), sessionOf
+	actor := actorOf
+	lop := churchOp("liturgies")
 
 	huma.Register(api, lop("getPrepareWeek", http.MethodGet, "/liturgies/prepare", http.StatusOK, "The service times of a week and which have a liturgy"),
 		func(ctx context.Context, in *struct {
@@ -170,8 +179,20 @@ func RegisterLiturgies(api huma.API, d LiturgyDeps) {
 			}
 			return out, nil
 		})
+}
 
-	// --- liturgies ---
+// registerLiturgyCrud registers listing, creating, reading, changing and deleting a liturgy, and
+// its edit history.
+func registerLiturgyCrud(api huma.API, d LiturgyDeps) {
+	registerLiturgyOpen(api, d)
+	registerLiturgyChange(api, d)
+}
+
+// registerLiturgyOpen registers listing, creating and reading a liturgy.
+func registerLiturgyOpen(api huma.API, d LiturgyDeps) {
+	fail, sess := failer(d.Log), sessionOf
+	actor := actorOf
+	lop := churchOp("liturgies")
 
 	huma.Register(api, lop("listLiturgies", http.MethodGet, "/liturgies", http.StatusOK, "List the liturgies the caller may see"),
 		func(ctx context.Context, in *struct {
@@ -244,6 +265,14 @@ func RegisterLiturgies(api huma.API, d LiturgyDeps) {
 			}
 			return &liturgyOutput{Body: liturgyView(v)}, nil
 		})
+}
+
+// registerLiturgyChange registers changing and deleting a liturgy, and its edit history.
+func registerLiturgyChange(api huma.API, d LiturgyDeps) {
+	fail, sess := failer(d.Log), sessionOf
+	actor := actorOf
+	lop := churchOp("liturgies")
+
 	huma.Register(api, lop("updateLiturgy", http.MethodPatch, "/liturgies/{id}", http.StatusOK, "Change the date, time or name of a liturgy"),
 		func(ctx context.Context, in *struct {
 			ID   string `path:"id" maxLength:"26"`
@@ -294,8 +323,19 @@ func RegisterLiturgies(api huma.API, d LiturgyDeps) {
 			}
 			return out, nil
 		})
+}
 
-	// --- items ---
+// registerLiturgyItems registers the items of a liturgy and the songs on them.
+func registerLiturgyItems(api huma.API, d LiturgyDeps) {
+	registerLiturgyItemEdits(api, d)
+	registerLiturgyItemSongs(api, d)
+}
+
+// registerLiturgyItemEdits registers adding, changing, removing and reordering the items.
+func registerLiturgyItemEdits(api huma.API, d LiturgyDeps) {
+	fail, sess := failer(d.Log), sessionOf
+	actor := actorOf
+	lop := churchOp("liturgies")
 
 	huma.Register(api, lop("addLiturgyItem", http.MethodPost, "/liturgies/{id}/items", http.StatusCreated, "Add an item"),
 		func(ctx context.Context, in *struct {
@@ -379,6 +419,14 @@ func RegisterLiturgies(api huma.API, d LiturgyDeps) {
 			d.Log.Info("items_reordered", "actor", actor(ctx), "liturgy_id", in.ID)
 			return &orderOutput{Body: orderResultView(r)}, nil
 		})
+}
+
+// registerLiturgyItemSongs registers the songs on an item and their sequence.
+func registerLiturgyItemSongs(api huma.API, d LiturgyDeps) {
+	fail, sess := failer(d.Log), sessionOf
+	actor := actorOf
+	lop := churchOp("liturgies")
+
 	huma.Register(api, lop("addItemSong", http.MethodPost, "/liturgies/{id}/items/{iid}/songs", http.StatusCreated, "Add a song with its sequence filled"),
 		func(ctx context.Context, in *struct {
 			ID     string `path:"id" maxLength:"26"`
@@ -421,6 +469,13 @@ func RegisterLiturgies(api huma.API, d LiturgyDeps) {
 			d.Log.Info("item_songs_set", "actor", actor(ctx), "liturgy_id", in.ID, "item_id", in.ItemID)
 			return &itemResultOutput{Body: itemResultView(r)}, nil
 		})
+}
+
+// registerLiturgyAssignments registers adding and removing an assignment.
+func registerLiturgyAssignments(api huma.API, d LiturgyDeps) {
+	fail, sess := failer(d.Log), sessionOf
+	actor := actorOf
+	lop := churchOp("liturgies")
 
 	// --- assignments ---
 
@@ -442,6 +497,26 @@ func RegisterLiturgies(api huma.API, d LiturgyDeps) {
 			d.Log.Info("assignment_added", "actor", actor(ctx), "liturgy_id", in.ID, "assignment_id", string(v.Assignment.ID))
 			return &struct{ Body AssignmentView }{Body: assignmentView(v)}, nil
 		})
+
+	huma.Register(api, lop("removeAssignment", http.MethodDelete, "/liturgies/{id}/assignments/{aid}", http.StatusNoContent, "Remove an assignment"),
+		func(ctx context.Context, in *struct {
+			ID           string `path:"id" maxLength:"26"`
+			AssignmentID string `path:"aid" maxLength:"26"`
+		}) (*struct{}, error) {
+			if err := d.Liturgies.RemoveAssignment(ctx, sess(ctx), domain.LiturgyID(in.ID), domain.AssignmentID(in.AssignmentID)); err != nil {
+				return nil, fail(ctx, err)
+			}
+			d.Log.Info("assignment_removed", "actor", actor(ctx), "liturgy_id", in.ID, "assignment_id", in.AssignmentID)
+			return nil, nil
+		})
+}
+
+// registerLiturgyUndo registers undo and redo of the caller's edits.
+func registerLiturgyUndo(api huma.API, d LiturgyDeps) {
+	fail, sess := failer(d.Log), sessionOf
+	actor := actorOf
+	lop := churchOp("liturgies")
+
 	undoOut := func(id string, undo bool) func(ctx context.Context, in *struct {
 		ID string `path:"id" maxLength:"26"`
 	}) (*struct{ Body UndoResultView }, error) {
@@ -464,6 +539,14 @@ func RegisterLiturgies(api huma.API, d LiturgyDeps) {
 		"Undo the caller's newest edit that nobody else has touched since"), undoOut("undone", true))
 	huma.Register(api, lop("redoLiturgyEdit", http.MethodPost, "/liturgies/{id}/redo", http.StatusOK,
 		"Apply again the edit the caller undid last"), undoOut("redone", false))
+}
+
+// registerLiturgyReview registers the review transitions, the published copy and archiving.
+func registerLiturgyReview(api huma.API, d LiturgyDeps) {
+	fail, sess := failer(d.Log), sessionOf
+	actor := actorOf
+	lop := churchOp("liturgies")
+
 	type reviewBody struct {
 		Note string `json:"note,omitempty" maxLength:"4000" doc:"at most 500 characters after trimming"`
 	}
@@ -524,6 +607,14 @@ func RegisterLiturgies(api huma.API, d LiturgyDeps) {
 	}
 	archiveOp("archiveLiturgy", "/liturgies/{id}/archive", "Archive a published liturgy", "liturgy_archived", d.Liturgies.Archive)
 	archiveOp("unarchiveLiturgy", "/liturgies/{id}/unarchive", "Make an archived liturgy active again", "liturgy_unarchived", d.Liturgies.Unarchive)
+}
+
+// registerLiturgyHistory registers the review history and the comments.
+func registerLiturgyHistory(api huma.API, d LiturgyDeps) {
+	fail, sess := failer(d.Log), sessionOf
+	actor := actorOf
+	lop := churchOp("liturgies")
+
 	huma.Register(api, lop("listLiturgyStateChanges", http.MethodGet, "/liturgies/{id}/state-changes", http.StatusOK, "The review history of a liturgy, newest first"),
 		func(ctx context.Context, in *struct {
 			ID     string `path:"id" maxLength:"26"`
@@ -605,17 +696,6 @@ func RegisterLiturgies(api huma.API, d LiturgyDeps) {
 			}
 			d.Log.Info(event, "actor", actor(ctx), "liturgy_id", in.ID, "comment_id", in.CID)
 			return &struct{ Body CommentView }{Body: commentView(c)}, nil
-		})
-	huma.Register(api, lop("removeAssignment", http.MethodDelete, "/liturgies/{id}/assignments/{aid}", http.StatusNoContent, "Remove an assignment"),
-		func(ctx context.Context, in *struct {
-			ID           string `path:"id" maxLength:"26"`
-			AssignmentID string `path:"aid" maxLength:"26"`
-		}) (*struct{}, error) {
-			if err := d.Liturgies.RemoveAssignment(ctx, sess(ctx), domain.LiturgyID(in.ID), domain.AssignmentID(in.AssignmentID)); err != nil {
-				return nil, fail(ctx, err)
-			}
-			d.Log.Info("assignment_removed", "actor", actor(ctx), "liturgy_id", in.ID, "assignment_id", in.AssignmentID)
-			return nil, nil
 		})
 }
 

@@ -28,14 +28,22 @@ type ParsedReferenceView struct {
 	Display   string `json:"display" doc:"as typed, spaces collapsed"`
 }
 
+// readingResult is the response body of one reading with the caller's actions.
+func readingResult(v app.ReadingView) *readingOutput {
+	return &readingOutput{Body: readingView(v.Reading, v.Actions)}
+}
+
 // registerReadings registers the readings operations (07 §4).
 func registerReadings(api huma.API, d LibraryDeps) {
-	fail := func(ctx context.Context, err error) error { return MapError(ctx, err, d.Log) }
-	sess := func(ctx context.Context) *domain.Session { return RequestInfoFrom(ctx).Session }
-	readingOp := func(id, method, path string, status int, summary string) huma.Operation {
-		return tagged(op(id, method, path, TenancyChurch, status, summary), "library")
-	}
-	view := func(v app.ReadingView) *readingOutput { return &readingOutput{Body: readingView(v.Reading, v.Actions)} }
+	registerReadingLookup(api, d)
+	registerReadingBrowse(api, d)
+	registerReadingWrite(api, d)
+}
+
+// registerReadingLookup registers understanding a typed reference and finding its text.
+func registerReadingLookup(api huma.API, d LibraryDeps) {
+	fail, sess := failer(d.Log), sessionOf
+	readingOp := churchOp("library")
 
 	huma.Register(api, readingOp("parseReference", http.MethodGet, "/readings/parse", http.StatusOK, "Understand a typed Bible reference"),
 		func(ctx context.Context, in *struct {
@@ -71,6 +79,13 @@ func registerReadings(api huma.API, d LibraryDeps) {
 			}
 			return &struct{ Body LookupView }{out}, nil
 		})
+}
+
+// registerReadingBrowse registers searching, listing and reading saved readings.
+func registerReadingBrowse(api huma.API, d LibraryDeps) {
+	fail, sess := failer(d.Log), sessionOf
+	readingOp := churchOp("library")
+	view := readingResult
 
 	huma.Register(api, readingOp("listReadings", http.MethodGet, "/readings", http.StatusOK, "Search and list readings"),
 		func(ctx context.Context, in *struct {
@@ -101,6 +116,13 @@ func registerReadings(api huma.API, d LibraryDeps) {
 			}
 			return view(v), nil
 		})
+}
+
+// registerReadingWrite registers saving, changing and deleting readings.
+func registerReadingWrite(api huma.API, d LibraryDeps) {
+	fail, sess := failer(d.Log), sessionOf
+	readingOp := churchOp("library")
+	view := readingResult
 
 	huma.Register(api, readingOp("createReading", http.MethodPost, "/readings", http.StatusCreated, "Save a reading typed or pasted by a member"),
 		func(ctx context.Context, in *struct {

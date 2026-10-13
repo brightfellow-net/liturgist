@@ -73,23 +73,23 @@ type NameEntry struct {
 // ValidateEntryName trims and checks a duty or singing-part name and returns
 // its folded key. Failures are InvalidInputError values.
 func ValidateEntryName(kind ListKind, name *string) (key string, err error) {
-	return validateName(name, "name", kind.MaxLen())
+	return validateName(name, kind.MaxLen())
 }
 
 // validateName trims a one-line name of 1..limit characters with at least one
 // letter or digit, and returns Fold(name).
-func validateName(name *string, field string, limit int) (string, error) {
+func validateName(name *string, limit int) (string, error) {
 	*name = strings.TrimSpace(*name)
 	n := utf8.RuneCountInString(*name)
 	if n < 1 || n > limit {
-		return "", &InvalidInputError{Field: field, Message: "1 to " + strconv.Itoa(limit) + " characters."}
+		return "", &InvalidInputError{Field: "name", Message: "1 to " + strconv.Itoa(limit) + " characters."}
 	}
 	if strings.IndexFunc(*name, unicode.IsControl) >= 0 {
-		return "", &InvalidInputError{Field: field, Message: "No line breaks."}
+		return "", &InvalidInputError{Field: "name", Message: "No line breaks."}
 	}
 	key := Fold(*name)
 	if key == "" {
-		return "", &InvalidInputError{Field: field, Message: "Use at least one letter or digit."}
+		return "", &InvalidInputError{Field: "name", Message: "Use at least one letter or digit."}
 	}
 	return key, nil
 }
@@ -145,7 +145,7 @@ type Template struct {
 // ValidateTemplate trims and checks a template and its items (09 §2.2, §2.3)
 // and sets NameKey. The duties are checked by the use case.
 func ValidateTemplate(t *Template) error {
-	key, err := validateName(&t.Name, "name", MaxPlanningName)
+	key, err := validateName(&t.Name, MaxPlanningName)
 	if err != nil {
 		return err
 	}
@@ -206,7 +206,7 @@ func ValidClock(s string) bool { return clockRe.MatchString(s) }
 // ValidateService trims and checks a service, sorts its times by weekday and
 // time, and sets NameKey. The template is checked by the use case.
 func ValidateService(s *Service) error {
-	key, err := validateName(&s.Name, "name", MaxPlanningName)
+	key, err := validateName(&s.Name, MaxPlanningName)
 	if err != nil {
 		return err
 	}

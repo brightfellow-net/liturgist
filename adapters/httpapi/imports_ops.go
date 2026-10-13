@@ -188,11 +188,15 @@ type importPath struct {
 
 // registerImports registers the import operations (08 §5). Every one needs library.edit.
 func registerImports(api huma.API, d LibraryDeps) {
-	fail := func(ctx context.Context, err error) error { return MapError(ctx, err, d.Log) }
-	sess := func(ctx context.Context) *domain.Session { return RequestInfoFrom(ctx).Session }
-	importOp := func(id, method, path string, status int, summary string) huma.Operation {
-		return tagged(op(id, method, path, TenancyChurch, status, summary), "library")
-	}
+	registerImportBatches(api, d)
+	registerImportCandidates(api, d)
+	registerImportFinish(api, d)
+}
+
+// registerImportBatches registers creating, listing and reading import batches.
+func registerImportBatches(api huma.API, d LibraryDeps) {
+	fail, sess := failer(d.Log), sessionOf
+	importOp := churchOp("library")
 
 	create := importOp("createImport", http.MethodPost, "/imports", http.StatusCreated, "Parse files into an import batch")
 	create.MaxBodyBytes = maxImportBody
@@ -249,6 +253,12 @@ func registerImports(api huma.API, d LibraryDeps) {
 			}
 			return &importBatchOutput{Body: batchView(v)}, nil
 		})
+}
+
+// registerImportCandidates registers changing, deciding and previewing the candidates of a batch.
+func registerImportCandidates(api huma.API, d LibraryDeps) {
+	fail, sess := failer(d.Log), sessionOf
+	importOp := churchOp("library")
 
 	huma.Register(api, importOp("updateImportCandidate", http.MethodPatch, "/imports/{id}/candidates/{cid}", http.StatusOK, "Change a candidate's draft"),
 		func(ctx context.Context, in *struct {
@@ -308,6 +318,12 @@ func registerImports(api huma.API, d LibraryDeps) {
 			}
 			return &struct{ Body MergePreviewView }{out}, nil
 		})
+}
+
+// registerImportFinish registers applying and discarding a batch.
+func registerImportFinish(api huma.API, d LibraryDeps) {
+	fail, sess := failer(d.Log), sessionOf
+	importOp := churchOp("library")
 
 	huma.Register(api, importOp("applyImport", http.MethodPost, "/imports/{id}/apply", http.StatusOK, "Create or merge the chosen songs"),
 		func(ctx context.Context, in *importPath) (*struct{ Body ApplyResultView }, error) {

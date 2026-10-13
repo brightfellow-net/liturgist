@@ -53,11 +53,20 @@ type songListOutput struct {
 func RegisterLibrary(api huma.API, d LibraryDeps) {
 	registerReadings(api, d)
 	registerImports(api, d)
-	fail := func(ctx context.Context, err error) error { return MapError(ctx, err, d.Log) }
-	sess := func(ctx context.Context) *domain.Session { return RequestInfoFrom(ctx).Session }
-	songOp := func(id, method, path string, status int, summary string) huma.Operation {
-		return tagged(op(id, method, path, TenancyChurch, status, summary), "library")
-	}
+	registerSongs(api, d)
+	registerSongLinks(api, d)
+}
+
+// registerSongs registers searching, reading, adding, changing and deleting songs.
+func registerSongs(api huma.API, d LibraryDeps) {
+	registerSongsReadCreate(api, d)
+	registerSongsChange(api, d)
+}
+
+// registerSongsReadCreate registers searching, reading and adding songs.
+func registerSongsReadCreate(api huma.API, d LibraryDeps) {
+	fail, sess := failer(d.Log), sessionOf
+	songOp := churchOp("library")
 
 	huma.Register(api, songOp("listSongs", http.MethodGet, "/songs", http.StatusOK, "Search and list songs"),
 		func(ctx context.Context, in *struct {
@@ -124,6 +133,12 @@ func RegisterLibrary(api huma.API, d LibraryDeps) {
 			d.Log.Info("song_created", "actor", string(sess(ctx).UserID), "song_id", string(v.Song.ID))
 			return &songOutput{Body: songView(v)}, nil
 		})
+}
+
+// registerSongsChange registers changing and deleting a song.
+func registerSongsChange(api huma.API, d LibraryDeps) {
+	fail, sess := failer(d.Log), sessionOf
+	songOp := churchOp("library")
 
 	huma.Register(api, songOp("updateSong", http.MethodPatch, "/songs/{id}", http.StatusOK, "Change a song, its sections or its arrangement"),
 		func(ctx context.Context, in *struct {
@@ -178,6 +193,12 @@ func RegisterLibrary(api huma.API, d LibraryDeps) {
 			d.Log.Info("song_deleted", "actor", string(sess(ctx).UserID), "song_id", in.ID)
 			return nil, nil
 		})
+}
+
+// registerSongLinks registers linking and unlinking the versions of one hymn in other languages.
+func registerSongLinks(api huma.API, d LibraryDeps) {
+	fail, sess := failer(d.Log), sessionOf
+	songOp := churchOp("library")
 
 	huma.Register(api, songOp("linkSong", http.MethodPost, "/songs/{id}/link", http.StatusOK, "Link another-language version of the same hymn"),
 		func(ctx context.Context, in *struct {

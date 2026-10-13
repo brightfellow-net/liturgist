@@ -37,12 +37,16 @@ type serviceOutput struct{ Body ServiceView }
 // RegisterPlanning registers the duties, singing parts, templates and
 // services operations (09 §4).
 func RegisterPlanning(api huma.API, d PlanningDeps) {
-	fail := func(ctx context.Context, err error) error { return MapError(ctx, err, d.Log) }
-	sess := func(ctx context.Context) *domain.Session { return RequestInfoFrom(ctx).Session }
-	planOp := func(id, method, path string, status int, summary string) huma.Operation {
-		return tagged(op(id, method, path, TenancyChurch, status, summary), "planning")
-	}
-	actor := func(ctx context.Context) string { return string(sess(ctx).UserID) }
+	registerNameLists(api, d)
+	registerTemplates(api, d)
+	registerServices(api, d)
+}
+
+// registerNameLists registers the duties and the singing parts, which share one set of operations.
+func registerNameLists(api huma.API, d PlanningDeps) {
+	fail, sess := failer(d.Log), sessionOf
+	actor := actorOf
+	planOp := churchOp("planning")
 
 	registerList := func(kind domain.ListKind, path, noun, one, many string) {
 		huma.Register(api, planOp("list"+many, http.MethodGet, path, http.StatusOK, "List the "+noun+" in order"),
@@ -108,6 +112,13 @@ func RegisterPlanning(api huma.API, d PlanningDeps) {
 	}
 	registerList(domain.KindDuty, "/duties", "duties", "Duty", "Duties")
 	registerList(domain.KindSingingPart, "/singing-parts", "singing parts", "SingingPart", "SingingParts")
+}
+
+// registerTemplates registers the templates.
+func registerTemplates(api huma.API, d PlanningDeps) {
+	fail, sess := failer(d.Log), sessionOf
+	actor := actorOf
+	planOp := churchOp("planning")
 
 	// --- templates ---
 
@@ -188,6 +199,13 @@ func RegisterPlanning(api huma.API, d PlanningDeps) {
 			d.Log.Info("template_deleted", "actor", actor(ctx), "template_id", in.ID)
 			return nil, nil
 		})
+}
+
+// registerServices registers the regular services.
+func registerServices(api huma.API, d PlanningDeps) {
+	fail, sess := failer(d.Log), sessionOf
+	actor := actorOf
+	planOp := churchOp("planning")
 
 	// --- services ---
 

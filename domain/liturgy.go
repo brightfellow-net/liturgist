@@ -245,7 +245,7 @@ func ValidateItemSong(s *LiturgySong, field string) error {
 
 // ValidateAssignmentName trims and checks a free-text name and returns Fold(name).
 func ValidateAssignmentName(name *string) (string, error) {
-	return validateName(name, "name", MaxAssignmentName)
+	return validateName(name, MaxAssignmentName)
 }
 
 // SectionDisplay is the text a section shows in a sequence: its own label, or

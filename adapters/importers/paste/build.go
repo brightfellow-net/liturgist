@@ -104,7 +104,7 @@ func Build(items []Item, language string) Result {
 	byLabel := map[labelKey]int{} // written label → section index
 	usedVerse := map[int]bool{}   // verse numbers given out
 	repeated := false
-	add := func(sec domain.DraftSection, key *labelKey) int {
+	add := func(sec domain.DraftSection, key *labelKey) {
 		r.Sections = append(r.Sections, sec)
 		i := len(r.Sections) - 1
 		byText[fold(sec.Text)] = i
@@ -114,7 +114,6 @@ func Build(items []Item, language string) Result {
 			}
 		}
 		r.Arrangement = append(r.Arrangement, i)
-		return i
 	}
 	repeat := func(i int) {
 		repeated = true

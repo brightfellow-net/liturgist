@@ -127,8 +127,18 @@ type idPath struct {
 // RegisterChurch registers the setup, church, member, role, invite and reset
 // operations (03 §7–§10, 04 §6).
 func RegisterChurch(api huma.API, d ChurchDeps) {
-	fail := func(ctx context.Context, err error) error { return MapError(ctx, err, d.Log) }
-	sess := func(ctx context.Context) *domain.Session { return RequestInfoFrom(ctx).Session }
+	registerSetup(api, d)
+	registerChurchSettings(api, d)
+	registerMembers(api, d)
+	registerRoles(api, d)
+	registerInvites(api, d)
+	registerPasswordReset(api, d)
+}
+
+// registerSetup registers the first-time setup and the list of Bible translations, which need no
+// church.
+func registerSetup(api huma.API, d ChurchDeps) {
+	fail := failer(d.Log)
 
 	// --- setup (platform) ---
 
@@ -194,6 +204,11 @@ func RegisterChurch(api huma.API, d ChurchDeps) {
 			}
 			return out, nil
 		})
+}
+
+// registerChurchSettings registers reading and changing the church settings and its logo.
+func registerChurchSettings(api huma.API, d ChurchDeps) {
+	fail, sess := failer(d.Log), sessionOf
 
 	// --- church ---
 
@@ -247,6 +262,11 @@ func RegisterChurch(api huma.API, d ChurchDeps) {
 		})
 
 	registerLogo(api, d)
+}
+
+// registerMembers registers the members of the church.
+func registerMembers(api huma.API, d ChurchDeps) {
+	fail, sess := failer(d.Log), sessionOf
 
 	// --- members ---
 
@@ -300,6 +320,11 @@ func RegisterChurch(api huma.API, d ChurchDeps) {
 			d.Log.Info("reset_link_created", "actor", string(sess(ctx).UserID), "target_user_id", string(res.User.ID))
 			return &linkOutput{Body: LinkView{Link: res.Link, ExpiresAt: res.ExpiresAt}}, nil
 		})
+}
+
+// registerRoles registers the roles and the list of scopes.
+func registerRoles(api huma.API, d ChurchDeps) {
+	fail, sess := failer(d.Log), sessionOf
 
 	// --- roles ---
 
@@ -375,6 +400,11 @@ func RegisterChurch(api huma.API, d ChurchDeps) {
 			}
 			return out, nil
 		})
+}
+
+// registerInvites registers creating, regenerating and cancelling invites, and accepting them.
+func registerInvites(api huma.API, d ChurchDeps) {
+	fail, sess := failer(d.Log), sessionOf
 
 	// --- invites ---
 
@@ -476,6 +506,11 @@ func RegisterChurch(api huma.API, d ChurchDeps) {
 			d.Log.Info("invite_accepted", "user_id", string(sess(ctx).UserID))
 			return &statusOnlyOutput{Status: status}, nil
 		})
+}
+
+// registerPasswordReset registers looking at a reset link and setting a new password.
+func registerPasswordReset(api huma.API, d ChurchDeps) {
+	fail := failer(d.Log)
 
 	// --- password reset (platform) ---
 
