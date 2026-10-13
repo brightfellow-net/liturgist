@@ -32,6 +32,24 @@ func encodeJSON(v any) ([]byte, error) {
 	return bytes.TrimRight(b.Bytes(), "\n"), nil
 }
 
+// copyBuilder holds what buildPublished looks up while it makes a copy.
+type copyBuilder struct {
+	ctx    context.Context
+	sc     churchScope
+	l      domain.Liturgy
+	duties map[string]string // id → name
+	parts  map[string]string // singing part id → name
+	songs  map[domain.SongID]domain.Song
+}
+
+// ref is the id and the name of a duty or singing part now, for the copy.
+func (b *copyBuilder) ref(m map[string]string, id string) *domain.PublishedRef {
+	if id == "" {
+		return nil
+	}
+	return &domain.PublishedRef{ID: id, Name: m[id]}
+}
+
 // buildPublished makes the self-contained copy of a liturgy (13 §3) inside the
 // publishing transaction. It refuses a liturgy with problems (defence in depth:
 // step 4 refuses them at submit) and a copy over the size cap.
@@ -47,87 +65,116 @@ func buildPublished(ctx context.Context, sc churchScope, l domain.Liturgy) (cont
 	if p := domain.Problems(items); len(p) > 0 {
 		return nil, nil, &HasProblemsError{Problems: p}
 	}
-	duties, err := nameMap(ctx, sc.cs.Duties())
-	if err != nil {
+	b := &copyBuilder{ctx: ctx, sc: sc, l: l, songs: map[domain.SongID]domain.Song{}}
+	if b.duties, err = nameMap(ctx, sc.cs.Duties()); err != nil {
 		return nil, nil, err
 	}
-	parts, err := nameMap(ctx, sc.cs.SingingParts())
-	if err != nil {
+	if b.parts, err = nameMap(ctx, sc.cs.SingingParts()); err != nil {
 		return nil, nil, err
-	}
-	ref := func(m map[string]string, id string) *domain.PublishedRef {
-		if id == "" {
-			return nil
-		}
-		return &domain.PublishedRef{ID: id, Name: m[id]}
 	}
 	c := domain.PublishedContent{Format: domain.PublishedFormat, Items: make([]domain.PublishedItem, 0, len(items)),
 		Liturgy:       domain.PublishedLiturgy{Date: l.Date, Time: l.Time, ServiceName: l.ServiceName, Language: l.Language, ChurchName: church.Name},
 		LicenceFooter: church.Settings.LicenceFooter}
-	songs := map[domain.SongID]domain.Song{}
 	sizes := make([]int, len(items))
 	for i, it := range items {
-		pi := domain.PublishedItem{ID: it.ID, Position: it.Position, Type: it.Type, Title: it.Title, Text: it.Text,
-			Duty: ref(duties, string(it.DutyID))}
-		if it.ReadingID != "" {
-			r, err := sc.cs.Readings().ByID(ctx, it.ReadingID)
-			if err != nil {
-				return nil, nil, err
-			}
-			pi.Reading = &domain.PublishedReading{ReferenceDisplay: r.ReferenceDisplay, TranslationCode: r.Translation.Code,
-				Text: r.Text, Attribution: r.Attribution}
-		}
-		for _, s := range it.Songs {
-			song, ok := songs[s.SongID]
-			if !ok {
-				if song, err = sc.cs.Songs().ByID(ctx, s.SongID); err != nil {
-					return nil, nil, err
-				}
-				songs[s.SongID] = song
-			}
-			ps := domain.PublishedSong{SongID: song.ID, Title: song.Title, HymnalSource: song.HymnalSource, HymnalNumber: song.HymnalNumber,
-				Key: s.Key, Note: s.Note, CopyrightHolder: song.CopyrightHolder, CopyrightLine: song.CopyrightLine,
-				CCLISongNumber: song.CCLISongNumber, Sections: []domain.PublishedSection{}, Entries: make([]domain.PublishedEntry, 0, len(s.Entries))}
-			used := map[domain.SectionID]bool{}
-			for _, e := range s.Entries {
-				if !used[e.SectionID] {
-					idx := -1
-					for k := range song.Sections {
-						if song.Sections[k].ID == e.SectionID {
-							idx = k
-						}
-					}
-					if idx < 0 {
-						return nil, nil, fmt.Errorf("section %s is not a section of song %s", e.SectionID, song.ID)
-					}
-					sec := song.Sections[idx]
-					ps.Sections = append(ps.Sections, domain.PublishedSection{ID: sec.ID, Kind: sec.Kind, Number: sec.Number,
-						Label: domain.SectionLabelIn(sec, l.Language), Text: sec.Text})
-					used[e.SectionID] = true
-				}
-				ps.Entries = append(ps.Entries, domain.PublishedEntry{SectionID: e.SectionID, Part: ref(parts, string(e.SingingPartID)),
-					KeyChange: e.KeyChange, Note: e.Note})
-			}
-			pi.Songs = append(pi.Songs, ps)
-		}
-		b, err := encodeJSON(pi)
+		pi, err := b.item(it)
 		if err != nil {
 			return nil, nil, err
 		}
-		sizes[i] = len(b)
+		enc, err := encodeJSON(pi)
+		if err != nil {
+			return nil, nil, err
+		}
+		sizes[i] = len(enc)
 		c.Items = append(c.Items, pi)
 	}
-	as, err := sc.cs.Assignments().ByLiturgy(ctx, l.ID)
+	if c.Assignments, assignees, err = b.assignments(); err != nil {
+		return nil, nil, err
+	}
+	content, err = encodeJSON(c)
 	if err != nil {
 		return nil, nil, err
 	}
+	if len(content) > domain.MaxPublishedBytes {
+		return nil, nil, tooLarge(items, sizes)
+	}
+	return content, assignees, nil
+}
+
+// item makes the copy of one item, with its reading and its songs.
+func (b *copyBuilder) item(it domain.Item) (domain.PublishedItem, error) {
+	pi := domain.PublishedItem{ID: it.ID, Position: it.Position, Type: it.Type, Title: it.Title, Text: it.Text,
+		Duty: b.ref(b.duties, string(it.DutyID))}
+	if it.ReadingID != "" {
+		r, err := b.sc.cs.Readings().ByID(b.ctx, it.ReadingID)
+		if err != nil {
+			return pi, err
+		}
+		pi.Reading = &domain.PublishedReading{ReferenceDisplay: r.ReferenceDisplay, TranslationCode: r.Translation.Code,
+			Text: r.Text, Attribution: r.Attribution}
+	}
+	for _, s := range it.Songs {
+		ps, err := b.song(s)
+		if err != nil {
+			return pi, err
+		}
+		pi.Songs = append(pi.Songs, ps)
+	}
+	return pi, nil
+}
+
+// song makes the copy of one song of an item: the song as it is now, the
+// sections its sequence uses (once each, in first-use order) and the sequence.
+func (b *copyBuilder) song(s domain.LiturgySong) (domain.PublishedSong, error) {
+	song, ok := b.songs[s.SongID]
+	if !ok {
+		var err error
+		if song, err = b.sc.cs.Songs().ByID(b.ctx, s.SongID); err != nil {
+			return domain.PublishedSong{}, err
+		}
+		b.songs[s.SongID] = song
+	}
+	ps := domain.PublishedSong{SongID: song.ID, Title: song.Title, HymnalSource: song.HymnalSource, HymnalNumber: song.HymnalNumber,
+		Key: s.Key, Note: s.Note, CopyrightHolder: song.CopyrightHolder, CopyrightLine: song.CopyrightLine,
+		CCLISongNumber: song.CCLISongNumber, Sections: []domain.PublishedSection{}, Entries: make([]domain.PublishedEntry, 0, len(s.Entries))}
+	used := map[domain.SectionID]bool{}
+	for _, e := range s.Entries {
+		if !used[e.SectionID] {
+			idx := -1
+			for k := range song.Sections {
+				if song.Sections[k].ID == e.SectionID {
+					idx = k
+				}
+			}
+			if idx < 0 {
+				return domain.PublishedSong{}, fmt.Errorf("section %s is not a section of song %s", e.SectionID, song.ID)
+			}
+			sec := song.Sections[idx]
+			ps.Sections = append(ps.Sections, domain.PublishedSection{ID: sec.ID, Kind: sec.Kind, Number: sec.Number,
+				Label: domain.SectionLabelIn(sec, b.l.Language), Text: sec.Text})
+			used[e.SectionID] = true
+		}
+		ps.Entries = append(ps.Entries, domain.PublishedEntry{SectionID: e.SectionID, Part: b.ref(b.parts, string(e.SingingPartID)),
+			KeyChange: e.KeyChange, Note: e.Note})
+	}
+	return ps, nil
+}
+
+// assignments makes the team list of the copy, and the members on it (once
+// each, in order) for the "my assignments" index.
+func (b *copyBuilder) assignments() ([]domain.PublishedAssignment, []domain.UserID, error) {
+	as, err := b.sc.cs.Assignments().ByLiturgy(b.ctx, b.l.ID)
+	if err != nil {
+		return nil, nil, err
+	}
+	var assignees []domain.UserID
 	seen := map[domain.UserID]bool{}
-	c.Assignments = make([]domain.PublishedAssignment, 0, len(as))
+	out := make([]domain.PublishedAssignment, 0, len(as))
 	for _, a := range as {
-		pa := domain.PublishedAssignment{Duty: domain.PublishedRef{ID: string(a.DutyID), Name: duties[string(a.DutyID)]}, Name: a.Name}
+		pa := domain.PublishedAssignment{Duty: domain.PublishedRef{ID: string(a.DutyID), Name: b.duties[string(a.DutyID)]}, Name: a.Name}
 		if a.UserID != "" {
 			pa.UserID = a.UserID
-			if u, err := sc.users.ByID(ctx, a.UserID); err == nil {
+			if u, err := b.sc.users.ByID(b.ctx, a.UserID); err == nil {
 				pa.Name = u.Name
 			} else if !errors.Is(err, ErrNotFound) {
 				return nil, nil, err
@@ -137,26 +184,24 @@ func buildPublished(ctx context.Context, sc churchScope, l domain.Liturgy) (cont
 				assignees = append(assignees, a.UserID)
 			}
 		}
-		c.Assignments = append(c.Assignments, pa)
+		out = append(out, pa)
 	}
-	content, err = encodeJSON(c)
-	if err != nil {
-		return nil, nil, err
-	}
-	if len(content) > domain.MaxPublishedBytes {
-		big := 0
-		for i := range sizes {
-			if sizes[i] > sizes[big] {
-				big = i
-			}
+	return out, assignees, nil
+}
+
+// tooLarge is the error of a copy over the cap; it names the largest item.
+func tooLarge(items []domain.Item, sizes []int) error {
+	big := 0
+	for i := range sizes {
+		if sizes[i] > sizes[big] {
+			big = i
 		}
-		title := ""
-		if len(items) > 0 {
-			title = items[big].Title
-		}
-		return nil, nil, &PublishTooLargeError{LargestItem: title}
 	}
-	return content, assignees, nil
+	title := ""
+	if len(items) > 0 {
+		title = items[big].Title
+	}
+	return &PublishTooLargeError{LargestItem: title}
 }
 
 func nameMap(ctx context.Context, r NameListRepo) (map[string]string, error) {

@@ -51,96 +51,7 @@ func (u *Liturgies) Redo(ctx context.Context, sess *domain.Session, id domain.Li
 
 func (u *Liturgies) step(ctx context.Context, sess *domain.Session, id domain.LiturgyID, undo bool) (UndoResult, error) {
 	var res UndoResult
-	err := u.Tx.Write(ctx, func(s Store) error {
-		// Always adds references (a restored item, song or assignment), so the church lock comes first.
-		sc, err := actorIn(ctx, s, sess, true)
-		if err != nil {
-			return err
-		}
-		if _, err := sc.openEdit(ctx, id); err != nil {
-			return err
-		}
-		// The history counter first: the test below then sees every committed edit (10 §5).
-		seq, err := sc.nextSeq(ctx, id)
-		if err != nil {
-			return err
-		}
-		l, err := sc.cs.Liturgies().ByID(ctx, id)
-		if err != nil {
-			return missing(err)
-		}
-		if !l.State.Editable() {
-			return ErrLiturgyLocked
-		}
-		var (
-			target domain.Edit
-			from   int // foreign rows count after this seq
-		)
-		if undo {
-			target, err = sc.cs.Edits().Newest(ctx, sc.actor.UserID, id, l.UndoFloorSeq, domain.UndoWindow)
-			from = target.Seq
-		} else {
-			target, err = sc.cs.Edits().NewestUndone(ctx, sc.actor.UserID, id, l.UndoFloorSeq)
-			from = target.UndoSeq
-		}
-		if errors.Is(err, ErrNotFound) {
-			if undo {
-				return &refusal{reason: UndoNothingToUndo}
-			}
-			return &refusal{reason: UndoNothingToRedo}
-		}
-		if err != nil {
-			return err
-		}
-		refuse := func(reason string) error {
-			r := &refusal{reason: reason}
-			switch {
-			case !undo:
-				r.drop = true
-			case domain.Skippable(target.Command):
-				r.skip = target.ID
-			}
-			return r
-		}
-		foreign, err := sc.cs.Edits().Foreign(ctx, id, from, sc.actor.UserID)
-		if err != nil {
-			return err
-		}
-		if slices.ContainsFunc(foreign, target.TouchedBy) {
-			return refuse(UndoChangedSince)
-		}
-		ap, err := u.apply(ctx, sc, l, target, undo)
-		var gone *UndoRefusedError
-		if errors.As(err, &gone) {
-			return refuse(gone.Reason)
-		}
-		if err != nil {
-			return err
-		}
-		cmd := domain.CmdRedo
-		if undo {
-			cmd = domain.CmdUndo
-		}
-		row := domain.Edit{Seq: seq, Command: cmd, TargetEditID: target.ID, ItemID: ap.item,
-			LiturgyVersionAfter: ap.liturgyVersion, ItemVersionAfter: ap.itemVersion}
-		if err := u.append(ctx, sc, id, row, ap.before, ap.after); err != nil {
-			return err
-		}
-		to, undoSeq, wasStatus := domain.EditUndone, seq, domain.EditDone
-		if !undo {
-			to, undoSeq, wasStatus = domain.EditDone, 0, domain.EditUndone
-		}
-		ok, err := sc.cs.Edits().SetStatus(ctx, target.ID, wasStatus, to, undoSeq)
-		if err != nil {
-			return err
-		}
-		if !ok { // cannot happen under the liturgy's row lock
-			return errors.New("undo: the edit changed status while it was being acted on")
-		}
-		target.Status, target.UndoSeq = to, undoSeq
-		res = UndoResult{Edit: target, LiturgyVersion: ap.liturgyVersion, ItemID: ap.item, ItemVersion: ap.itemVersion}
-		return nil
-	})
+	err := u.Tx.Write(ctx, func(s Store) error { return u.stepIn(ctx, s, sess, id, undo, &res) })
 	var ref *refusal
 	if !errors.As(err, &ref) {
 		return res, err
@@ -159,6 +70,108 @@ func (u *Liturgies) step(ctx context.Context, sess *domain.Session, id domain.Li
 		})
 	}
 	return res, &UndoRefusedError{Reason: ref.reason}
+}
+
+// stepIn is one undo or redo inside the transaction. A refusal is returned as
+// a *refusal, which rolls the transaction back; step then does the
+// bookkeeping of the refusal in a transaction of its own.
+func (u *Liturgies) stepIn(ctx context.Context, s Store, sess *domain.Session, id domain.LiturgyID, undo bool, res *UndoResult) error {
+	// Always adds references (a restored item, song or assignment), so the church lock comes first.
+	sc, err := actorIn(ctx, s, sess, true)
+	if err != nil {
+		return err
+	}
+	if _, err := sc.openEdit(ctx, id); err != nil {
+		return err
+	}
+	// The history counter first: the test below then sees every committed edit (10 §5).
+	seq, err := sc.nextSeq(ctx, id)
+	if err != nil {
+		return err
+	}
+	l, err := sc.cs.Liturgies().ByID(ctx, id)
+	if err != nil {
+		return missing(err)
+	}
+	if !l.State.Editable() {
+		return ErrLiturgyLocked
+	}
+	target, from, err := pickEdit(ctx, sc, l, undo)
+	if err != nil {
+		return err
+	}
+	foreign, err := sc.cs.Edits().Foreign(ctx, id, from, sc.actor.UserID)
+	if err != nil {
+		return err
+	}
+	if slices.ContainsFunc(foreign, target.TouchedBy) {
+		return refuseStep(target, undo, UndoChangedSince)
+	}
+	ap, err := u.apply(ctx, sc, l, target, undo)
+	var gone *UndoRefusedError
+	if errors.As(err, &gone) {
+		return refuseStep(target, undo, gone.Reason)
+	}
+	if err != nil {
+		return err
+	}
+	cmd := domain.CmdRedo
+	if undo {
+		cmd = domain.CmdUndo
+	}
+	row := domain.Edit{Seq: seq, Command: cmd, TargetEditID: target.ID, ItemID: ap.item,
+		LiturgyVersionAfter: ap.liturgyVersion, ItemVersionAfter: ap.itemVersion}
+	if err := u.append(ctx, sc, id, row, ap.before, ap.after); err != nil {
+		return err
+	}
+	to, undoSeq, wasStatus := domain.EditUndone, seq, domain.EditDone
+	if !undo {
+		to, undoSeq, wasStatus = domain.EditDone, 0, domain.EditUndone
+	}
+	ok, err := sc.cs.Edits().SetStatus(ctx, target.ID, wasStatus, to, undoSeq)
+	if err != nil {
+		return err
+	}
+	if !ok { // cannot happen under the liturgy's row lock
+		return errors.New("undo: the edit changed status while it was being acted on")
+	}
+	target.Status, target.UndoSeq = to, undoSeq
+	*res = UndoResult{Edit: target, LiturgyVersion: ap.liturgyVersion, ItemID: ap.item, ItemVersion: ap.itemVersion}
+	return nil
+}
+
+// pickEdit finds the edit to undo (the caller's newest one inside the window)
+// or to redo (the one undone last). from is the history position after which
+// other people's edits are looked at. Nothing to take is a refusal.
+func pickEdit(ctx context.Context, sc churchScope, l domain.Liturgy, undo bool) (target domain.Edit, from int, err error) {
+	if undo {
+		target, err = sc.cs.Edits().Newest(ctx, sc.actor.UserID, l.ID, l.UndoFloorSeq, domain.UndoWindow)
+		from = target.Seq
+	} else {
+		target, err = sc.cs.Edits().NewestUndone(ctx, sc.actor.UserID, l.ID, l.UndoFloorSeq)
+		from = target.UndoSeq
+	}
+	if errors.Is(err, ErrNotFound) {
+		if undo {
+			return target, from, &refusal{reason: UndoNothingToUndo}
+		}
+		return target, from, &refusal{reason: UndoNothingToRedo}
+	}
+	return target, from, err
+}
+
+// refuseStep is a refusal of an edit that is there. A redo that is refused
+// drops the stack of undone edits; an undo that is refused skips an edit
+// that is not structural, so the ones below it can still be undone.
+func refuseStep(target domain.Edit, undo bool, reason string) error {
+	r := &refusal{reason: reason}
+	switch {
+	case !undo:
+		r.drop = true
+	case domain.Skippable(target.Command):
+		r.skip = target.ID
+	}
+	return r
 }
 
 func gone() error    { return &UndoRefusedError{Reason: UndoReferenceGone} }
@@ -266,42 +279,60 @@ func songsOf(ctx context.Context, cs ChurchStore, img []songImage) ([]domain.Lit
 	for i, si := range img {
 		ls := domain.LiturgySong{ID: domain.ItemSongID(si.ID), Position: i, SongID: domain.SongID(si.SongID), SongTitle: si.SongTitle,
 			Key: si.Key, Note: si.Note, Entries: make([]domain.Entry, len(si.Entries))}
-		var sections map[domain.SectionID]bool
-		if ls.SongID != "" {
-			song, ok := cache[ls.SongID]
-			if !ok {
-				var err error
-				if song, err = cs.Songs().ByID(ctx, ls.SongID); err != nil {
-					if errors.Is(err, ErrNotFound) {
-						return nil, gone()
-					}
-					return nil, err
-				}
-				cache[ls.SongID] = song
-			}
-			sections = make(map[domain.SectionID]bool, len(song.Sections))
-			for _, sec := range song.Sections {
-				sections[sec.ID] = true
-			}
+		sections, err := sectionsOfSong(ctx, cs, ls.SongID, cache)
+		if err != nil {
+			return nil, err
 		}
 		for j, ei := range si.Entries {
-			if ei.SectionID != "" && !sections[domain.SectionID(ei.SectionID)] {
-				return nil, gone()
+			if ls.Entries[j], err = entryOf(ctx, cs, sections, ei, j); err != nil {
+				return nil, err
 			}
-			if ei.SingingPartID != "" {
-				if _, err := cs.SingingParts().ByID(ctx, ei.SingingPartID); err != nil {
-					if errors.Is(err, ErrNotFound) {
-						return nil, gone()
-					}
-					return nil, err
-				}
-			}
-			ls.Entries[j] = domain.Entry{ID: domain.EntryID(ei.ID), Position: j, SectionID: domain.SectionID(ei.SectionID),
-				SingingPartID: domain.SingingPartID(ei.SingingPartID), KeyChange: ei.KeyChange, Note: ei.Note, SectionLabel: ei.SectionLabel}
 		}
 		out[i] = ls
 	}
 	return out, nil
+}
+
+// sectionsOfSong returns the IDs of the sections the song has now. A song
+// that is gone is a refusal; no song means no sections.
+func sectionsOfSong(ctx context.Context, cs ChurchStore, id domain.SongID, cache map[domain.SongID]domain.Song) (map[domain.SectionID]bool, error) {
+	if id == "" {
+		return nil, nil
+	}
+	song, ok := cache[id]
+	if !ok {
+		var err error
+		if song, err = cs.Songs().ByID(ctx, id); err != nil {
+			if errors.Is(err, ErrNotFound) {
+				return nil, gone()
+			}
+			return nil, err
+		}
+		cache[id] = song
+	}
+	sections := make(map[domain.SectionID]bool, len(song.Sections))
+	for _, sec := range song.Sections {
+		sections[sec.ID] = true
+	}
+	return sections, nil
+}
+
+// entryOf rebuilds the entry at position pos. Its section must be one of
+// sections and its singing part must still exist; otherwise it is a refusal.
+func entryOf(ctx context.Context, cs ChurchStore, sections map[domain.SectionID]bool, ei entryImage, pos int) (domain.Entry, error) {
+	if ei.SectionID != "" && !sections[domain.SectionID(ei.SectionID)] {
+		return domain.Entry{}, gone()
+	}
+	if ei.SingingPartID != "" {
+		if _, err := cs.SingingParts().ByID(ctx, ei.SingingPartID); err != nil {
+			if errors.Is(err, ErrNotFound) {
+				return domain.Entry{}, gone()
+			}
+			return domain.Entry{}, err
+		}
+	}
+	return domain.Entry{ID: domain.EntryID(ei.ID), Position: pos, SectionID: domain.SectionID(ei.SectionID),
+		SingingPartID: domain.SingingPartID(ei.SingingPartID), KeyChange: ei.KeyChange, Note: ei.Note, SectionLabel: ei.SectionLabel}, nil
 }
 
 // applySongs puts the whole list of songs of an item back (or again).

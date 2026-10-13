@@ -60,51 +60,13 @@ func (u *Liturgies) Review(ctx context.Context, sess *domain.Session, id domain.
 		if err != nil {
 			return err
 		}
-		rule, ok := in.Action.Rule()
-		if !ok {
-			return &domain.InvalidInputError{Field: "action", Message: "Unknown action."}
-		}
-		if err := sc.actor.Require(rule.Scope); err != nil {
+		rule, note, expect, err := u.reviewAllowed(ctx, sc, l, in)
+		if err != nil {
 			return err
-		}
-		note := in.Note
-		if err := domain.ValidateNote(&note); err != nil {
-			return err
-		}
-		if rule.NeedsSeq && in.EditSeq == nil {
-			return &domain.InvalidInputError{Field: "edit_seq", Message: "Required."}
-		}
-		if !rule.Allowed(l.State) {
-			return &InvalidTransitionError{State: l.State}
-		}
-		if l.ArchivedAt != nil {
-			return ErrLiturgyArchived
-		}
-		if in.Action == domain.ActionReopen && l.State == domain.StatePublished {
-			lim, err := u.limits(ctx)
-			if err != nil {
-				return err
-			}
-			if err := lim.check(ctx, sc.cs, 1, LimitMaxUnpublishedLiturgies); err != nil {
-				return err
-			}
-		}
-		expect := l.EditSeq
-		if rule.NeedsSeq {
-			expect = *in.EditSeq
 		}
 		if in.Action == domain.ActionSubmit {
-			// The check and the update see the same edit_seq: an edit between them
-			// leaves the update without a row (12 §2, P-69).
-			items, err := sc.cs.LiturgyItems().ByLiturgy(ctx, id)
-			if err != nil {
+			if err := reviewSubmitChecks(ctx, sc, id); err != nil {
 				return err
-			}
-			if len(items) == 0 {
-				return ErrEmptyLiturgy
-			}
-			if p := domain.Problems(items); len(p) > 0 {
-				return &HasProblemsError{Problems: p}
 			}
 		}
 		now := u.Clock.Now()
@@ -113,18 +75,7 @@ func (u *Liturgies) Review(ctx context.Context, sess *domain.Session, id domain.
 			return err
 		}
 		if !ok {
-			// Gone, in another state, or changed since: the state wins (12 §2).
-			cur, err := sc.cs.Liturgies().ByID(ctx, id)
-			if err != nil {
-				return missing(err)
-			}
-			switch {
-			case cur.State != l.State:
-				return &InvalidTransitionError{State: cur.State}
-			case cur.ArchivedAt != nil:
-				return ErrLiturgyArchived
-			}
-			return ErrReviewStale
+			return explainNoTransition(ctx, sc, id, l.State)
 		}
 		if err := sc.cs.StateChanges().Append(ctx, domain.StateChange{ID: domain.StateChangeID(u.IDs.NewID()), LiturgyID: id,
 			From: l.State, To: rule.To, UserID: sc.actor.UserID, Note: note, EditSeq: seq, CreatedAt: now}); err != nil {
@@ -150,6 +101,82 @@ func (u *Liturgies) Review(ctx context.Context, sess *domain.Session, id domain.
 		return err
 	})
 	return res, err
+}
+
+// reviewAllowed checks everything that can be known before the state is
+// changed, in this order: the action, the caller's scope, the note, the
+// edit_seq, the current state, archiving and, for reopening a published
+// liturgy, the limit. It returns the rule, the trimmed note and the edit_seq
+// the conditional update must still see.
+func (u *Liturgies) reviewAllowed(ctx context.Context, sc churchScope, l domain.Liturgy, in ReviewInput) (rule domain.ReviewRule, note string, expect int, err error) {
+	rule, ok := in.Action.Rule()
+	if !ok {
+		return rule, "", 0, &domain.InvalidInputError{Field: "action", Message: "Unknown action."}
+	}
+	if err := sc.actor.Require(rule.Scope); err != nil {
+		return rule, "", 0, err
+	}
+	note = in.Note
+	if err := domain.ValidateNote(&note); err != nil {
+		return rule, "", 0, err
+	}
+	if rule.NeedsSeq && in.EditSeq == nil {
+		return rule, "", 0, &domain.InvalidInputError{Field: "edit_seq", Message: "Required."}
+	}
+	if !rule.Allowed(l.State) {
+		return rule, "", 0, &InvalidTransitionError{State: l.State}
+	}
+	if l.ArchivedAt != nil {
+		return rule, "", 0, ErrLiturgyArchived
+	}
+	if in.Action == domain.ActionReopen && l.State == domain.StatePublished {
+		lim, err := u.limits(ctx)
+		if err != nil {
+			return rule, "", 0, err
+		}
+		if err := lim.check(ctx, sc.cs, 1, LimitMaxUnpublishedLiturgies); err != nil {
+			return rule, "", 0, err
+		}
+	}
+	expect = l.EditSeq
+	if rule.NeedsSeq {
+		expect = *in.EditSeq
+	}
+	return rule, note, expect, nil
+}
+
+// reviewSubmitChecks refuses to submit a liturgy with no items or with
+// problems. The check and the update see the same edit_seq: an edit between
+// them leaves the update without a row (12 §2, P-69).
+func reviewSubmitChecks(ctx context.Context, sc churchScope, id domain.LiturgyID) error {
+	items, err := sc.cs.LiturgyItems().ByLiturgy(ctx, id)
+	if err != nil {
+		return err
+	}
+	if len(items) == 0 {
+		return ErrEmptyLiturgy
+	}
+	if p := domain.Problems(items); len(p) > 0 {
+		return &HasProblemsError{Problems: p}
+	}
+	return nil
+}
+
+// explainNoTransition says why the conditional update found no row: the
+// liturgy is gone, in another state or archived, or it changed since the
+// reviewer saw it. The state wins (12 §2).
+func explainNoTransition(ctx context.Context, sc churchScope, id domain.LiturgyID, was domain.LiturgyState) error {
+	cur, err := sc.cs.Liturgies().ByID(ctx, id)
+	if err != nil {
+		return missing(err)
+	}
+	switch {
+	case cur.State != was:
+		return &InvalidTransitionError{State: cur.State}
+	case cur.ArchivedAt != nil:
+		return ErrLiturgyArchived
+	}
+	return ErrReviewStale
 }
 
 // StateChangePage is one page of the review history.
