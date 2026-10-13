@@ -18,7 +18,7 @@ On 2026-10-13, `main` at `024fa06`, Go 1.27, with `golangci-lint` v2.14.0 and ex
 | Unused parameters (`unparam`) | 2: `paste.Build` (an unused result), `domain.validateName` (`field` is always `"name"`) |
 | Largest Go files | `app/imports.go` 753, `sqlstore/liturgies.go` 733, `httpapi/liturgy_ops.go` 631, `app/ports.go` 623 |
 | Largest web files | `MembersPage.tsx` 321, then under 300 |
-| Packages without a package comment | `cmd/liturgist` (all others have one) |
+| Packages without a package comment | None. (The survey first reported `cmd/liturgist`; it has a "Command liturgist …" comment, and the check had looked only for the "Package" form.) |
 | Statement coverage, SQLite only, across packages | 86.1 %; the functions in §2 are 72 % to 99 % |
 
 The code is in good shape. The candidates are a short list of long functions, most of them *registration* functions (a flat list of operations) or *parsers*.
@@ -55,7 +55,7 @@ The code is in good shape. The candidates are a short list of long functions, mo
 | R-3 | **Slice B (importers).** Split `Parse`, `parseSong` and `Build` into stages (read, build sections, derive title and key) with plain data between them. Guard: the existing importer tests with their sample files, which cover 91–99 % | **Approved** 2026-10-13 |
 | R-4 | **Slice C (use cases), in three slices:** C1 publishing and review (`buildPublished`, `Review`, `songsOf`, `step`); C2 editing (`UpdateItem`, `SetSongs`, `AddAssignment`, `PrepareCreateArchiving`); C3 import, setup and login (`Imports.Create`, `Decide`, `Setup.Run`, `Auth.Login`). **Before moving code, every function below 85 % covered gets characterization tests first** (`AddAssignment`, `PrepareCreateArchiving`, `songsOf`, `Setup.Run`, `Review`, `buildPublished`, `Login`), in its own commit so the old behaviour is pinned. Each extracted helper keeps working inside the same transaction closure; the call to `actorIn(..., lock)` stays first | **Approved** 2026-10-13 |
 | R-5 | **Slice D, only part of it.** Do `cmd/liturgist.run` (a table of commands; adds in-process tests, since it is 47 % covered). **Leave `MapError`** (a flat table of cases is clear as it is) **and `server.Restore`** (staged and commented; splitting it moves risk into the one command that must never fail) | **Approved** 2026-10-13 |
-| R-6 | **Tidy slice.** Remove the two `unparam` findings; add the missing package comment to `cmd/liturgist` | **Approved** 2026-10-13 |
+| R-6 | **Tidy slice.** Remove the two `unparam` findings. (The package comment of `cmd/liturgist` named here exists already; see §1) | **Approved** 2026-10-13 |
 | R-7 | **Publication readiness (no code moves).** (a) State in `README.md` and in the package comments of `domain`, `app` and `server` that the Go API is **pre-1.0 with no stability promise**; (b) say that `go install` is not an install method (the web app is not in git; use Docker or a release); (c) list which packages are meant to be imported (`domain`, `app`, `server`, `adapters/*`) and that `internal/` is not; (d) tag `v0.1.0-rc1` after the slices, then `v0.1.0` | **Approved** 2026-10-13 |
 | R-8 | **No new lint rule now.** After slice C the survey is run again and its numbers go into §6; whether to switch `gocognit` on at a lenient limit (50) in `.golangci.yml` is the owner's call then | **Approved** 2026-10-13 |
 | R-9 | **A second edition's contract.** Add a short section to `README.md` and to the package comment of `server` that says what the hosted edition (`liturgist-saas`) may depend on: **the composition seam** (`server.New` with the options `WithRoutes`, `WithTenantResolver`, `WithEntitlements`, `WithURLBuilder`, `WithStorage`, `WithEventBus`, `WithNotifier`, `WithBibleTextProvider` and `WithImporter`, and the exported `httpapi.Register*` functions) and the **extension ports** behind those options (`Entitlements`, `URLBuilder`, `Storage`, `EventBus`, `Notifier`, `BibleTextProvider`, `Importer`, `httpapi.TenantResolver`). `AuthProvider` and `Exporter` are declared in `app/extensions.go` but no option wires them (nothing calls them yet), so they are **not** part of the contract until one does. Everything else in `app` and `domain` is reachable but not part of that contract. Rules for the ports: keep each as small as possible; add a new capability as a **new optional interface** that the caller checks for, not as a new method on an existing one; every change to a port is listed under **Ports** in `CHANGELOG.md` (04 §7). Add a CI job to `liturgist-saas` (outside this repository) that builds it against core `main` every night, so a break is seen on the day it happens | **Approved** 2026-10-13 |
@@ -119,3 +119,20 @@ Each slice is drafted in its own worktree and waits for the owner's approval, as
 | Extension points and the stability promise to `liturgist-saas` | [04 §7](04-tenancy-extensions.md#7-extension-points) |
 | SaaS hosting, tenancy and editions | [SPEC §8.1.1 and §8.2](../SPEC.md#811-saas-multi-church-hosting-moves-to-liturgist-saas) |
 | Entitlements and limits | [04 §8](04-tenancy-extensions.md#8-entitlements) |
+
+## 8. Slice 16A as built (2026-10-13)
+
+| Part | Where |
+|---|---|
+| Each long `Register…` function is a list of calls to group functions; the handler code moved unchanged. `RegisterLiturgies`: week, open, change, item edits, item songs, assignments, undo, review, history. `RegisterChurch`: setup, church settings, members, roles, invites, password reset. `RegisterPlanning`: name lists, templates, services. `RegisterLibrary`: readings, imports, songs, song links. `registerImports`: batches, candidates, finish. `registerReadings`: lookup, browse, write | `adapters/httpapi/*_ops.go` |
+| Shared helpers `failer`, `sessionOf`, `actorOf`, `churchOp` replace five copies of the same closures; `liturgyPath` and `readingResult` moved to package level | `adapters/httpapi/register.go`, `liturgy_ops.go`, `readings_ops.go` |
+| Two `unparam` findings: the unused result of `paste.Build`'s `add`, and the `field` parameter of `domain.validateName` (always `"name"`) | `adapters/importers/paste/build.go`, `domain/planning.go`, `domain/liturgy.go` |
+
+**Deviations from the plan**
+- Groups are 40 to 100 lines, not "about 60": one handler is 20 to 30 lines. The longest function in `httpapi` is 103 lines (it was 151).
+- `removeAssignment` moved into the assignments group (it was registered last). Registration order is not observable through the API; the byte-identical check covers it.
+- The package comment of `cmd/liturgist` was not missing (see §1).
+
+**Guards:** `make gen` gave a byte-identical `openapi.json` and `schema.d.ts`; 102 operations before and after; `TestTenancyDeclarations` unchanged; uncovered statements in `httpapi` 93 before and 93 after (merged profile, SQLite); the whole suite with `-race` on SQLite and PostgreSQL (22 packages); `golangci-lint` 0 issues. Survey after the slice: cognitive-complexity findings in `httpapi` 3 → 0 (`RegisterLiturgies` was 101), over-long functions in `httpapi` 3 → 0, repo-wide gocognit 19 → 16; `MapError` unchanged by plan ([R-5]).
+
+**Incident:** the WIP commit of this slice was made on `main` by mistake (a background command does not keep its working directory, and `git add -A` ran in the main checkout). It held only `.claude/skills/stream-coding/SKILL.md` and `docs/impl/step3-adversarial-review.md`, was never pushed, and was undone by the owner with `git reset --mixed`. From then on `git -C <worktree>` and explicit paths are used for every commit from a background shell.
