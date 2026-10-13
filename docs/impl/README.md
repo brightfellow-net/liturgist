@@ -65,6 +65,14 @@ After step 6: a church admin uploads a logo that appears left of the church name
 |---|---|
 | [15-church-logo.md](15-church-logo.md) | Upload, image checks, storage, serving route, settings section, display |
 
+## 1f. Documents for the refactoring before the first release
+
+Behaviour-preserving clean-up of the longest functions and a few publication-readiness items. **Status: decisions R-1 to R-11 Approved** 2026-10-13 ([16 §3](16-refactoring.md#3-decisions)); no slice drafted yet.
+
+| Document | Covers |
+|---|---|
+| [16-refactoring.md](16-refactoring.md) | What was measured, the candidates, slices 16A to 16E, guards |
+
 ## 2. How to use these documents
 
 - **Required reading before writing any step-1 code:** [SPEC.md](../SPEC.md) and **every** document in the table above. This index alone is not a specification.
