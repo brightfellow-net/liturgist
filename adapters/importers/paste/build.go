@@ -72,120 +72,146 @@ type labelKey struct {
 	number int
 }
 
+// builder holds what Build has worked out so far.
+type builder struct {
+	language   string
+	r          Result
+	maxVerse   int              // highest verse number written or given out
+	unlabelled map[string]int   // how often each unlabelled text occurs (rule 4)
+	byText     map[string]int   // folded text → section index
+	byLabel    map[labelKey]int // written label → section index
+	usedVerse  map[int]bool     // verse numbers given out
+	repeated   bool
+}
+
+func (b *builder) fold(s string) string { return domain.FoldFor(b.language, s) }
+
+func (b *builder) warn(code string) {
+	for _, w := range b.r.Warnings {
+		if w == code {
+			return
+		}
+	}
+	b.r.Warnings = append(b.r.Warnings, code)
+}
+
+// add appends a section and puts it in the arrangement.
+func (b *builder) add(sec domain.DraftSection, key *labelKey) {
+	b.r.Sections = append(b.r.Sections, sec)
+	i := len(b.r.Sections) - 1
+	b.byText[b.fold(sec.Text)] = i
+	if key != nil {
+		if _, ok := b.byLabel[*key]; !ok {
+			b.byLabel[*key] = i
+		}
+	}
+	b.r.Arrangement = append(b.r.Arrangement, i)
+}
+
+// repeat puts an earlier section in the arrangement again.
+func (b *builder) repeat(i int) {
+	b.repeated = true
+	b.r.Arrangement = append(b.r.Arrangement, i)
+}
+
+func (b *builder) nextVerse() int {
+	b.maxVerse++
+	return b.maxVerse
+}
+
 // Build turns blocks into sections and an arrangement (08 §4.1 rules 3 to 6).
 func Build(items []Item, language string) Result {
-	var r Result
-	warn := func(code string) {
-		for _, w := range r.Warnings {
-			if w == code {
-				return
-			}
-		}
-		r.Warnings = append(r.Warnings, code)
-	}
-	fold := func(s string) string { return domain.FoldFor(language, s) }
-
-	// Highest verse number the writer used; unlabelled verses count on from it.
-	maxVerse := 0
+	b := &builder{language: language, unlabelled: map[string]int{}, byText: map[string]int{},
+		byLabel: map[labelKey]int{}, usedVerse: map[int]bool{}}
 	for _, it := range items {
-		if it.Labelled && it.Kind == domain.SectionVerse && it.Number > maxVerse {
-			maxVerse = it.Number
+		// Highest verse number the writer used; unlabelled verses count on from it.
+		if it.Labelled && it.Kind == domain.SectionVerse && it.Number > b.maxVerse {
+			b.maxVerse = it.Number
+		}
+		if !it.Labelled && b.fold(it.Text) != "" {
+			b.unlabelled[b.fold(it.Text)]++
 		}
 	}
-	// How often each unlabelled text occurs (rule 4).
-	unlabelled := map[string]int{}
-	for _, it := range items {
-		if !it.Labelled && fold(it.Text) != "" {
-			unlabelled[fold(it.Text)]++
-		}
-	}
-
-	byText := map[string]int{}    // folded text → section index
-	byLabel := map[labelKey]int{} // written label → section index
-	usedVerse := map[int]bool{}   // verse numbers given out
-	repeated := false
-	add := func(sec domain.DraftSection, key *labelKey) {
-		r.Sections = append(r.Sections, sec)
-		i := len(r.Sections) - 1
-		byText[fold(sec.Text)] = i
-		if key != nil {
-			if _, ok := byLabel[*key]; !ok {
-				byLabel[*key] = i
-			}
-		}
-		r.Arrangement = append(r.Arrangement, i)
-	}
-	repeat := func(i int) {
-		repeated = true
-		r.Arrangement = append(r.Arrangement, i)
-	}
-	nextVerse := func() int {
-		maxVerse++
-		return maxVerse
-	}
-
 	for _, it := range items {
 		text := domain.NormalizeLyrics(it.Text)
 		if it.Labelled {
-			key := labelKey{it.Kind, it.Number}
-			if it.Kind != domain.SectionVerse {
-				key.number = 0
-			}
-			if fold(text) == "" {
-				if i, ok := byLabel[key]; ok {
-					repeat(i)
-				}
-				continue
-			}
-			if i, ok := byLabel[key]; ok && fold(r.Sections[i].Text) == fold(text) {
-				repeat(i)
-				continue
-			}
-			sec := domain.DraftSection{Kind: it.Kind, Label: it.Label, Text: text}
-			switch {
-			case it.Kind != domain.SectionVerse:
-				if it.NumberSet {
-					warn(domain.WarnNumberDropped)
-				}
-			case !it.NumberSet || usedVerse[it.Number]:
-				sec.Number = nextVerse()
-				if it.NumberSet {
-					warn(domain.WarnVerseRenumbered)
-				} else {
-					warn(domain.WarnBlocksNumbered)
-				}
-			default:
-				sec.Number = it.Number
-			}
-			if sec.Kind == domain.SectionVerse {
-				usedVerse[sec.Number] = true
-			}
-			add(sec, &key)
-			continue
+			b.labelled(it, text)
+		} else {
+			b.unlabelledBlock(text)
 		}
-		f := fold(text)
-		if f == "" {
-			continue
-		}
-		if i, ok := byText[f]; ok {
-			repeat(i)
-			continue
-		}
-		if unlabelled[f] >= 2 {
-			warn(domain.WarnChorusGuessed)
-			add(domain.DraftSection{Kind: domain.SectionChorus, Text: text}, nil)
-			continue
-		}
-		warn(domain.WarnBlocksNumbered)
-		n := nextVerse()
-		usedVerse[n] = true
-		add(domain.DraftSection{Kind: domain.SectionVerse, Number: n, Text: text}, nil)
 	}
-	if !repeated {
-		r.Arrangement = nil
+	if !b.repeated {
+		b.r.Arrangement = nil
 	}
-	r.TooMany = len(r.Sections) > domain.MaxImportSections
-	return r
+	b.r.TooMany = len(b.r.Sections) > domain.MaxImportSections
+	return b.r
+}
+
+// labelled handles a block the writer gave a label (rule 3).
+func (b *builder) labelled(it Item, text string) {
+	key := labelKey{it.Kind, it.Number}
+	if it.Kind != domain.SectionVerse {
+		key.number = 0
+	}
+	if b.fold(text) == "" {
+		if i, ok := b.byLabel[key]; ok {
+			b.repeat(i)
+		}
+		return
+	}
+	if i, ok := b.byLabel[key]; ok && b.fold(b.r.Sections[i].Text) == b.fold(text) {
+		b.repeat(i)
+		return
+	}
+	sec := domain.DraftSection{Kind: it.Kind, Label: it.Label, Text: text}
+	b.number(&sec, it)
+	if sec.Kind == domain.SectionVerse {
+		b.usedVerse[sec.Number] = true
+	}
+	b.add(sec, &key)
+}
+
+// number gives a new section the number it keeps (rule 6): a verse keeps its
+// written number unless that is missing or already taken; other kinds have none.
+func (b *builder) number(sec *domain.DraftSection, it Item) {
+	switch {
+	case it.Kind != domain.SectionVerse:
+		if it.NumberSet {
+			b.warn(domain.WarnNumberDropped)
+		}
+	case !it.NumberSet || b.usedVerse[it.Number]:
+		sec.Number = b.nextVerse()
+		if it.NumberSet {
+			b.warn(domain.WarnVerseRenumbered)
+		} else {
+			b.warn(domain.WarnBlocksNumbered)
+		}
+	default:
+		sec.Number = it.Number
+	}
+}
+
+// unlabelledBlock handles a block without a label (rules 4 and 5): a text
+// seen before repeats its section, a text seen twice or more is a chorus,
+// anything else is the next verse.
+func (b *builder) unlabelledBlock(text string) {
+	f := b.fold(text)
+	if f == "" {
+		return
+	}
+	if i, ok := b.byText[f]; ok {
+		b.repeat(i)
+		return
+	}
+	if b.unlabelled[f] >= 2 {
+		b.warn(domain.WarnChorusGuessed)
+		b.add(domain.DraftSection{Kind: domain.SectionChorus, Text: text}, nil)
+		return
+	}
+	b.warn(domain.WarnBlocksNumbered)
+	n := b.nextVerse()
+	b.usedVerse[n] = true
+	b.add(domain.DraftSection{Kind: domain.SectionVerse, Number: n, Text: text}, nil)
 }
 
 // CharCount is a helper for callers that limit pasted text.
