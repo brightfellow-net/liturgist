@@ -67,7 +67,7 @@ After step 6: a church admin uploads a logo that appears left of the church name
 
 ## 1f. Documents for the refactoring before the first release
 
-Behaviour-preserving clean-up of the longest functions and a few publication-readiness items. **Status: decisions R-1 to R-11 Approved** 2026-10-13 ([16 §3](16-refactoring.md#3-decisions)); slice 16A (HTTP registration) **merged** 2026-10-13 ([16 §8](16-refactoring.md#8-slice-16a-as-built-2026-10-13)); 16B to 16E not drafted.
+Behaviour-preserving clean-up of the longest functions and a few publication-readiness items. **Status: decisions R-1 to R-11 Approved** 2026-10-13 ([16 §3](16-refactoring.md#3-decisions)); slice 16A (HTTP registration) **merged** 2026-10-13 ([16 §8](16-refactoring.md#8-slice-16a-as-built-2026-10-13)); 16B (importers) **merged** 2026-10-13 ([16 §9](16-refactoring.md#9-slice-16b-as-built-2026-10-13)); 16C to 16E not drafted.
 
 | Document | Covers |
 |---|---|

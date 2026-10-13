@@ -136,3 +136,19 @@ Each slice is drafted in its own worktree and waits for the owner's approval, as
 **Guards:** `make gen` gave a byte-identical `openapi.json` and `schema.d.ts`; 102 operations before and after; `TestTenancyDeclarations` unchanged; uncovered statements in `httpapi` 93 before and 93 after (merged profile, SQLite); the whole suite with `-race` on SQLite and PostgreSQL (22 packages); `golangci-lint` 0 issues. Survey after the slice: cognitive-complexity findings in `httpapi` 3 → 0 (`RegisterLiturgies` was 101), over-long functions in `httpapi` 3 → 0, repo-wide gocognit 19 → 16; `MapError` unchanged by plan ([R-5]).
 
 **Incident:** the WIP commit of this slice was made on `main` by mistake (a background command does not keep its working directory, and `git add -A` ran in the main checkout). It held only `.claude/skills/stream-coding/SKILL.md` and `docs/impl/step3-adversarial-review.md`, was never pushed, and was undone by the owner with `git reset --mixed`. From then on `git -C <worktree>` and explicit paths are used for every commit from a background shell.
+
+## 9. Slice 16B as built (2026-10-13)
+
+| Part | Where |
+|---|---|
+| `Build` is a `builder` with named steps: `add`, `repeat`, `nextVerse`, `labelled` (rule 3), `number` (the verse numbering), `unlabelledBlock` (rules 4 and 5); the two scans before the main loop became one | `adapters/importers/paste/build.go` |
+| `parseSong` is a `songParser`: `line`, `directive`, `startBlock`, `closeBlock`, `flushLoose`, `finish` | `adapters/importers/chordpro/chordpro.go` |
+| `Parse` is `read` (a `reader` with `start`, `end`, `chars` that fills a `raw`) and `draftOf` (a `drafter` with `metadata`, `items`, `arrangement`) | `adapters/importers/openlyrics/openlyrics.go` |
+
+The code inside each step is the original, moved; the extra field is only the state that the closures shared.
+
+**Guard.** These are pure functions, so the old and new code were compared on generated inputs, 40 000 per importer: random block and label sequences for `paste.Build`; random directive files for ChordPro (tab and grid blocks, unclosed blocks, `{new_song}`, bad keys and CCLI numbers); generated XML for OpenLyrics (truncated, wrong root, DOCTYPE, bad entity, unsupported encoding, text split by XML comments, verse orders that do and do not match). Every candidate, warning and error was identical. The comparison was checked by making twelve deliberate behaviour changes in the new code: nine were noticed at once; one (a property or title split into several XML tokens) was not, and the generator was extended until it was; two are equivalent changes, because the original has two redundant guards (`#` lines inside a skipped block can never match the directive pattern, and `seenDirective` repeats what `warn` already does). Per R-1 those guards stay. The temporary copy of the old code and the comparison were deleted and not committed.
+
+**Other checks:** the existing importer tests; `go test -race` for the importers, `app` (its import tests) and `server`; uncovered importer statements 29 before and 25 after (merged profile); `golangci-lint` 0 issues. Survey after the slice: no findings in the importer packages; repo-wide gocognit 19 at the start, 13 now; nestif 3, now 1.
+
+**Not done:** no PostgreSQL run (the importers touch no database; the `app` import tests ran on SQLite); no permanent differential test, since it needs the old code; `paste.CharCount` has no callers or tests and was left alone (not in the plan).
