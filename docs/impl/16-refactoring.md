@@ -152,3 +152,20 @@ The code inside each step is the original, moved; the extra field is only the st
 **Other checks:** the existing importer tests; `go test -race` for the importers, `app` (its import tests) and `server`; uncovered importer statements 29 before and 25 after (merged profile); `golangci-lint` 0 issues. Survey after the slice: no findings in the importer packages; repo-wide gocognit 19 at the start, 13 now; nestif 3, now 1.
 
 **Not done:** no PostgreSQL run (the importers touch no database; the `app` import tests ran on SQLite); no permanent differential test, since it needs the old code; `paste.CharCount` has no callers or tests and was left alone (not in the plan).
+
+## 10. Slice 16C.1 as built (2026-10-13): publishing, review, undo
+
+| Part | Where |
+|---|---|
+| `buildPublished` is a `copyBuilder` with `item`, `song`, `assignments` and a `tooLarge` function; the repository calls are in the same order | `app/liturgy_publish.go` |
+| `Review` calls `reviewAllowed` (the checks, in their old order), `reviewSubmitChecks` and `explainNoTransition` | `app/liturgy_review.go` |
+| `step` is the transaction call and the bookkeeping of a refusal; `stepIn` is one undo or redo, with `pickEdit` and `refuseStep` | `app/liturgy_undo.go` |
+| `songsOf` calls `sectionsOfSong` and `entryOf` | `app/liturgy_undo.go` |
+
+**Tests first (their own commits):** `TestUndoRestoresSongs` (songs, sequence, keys and notes come back), `TestUndoSongReferencesGone` (refused with `reference_gone` when the song, a section or the singing part was deleted, nothing restored), `TestReviewUnknownAction`, `TestPublishSizeNamesLargestItem` (the largest item is named when it is not the first), `TestPublishMemberWithTwoDuties` (twice on the copy, once in the index). Each was checked to reach the line it was written for before any code moved.
+
+**Mutation checks (17):** 11 caught. 6 survived, and each is a guard that is redundant or defensive in the original too: the archived check in `reviewAllowed` (the conditional update refuses an archived liturgy anyway, and `explainNoTransition` then says so); the "state changed meanwhile" branch of `explainNoTransition` (not reached by four concurrent publishers on PostgreSQL either, because the row lock serializes them; it would need fault injection in the store); the start position of a redo (a foreign edit that touches the item cannot lie between the edit and its undo, or the undo would have been refused); the editable check in `stepIn` (`openEdit` refuses first); the empty song ID guard of `sectionsOfSong` (a song in use cannot be deleted); the song cache (only an optimisation). One more survivor, the de-duplication of members on the copy, had no test; `TestPublishMemberWithTwoDuties` caught it afterwards.
+
+**Other checks:** `go test -race` on `app`, SQLite and PostgreSQL (379 s); the server tests on SQLite; `golangci-lint` 0 issues; uncovered statements in the three files 136 before, 130 after (merged profile, SQLite). Survey: no findings left in these files; repo-wide gocognit 19 at the start, 9 now.
+
+**Not done:** the defensive branches above are not pinned; `AddAssignment`, `PrepareCreateArchiving`, `Setup.Run` and `Auth.Login` belong to 16C.2 and 16C.3, with tests first.
